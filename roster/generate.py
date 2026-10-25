@@ -5,6 +5,8 @@ import json
 import os
 from pathlib import Path
 import re
+import secrets
+import stat
 import sys
 import tomllib
 
@@ -250,15 +252,69 @@ def contain(files, out):
             refuse(path, 'not a regular file')
 
 
-def write(path, text):
-    """Write only on change so a re-run touches nothing; return whether the file changed."""
-    if path.exists() and path.read_text(encoding='utf-8') == text:
-        return False
-    path.parent.mkdir(parents=True, exist_ok=True)
-    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o644)
-    with open(descriptor, 'w', encoding='utf-8') as handle:
-        handle.write(text)
-    return True
+DIR_FLAGS = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+
+
+def open_root(root):
+    """Open a resolved directory, creating it if missing, as the anchor no later write re-resolves."""
+    root.mkdir(parents=True, exist_ok=True)
+    return os.open(root, DIR_FLAGS)
+
+
+def open_parent(root_fd, parts):
+    """Walk and create directories one component at a time below root_fd, never following a symlink."""
+    fd = os.dup(root_fd)
+    for part in parts:
+        try:
+            os.mkdir(part, 0o755, dir_fd=fd)
+        except FileExistsError:
+            pass
+        try:
+            child = os.open(part, DIR_FLAGS, dir_fd=fd)
+        finally:
+            os.close(fd)
+        fd = child
+    return fd
+
+
+def current_text(name, dir_fd):
+    try:
+        fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=dir_fd)
+    except FileNotFoundError:
+        return None
+    with open(fd, 'rb') as handle:
+        if not stat.S_ISREG(os.fstat(fd).st_mode):
+            return None
+        return handle.read().decode('utf-8', errors='replace')
+
+
+def write(root_fd, relative, text):
+    """Write only on change so a re-run touches nothing; return whether the file changed.
+
+    The new content goes to a fresh, exclusively created temporary file that is renamed over the entry, so
+    an existing inode (perhaps hard-linked elsewhere) is never truncated, and every step is relative to a
+    directory descriptor so no path string is re-resolved after the preflight.
+    """
+    *parents, name = relative.parts
+    dir_fd = open_parent(root_fd, parents)
+    try:
+        if current_text(name, dir_fd) == text:
+            return False
+        temp = f'.{name}.{secrets.token_hex(8)}.tmp'
+        fd = os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o644, dir_fd=dir_fd)
+        try:
+            with open(fd, 'w', encoding='utf-8') as handle:
+                handle.write(text)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temp, name, src_dir_fd=dir_fd, dst_dir_fd=dir_fd)
+        except BaseException:
+            os.unlink(temp, dir_fd=dir_fd)
+            raise
+        os.fsync(dir_fd)
+        return True
+    finally:
+        os.close(dir_fd)
 
 
 def main():
@@ -285,10 +341,19 @@ def main():
     for path in in_place:
         if path.is_symlink() or path.resolve() != path:
             refuse(path, 'the in-repo table is or sits under a symlink')
-    files = {**generated, **in_place}
-    for path, text in files.items():
-        shown = path.relative_to(ROOT) if path.is_relative_to(ROOT) else path
-        print(f'{"wrote" if write(path, text) else "unchanged"} {shown}')
+    # Writes walk from these resolved anchors by descriptor, so a path swapped after the preflight is not followed.
+    for anchor, files, base in ((out.resolve(), generated, out), (ROOT, in_place, ROOT)):
+        root_fd = open_root(anchor)
+        try:
+            for path, text in files.items():
+                shown = path.relative_to(ROOT) if path.is_relative_to(ROOT) else path
+                try:
+                    changed = write(root_fd, path.relative_to(base), text)
+                except OSError as error:
+                    raise SystemExit(f'generate.py: stopped at {path}: {error}')
+                print(f'{"wrote" if changed else "unchanged"} {shown}')
+        finally:
+            os.close(root_fd)
     return 0
 
 

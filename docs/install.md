@@ -34,9 +34,12 @@ sign-in status, notes and any refusals. It exits 2 when something is refused;
 
 Before reading or writing anything, every target, state and backup path is
 checked to lie below the selected home with no symlinked or non-directory
-component; a symlinked `~/.codex`, for example, is refused. `--uninstall` runs the
-same check on every path in the manifest, and refuses a manifest entry that is
-absolute, contains `..` or lies outside the managed roots.
+component; a symlinked `~/.codex`, for example, is refused. A target or backup
+that is a regular file with more than one hard link is refused too, before it is
+read, backed up or replaced, because its contents also live outside the managed
+path. `--uninstall` runs the same checks on every path in the manifest, and
+refuses a manifest entry that is absolute, contains `..` or lies outside the
+managed roots.
 
 | Option | Effect |
 | --- | --- |
@@ -90,7 +93,8 @@ model_reasoning_effort = "high"
 The root block sits before the first table. The `agents` and `features` blocks
 go inside an existing `[agents]` or `[features]` table, or carry their own
 header at the end of the file. The `hooks.state` block holds one table per Orca
-hook. A statement Codex adds inside a block is kept, outside it, on the next run.
+hook. A statement, comment or blank line added inside a block is kept byte for
+byte, in order, just after the block on the next run and on uninstall.
 A block that carries its own table header keeps that header on uninstall when a
 foreign key inside or just after it still needs it, so such keys stay in their
 table. Markers count only as comment lines between statements, never as text
@@ -176,7 +180,8 @@ renamed into place.
 - removes only the managed blocks and keys from `config.toml`, `settings.json`
   and `~/.claude.json`, restoring their previous values and putting adopted
   original lines back, and keeps every later change; a file the installer created
-  and nobody changed is removed;
+  is removed only when nothing but its owned keys and blocks is left in it,
+  otherwise the rest stays in place and is reported as kept;
 - restores the previous Orca app settings through the helper, unless they have
   changed since install;
 - removes the directories it created when they are empty, and the manifest.
@@ -186,3 +191,12 @@ uninstall cannot remove keys cleanly, it leaves that file as is, reports a
 problem, keeps the manifest as `manifest-<timestamp>.incomplete.json` (with the
 previous key values) and leaves the backups for manual recovery: copy a replaced
 file back from `backups/<timestamp>/`.
+
+## Limits
+
+The containment checks inspect each path just before using it, but the installer
+still opens and renames by path. A process running as the same user that
+atomically swaps a directory or link in the home while the installer runs (for
+example with `renamex_np` and `RENAME_SWAP`) can redirect a write. Such a process
+can already change anything in that account, so this race is accepted, as for
+the roster generator ([#9](https://github.com/jdip/orca-pod/issues/9)).

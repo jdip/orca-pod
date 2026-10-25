@@ -142,22 +142,32 @@ def validate_manifest(old):
         backup_ok({'path': settings['backup']}, 'Orca settings backup')
 
 
-def read_regular(path):
+def single_link(path, st):
+    """Refuse a regular file with other hard links: its bytes also live outside the managed path."""
+    if stat.S_ISREG(st.st_mode) and st.st_nlink > 1:
+        raise Refusal(f'{path} is a hard link ({st.st_nlink} links); refusing to read, back up or replace it')
+
+
+def read_regular(path, links_ok=False):
     fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
     with open(fd, 'rb') as handle:
+        if not links_ok:
+            single_link(path, os.fstat(fd))
         return handle.read()
 
 
-def current_bytes(path):
-    """File bytes, or b'symlink:<target>' for a link, or None when absent."""
+def current_bytes(path, links_ok=False):
+    """File bytes, or b'symlink:<target>' for a link, or None when absent; a hard-linked file is refused."""
     try:
-        mode = os.lstat(path).st_mode
+        st = os.lstat(path)
     except FileNotFoundError:
         return None
-    if stat.S_ISLNK(mode):
+    if stat.S_ISLNK(st.st_mode):
         return b'symlink:' + os.readlink(path).encode()
-    if stat.S_ISREG(mode):
-        return read_regular(path)
+    if stat.S_ISREG(st.st_mode):
+        if not links_ok:
+            single_link(path, st)
+        return read_regular(path, links_ok)
     raise Refusal(f'{path} exists and is not a regular file or symlink')
 
 
@@ -197,7 +207,7 @@ def orca_hook_trust(home, notes, orca_version):
     the installed Orca version is pinned to write; any other hook is reported and left untrusted."""
     path = home / '.codex' / 'hooks.json'
     check_path(home, path)
-    data = current_bytes(path)
+    data = current_bytes(path, links_ok=True)  # Only hashed, never copied or replaced.
     if data is None:
         notes.append('~/.codex/hooks.json is absent, so no Codex hook trust is seeded; '
                      'rerun --apply after Orca installs its hooks')
@@ -207,7 +217,7 @@ def orca_hook_trust(home, notes, orca_version):
         notes.append(f'Orca {orca_version or "(not installed)"} has no pinned Codex hook commands, '
                      'so no Codex hook trust is seeded')
         return {}
-    raw = read_regular(path.resolve()) if data.startswith(b'symlink:') else data
+    raw = read_regular(path.resolve(), links_ok=True) if data.startswith(b'symlink:') else data
     events = json.loads(raw).get('hooks', {})
     source = path.resolve()  # Codex keys hook state by the canonical hooks.json path.
     trust, skipped = {}, []
@@ -355,6 +365,28 @@ def owns(kind, path, paths):
     return kind is not None and any(path[:len(m)] == m or (kind != 'key' and m[:len(path)] == path) for m in paths)
 
 
+def unowned(inner, table, paths, keep=()):
+    """The lines of a managed block body that the block does not own, in order, and whether any is a statement.
+
+    Comments and blank lines are unowned too, except the blank line the installer writes between two owned
+    tables. An owned table header listed in keep stays in place.
+    """
+    stmts = statements(inner, table)
+    lines, foreign = [], False
+    for i, (start, end, kind, path) in enumerate(stmts):
+        if kind is None:
+            separator = (not inner[start].strip() and 0 < i < len(stmts) - 1 and owns(*stmts[i - 1][2:], paths)
+                         and stmts[i + 1][2] == 'table' and owns(*stmts[i + 1][2:], paths))
+            if not separator:
+                lines += inner[start:end]
+        elif not owns(kind, path, paths):
+            lines += inner[start:end]
+            foreign = True
+        elif kind == 'table' and path in keep:
+            lines += inner[start:end]
+    return lines, foreign
+
+
 def toml_str(value):
     return json.dumps(value, ensure_ascii=False)  # A JSON string is a valid TOML basic string.
 
@@ -416,7 +448,7 @@ def merge_codex_config(text, trust, old_hook_keys):
     stmts = statements(base)
     managed = codex_managed(trust)
     domain = {**managed, 'hooks.state': managed['hooks.state'] + [('hooks', 'state', k) for k in old_hook_keys]}
-    moved, removed, adopted, first_removed, owned_tables = [], set(), {}, {}, set()
+    moved, removed, owner, first_removed, owned_tables = [], set(), {}, {}, set()
     for start, end, kind, path in stmts:
         if kind is None:
             continue
@@ -428,16 +460,22 @@ def merge_codex_config(text, trust, old_hook_keys):
                 if kind != 'key' or path[:-1] not in owned_tables:  # Report a whole owned table once.
                     moved.append((start + 1, '.'.join(path)))
                 removed.update(range(start, end))
-                adopted[name] = adopted.get(name, '') + ''.join(base[start:end])
+                owner[start] = name
                 first_removed.setdefault(name, start)
                 break
-    # Drop blank lines left between two adopted statements, such as the gaps between adopted tables.
+    # Move blank lines between two adopted statements, such as the gaps between adopted tables, along with
+    # them, so uninstall puts them back too.
     for start, end, kind, _ in stmts:
         if kind is None and not base[start].strip():
             above = [s for s in stmts if s[1] <= start and s[2] is not None]
             below = [s for s in stmts if s[0] >= end and s[2] is not None]
             if above and below and above[-1][0] in removed and below[0][0] in removed:
                 removed.add(start)
+                owner[start] = owner[below[0][0]]
+    adopted = {}
+    for start, end, _, _ in stmts:
+        if start in owner:
+            adopted[owner[start]] = adopted.get(owner[start], '') + ''.join(base[start:end])
     # An adopted key's original value is restored on uninstall; it cannot also sit in a block, or the
     # original would not have parsed.
     previous = {m: get_path(original, m)[0] for name in adopted for m in managed[name] if get_path(original, m)[1]}
@@ -445,10 +483,7 @@ def merge_codex_config(text, trust, old_hook_keys):
     inserts = {}  # base index -> [(block lines, foreign lines)]
     for name in BLOCKS:
         old_index, inner = old_blocks.get(name, (None, []))
-        foreign = []
-        for start, end, kind, path in statements(inner, table_at(stmts, old_index or 0)):
-            if kind is not None and not owns(kind, path, domain[name]):
-                foreign += inner[start:end]
+        foreign, _ = unowned(inner, table_at(stmts, old_index or 0), domain[name])
         header = name in CODEX_TABLE_KEYS and (name,) not in headers
         if name in CODEX_TABLE_KEYS and not header:
             index = headers[(name,)] + 1
@@ -500,18 +535,12 @@ def unmerge_codex_config(text, adopted, hook_keys, previous):
     domain = {**codex_managed({}), 'hooks.state': [('hooks', 'state', k) for k in hook_keys]}
     inserts = {}
     for name, (index, inner) in blocks.items():
-        keep, header = [], []
-        for start, end, kind, path in statements(inner, table_at(stmts, index)):
-            if kind is None:
-                continue
-            if not owns(kind, path, domain[name]):
-                keep += inner[start:end]
-            elif kind == 'table' and path == (name,):
-                header = inner[start:end]
+        table = table_at(stmts, index)
+        keep, foreign = unowned(inner, table, domain[name])
         # The block's own table header still opens that table for foreign keys inside or just after it.
         after = next((kind for start, _, kind, _ in stmts if start >= index and kind is not None), None)
-        if header and (keep or after == 'key'):
-            keep = header + keep
+        if foreign or after == 'key':
+            keep, _ = unowned(inner, table, domain[name], keep=[(name,)])
         inserts.setdefault(index, []).append(adopted.get(name, '') + ''.join(keep))
     out = []
     for i in range(len(base) + 1):
@@ -581,9 +610,11 @@ class Plan:
         return path.relative_to(self.home).as_posix()
 
     def check(self, path, leaf_dir=False):
-        """Containment preflight: record a refusal and return False for an unsafe path."""
+        """Containment and hard-link preflight: record a refusal and return False for an unsafe path."""
         try:
             check_path(self.home, path, leaf_dir)
+            if os.path.lexists(path):
+                single_link(path, os.lstat(path))
             return True
         except Refusal as error:
             if str(error) not in self.refusals:
@@ -690,7 +721,8 @@ def plan_stale(plan):
     for rel, entry in plan.old.get('files', {}).items():
         if rel not in planned:
             path = plan.home / rel
-            if plan.check(path):
+            backup = entry.get('backup')
+            if plan.check(path) and (not backup or plan.check(plan.home / STATE / backup['path'])):
                 plan.ops.append({'kind': 'remove', 'group': 'stale', 'path': path, 'rel': rel, 'entry': entry,
                                  'action': 'restore backup' if entry.get('backup') else 'remove'})
 
@@ -1027,6 +1059,8 @@ class Writer:
         self.check(path)
         if os.path.isdir(path) and not os.path.islink(path):
             raise Refusal(f'{path} is a directory')
+        if os.path.lexists(path):
+            single_link(path, os.lstat(path))
         self.ensure_dir(path.parent)
         self.write(path, data, mode if mode is not None else 0o644)
         self.changed += 1
@@ -1112,14 +1146,13 @@ def apply(plan, args, source, stamp):
                 del manifest['files'][op['rel']]
             else:
                 # Key-managed files hold credentials and private state, so they are never copied: the
-                # manifest records only the previous values of the owned keys and blocks.
-                record = dict(entry)
+                # manifest records only the previous values of the owned keys and blocks. No whole-file hash
+                # is kept, since other programs add content that uninstall must not take for its own.
                 if op['data'] != op['current']:
                     mode = stat.S_IMODE(os.lstat(path).st_mode) if os.path.lexists(path) else \
                         0o644 if path.name == 'settings.json' else 0o600
                     writer.put(path, op['data'], mode)
-                record['sha256'] = sha(op['data'])
-                manifest['keys'][op['rel']] = record
+                manifest['keys'][op['rel']] = entry
         writer.dirs = [rel for rel in writer.dirs if rel not in writer.prune_dirs(writer.dirs, empty_only=True)]
     finally:
         writer.state_dir()
@@ -1158,7 +1191,7 @@ def patch_orca(writer, patch, stamp):
     deadline = time.monotonic() + 600
     while time.monotonic() < deadline:
         try:
-            result = json.loads(read_regular(result_path))
+            result = json.loads(read_regular(result_path, links_ok=True))
             if 'ok' in result:
                 detail = result.get('after') if result['ok'] else result.get('error')
                 print(f'Orca app settings: {"ok" if result["ok"] else "FAILED"} {json.dumps(detail)}'
@@ -1231,18 +1264,20 @@ def uninstall_preflight(home, old):
     """Containment-check every path the manifest names before anything is written."""
     problems = []
 
-    def check(path, leaf_dir=False):
+    def check(path, leaf_dir=False, links=False):
         try:
             check_path(home, path, leaf_dir)
+            if links and os.path.lexists(path):
+                single_link(path, os.lstat(path))
         except Refusal as error:
             problems.append(str(error))
 
     for rel, entry in old.get('files', {}).items():
-        check(home / rel)
+        check(home / rel, links=True)
         if entry.get('backup'):
-            check(home / STATE / entry['backup']['path'])
+            check(home / STATE / entry['backup']['path'], links=True)
     for rel in old.get('keys', {}):
-        check(home / rel)
+        check(home / rel, links=True)
         if os.path.islink(home / rel):
             problems.append(f'~/{rel} is a symlink; refusing to replace it')
     for rel in old.get('dirs', []):
@@ -1279,33 +1314,39 @@ def uninstall(home, old, args, stamp):
         cur = current_bytes(path)
         if cur is None:
             continue
-        if entry['created'] and sha(cur) == entry.get('sha256'):
-            writer.remove(path)
-            print(f'  removed      ~/{rel}')
-            continue
+        # The owned keys are always removed first; a file the installer created is deleted only when nothing
+        # else is left in it, never on the strength of a whole-file hash.
         try:
             if entry['format'] == 'json':
                 data = json.loads(cur)
+                if not isinstance(data, dict):
+                    raise ValueError('not a JSON object')
+                before = copy.deepcopy(data)
                 for key, record in entry['keys'].items():
                     if key in data and data[key] == record['set']:
                         if record['had']:
                             data[key] = record['previous']
                         else:
                             del data[key]
-                new = dump_json(data, json_style(cur.decode('utf-8')))
+                new = cur if data == before else dump_json(data, json_style(cur.decode('utf-8')))
+                empty = data == {}
             else:
                 previous = {tuple(json.loads(p)): v for p, v in entry.get('previous', {}).items()}
                 new = unmerge_codex_config(cur.decode('utf-8'), entry.get('adopted', {}),
                                            entry.get('hook_keys', []), previous).encode('utf-8')
+                empty = not new.strip()
         except (ValueError, Refusal) as error:
             problems.append(f'~/{rel}: could not remove the managed keys ({error}); left as is')
             continue
-        if entry['created'] and not new.strip(b'{} \t\n'):
+        if entry['created'] and empty:
             writer.remove(path)
             print(f'  removed      ~/{rel} (only managed keys were left)')
-        elif new != cur:
+            continue
+        if new != cur:
             writer.put(path, new, stat.S_IMODE(os.lstat(path).st_mode))
             print(f'  removed keys ~/{rel} (restored the previous values of the managed keys)')
+        if entry['created']:
+            print(f'  kept         ~/{rel} (created by the installer, but it now holds content Orca Pod does not own)')
     settings = old.get('orca_settings')
     if settings and not args.scratch and not args.skip_orca_settings:
         pre = orca_settings_module().preflight(settings['previous'])

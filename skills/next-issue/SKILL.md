@@ -113,8 +113,21 @@ design; do not turn every detail into a user decision.
 Use a suitable branch/worktree while preserving unrelated work. For a rollup,
 start the child branch from its current verified remote rollup, following the
 shared rollup contract and local runbook. Implement the
-whole authorized outcome, including necessary concrete fixes. Before validation,
-choose execution and observation owners using
+whole authorized outcome, including necessary concrete fixes.
+
+Route execution ownership through the `roster` skill. The coordinator keeps the
+claim, tracker writes and every Git mutation: commits, pushes, PRs, merges and
+branch updates. Start implementation as a WRK `orca orchestration worker-start`
+with the roster's `--agent`, `--model` and `--effort`, in its own child worktree
+from that branch (`--worktree new-child --base-branch <branch>`). Before relying on
+the worker, check the receipt: `launch.effective` must equal `launch.requested`.
+Report a mismatch or failed launch to the operator; never relaunch on another
+model. WRK's authority is write within owned files, so it returns changes and
+evidence uncommitted and the coordinator inspects, commits and delivers them.
+Review goes through `code-review`, and independent bug proof through `tdd`, each
+with its roster roles. Settle every `worker_done` before integrating its work.
+
+Before validation, choose execution and observation owners using
 [Execution ownership](../pr-to-test/SKILL.md#execution-ownership). Apply the
 repository's documented Application Code/Tooling classification by purpose:
 

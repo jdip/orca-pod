@@ -24,21 +24,34 @@ When exploring the codebase, read `CONTEXT.md` (if it exists) so test names and 
 Choose separate proof and fix owners for consequential permission, data-integrity
 or security failures, subtle regressions or failed prior fixes when the expected
 benefit justifies coordination. Straightforward low-impact changes keep the normal
-loop. This is a selective ownership decision, not a model-diversity requirement.
+loop. Choosing separate owners is selective; once chosen, they run on opposite
+providers.
 
-Dispatch delegated work per the `roster` skill (skills/roster/SKILL.md).
+Dispatch both owners per the `roster` skill (skills/roster/SKILL.md) as separate
+workers:
+
+- **Proof owner:** TST-proof, on the other provider from the fix owner. When WRK
+  runs on Codex, use TST-proof's Claude alternate.
+- **Fix owner:** WRK.
+- **Security fix:** SEC-PROOF owns the proof, launched through the roster's SEC
+  launch, and WRK on Claude writes the fix against it.
+
+Verify each owner's model from its receipt and provider records as the roster
+requires. A launch failure is reported, never rerouted.
+
 Before a proposed patch steers reproduction, the primary gives the proof owner
 the reported symptom, expected contract and authorized environment.
 That proof owner establishes the behavioral failure at a public seam and records
 the unfixed revision, exact command/assertions, result and limits. An unavailable
 meaningful reproduction remains an explicit proof gap.
 
-Give a separate implementation owner the established contract and proof to fix it.
+Give the fix owner the established contract and proof to fix it.
 The proof owner reruns the same assertions and relevant native regressions at the
 fixed revision. Necessary assertion changes return to that owner, who first checks
 that they still expose the original symptom on the unfixed revision, then rechecks
 the fix. Retain attributable fail-before/pass-after evidence and any missed symptom,
-rework or intervention in the existing task. Independent code review still applies.
+rework or intervention in the existing task. Independent `code-review` still applies,
+with SEC-REV for a security fix.
 
 ## What a good test is
 

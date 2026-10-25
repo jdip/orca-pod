@@ -1,6 +1,6 @@
 ---
 name: code-review
-description: Review a PR, branch, or working-tree diff against repository standards and the requested outcome, including delivery reviews.
+description: Review a PR, branch, or working-tree diff against repository standards and the requested outcome, including delivery reviews and triggered security reviews.
 ---
 
 Two-axis review of the requested committed or working-tree changes:
@@ -8,7 +8,33 @@ Two-axis review of the requested committed or working-tree changes:
 - **Standards**: does the code conform to this repo's documented coding standards?
 - **Spec**: does the code faithfully implement the originating issue / spec?
 
-The primary agent selects the reviewer per the `roster` skill (skills/roster/SKILL.md) after preparing the comparison and requirements below. This applies to explicit reviews and delivery reviews. An already assigned reviewer performs its axes directly and returns findings to the primary; it does not reroute or spawn reviewers. A single reviewer checks both axes unless assigned only one. Review is read-only: report fixes for the implementation owner.
+A third, triggered axis applies when the change crosses a trust boundary:
+
+- **Security**: can the change be reached and abused across a trust boundary, and do existing controls hold? Owned by SEC-REV.
+
+The primary agent selects reviewers per the `roster` skill (skills/roster/SKILL.md) after preparing the review packet below. This applies to explicit reviews and delivery reviews. An already assigned reviewer performs its axes directly and returns findings to the primary; it does not reroute or spawn reviewers. A single reviewer checks Standards and Spec unless assigned only one. Review is read-only: report fixes for the implementation owner.
+
+## Reviewers
+
+Take every role, model and effort from the roster; never select a model here.
+
+- **REV** reviews Standards and Spec on the other provider from the implementer. When the implementer ran on Codex (WRK on Codex, or SEC-WRK), use REV's Claude alternate.
+- **REV2** adds an independent second review, in a fresh context, only for high-risk changes. It runs on the provider the roster lists, which can be the implementer's, and never sees REV's findings.
+- **SEC-REV** owns the Security axis whenever a trigger below applies, in addition to REV. For a pure security fix, SEC-REV may cover all three axes and REV becomes optional.
+
+Route to SEC-REV when the change touches authentication, sessions or authorization; secrets or credential handling; crypto; sandboxing or permissions; parsing untrusted input; installers or configuration writers that touch home directories; or network-exposed endpoints. Any other roster security-path trigger also applies: a security fix, CI/release credentials or supply chain, a reviewer's safeguard refusal, or the operator's request. Report every re-route.
+
+Launch SEC through the roster's **SEC launch**, never with `--agent`, `--model` or `--effort`: a Daybreak terminal on the reviewed worktree, adopted for supervision.
+
+```bash
+orca terminal create --worktree <sel> --title "🛡️ SEC <purpose>" --command "codex --profile orca-pod-sec" --json
+orca terminal wait --terminal <handle> --for tui-idle --timeout-ms 60000 --json
+orca orchestration worker-start --terminal <handle> --worktree <sel> --task-title "🛡️ SEC-REV <purpose>" --spec "$(cat <sec-brief-file>)" --json
+```
+
+The receipt proves nothing about an adopted terminal's model: verify Daybreak from the Codex records and tear down as the roster describes.
+
+Give every reviewer the same **review packet**, written per the roster's brief: the exact repository and immutable comparison; the complete requested diff, including work in progress when applicable; requirements; applicable instructions; this skill's assigned axes and smell baseline; and verification evidence with its limits. A reviewer on another provider receives no other context, so name the source files and callers to inspect. Keep credentials and unrelated private material out of the packet.
 
 Before publishing review comments or evidence, follow the target repository's
 applicable publication policy.
@@ -55,7 +81,7 @@ Each smell reads *what it is* → *how to fix*; match it against the diff:
 
 ### 4. Review the assigned axes
 
-Assess the target's applicable publication policy within both axes. Check outgoing
+Assess the target's applicable publication policy within the assigned axes. Check outgoing
 source, metadata and evidence and establish whether this review precedes the
 change's first applicable GitHub write. Report any earlier unreviewed publication
 as an exposure requiring investigation; a later review is not prevention.
@@ -82,18 +108,20 @@ full suite repeated for an already verified integration context,
 evidence reuse without explicit context equivalence, and alignment that edits
 guidance while its workflows, CI, tests or fixtures still enforce the retired rule.
 
-For **Spec**, identify missing or partial requirements, unrequested behavior, and incorrect implementations. Cite the supplied requirement and the changed location. Assess correctness, regressions, and relevant security implications within the requested scope.
+For **Spec**, identify missing or partial requirements, unrequested behavior, and incorrect implementations. Cite the supplied requirement and the changed location. Assess correctness, regressions, and relevant security implications within the requested scope; a triggered Security axis goes deeper.
+
+For **Security**, map the trust boundaries the change touches and trace attack paths from their actual entry points. Validate each finding against reachable behavior and existing controls, never a hypothetical caller. Report severity, the practical impact, uncertainty and a focused remediation. Analysis stays defensive and local: never exploit live systems.
 
 For structural cleanup, dependency changes, or claims of simplification, also apply
 [maintenance review](maintenance-review.md) within these same axes. Follow that
 pointer when the change moves responsibilities, removes a path, or adds/replaces a
 dependency, even if the PR does not call itself a refactor.
 
-When the primary splits the axes, give each reviewer the same immutable comparison, applicable standards, requirements, and evidence. Assigned reviewers work directly without recursive delegation. The primary reconciles duplicate findings and remains accountable for coverage of both axes.
+When the primary splits the axes, give each reviewer the same review packet. Assigned reviewers work directly without recursive delegation. The primary reconciles duplicate findings and remains accountable for coverage of every assigned axis.
 
 ### 5. Report
 
-Report Standards and Spec outcomes separately, with severity, exact file/line evidence, the concrete failure, and a focused correction for each actionable finding. State when an axis has no actionable findings or cannot be assessed. Distinguish review evidence from checks actually executed. Subsequent changes require review only of the changes and affected conclusions; completed evidence remains reusable where it still applies.
+Report Standards, Spec and any Security outcomes separately, with severity, exact file/line evidence, the concrete failure, and a focused correction for each actionable finding. State when an axis has no actionable findings or cannot be assessed. Distinguish review evidence from checks actually executed. Subsequent changes require review only of the changes and affected conclusions; completed evidence remains reusable where it still applies.
 
 ## Why two axes
 
@@ -102,7 +130,7 @@ A change can pass one axis and fail the other:
 - Code that follows every standard but implements the wrong thing → **Standards pass, Spec fail.**
 - Code that does exactly what the issue asked but breaks the project's conventions → **Spec pass, Standards fail.**
 
-Reporting them separately stops one axis from masking the other.
+Reporting them separately stops one axis from masking the other. Security is separate for the same reason: code can match the spec and the standards and still open an attack path.
 
 ## Attribution
 

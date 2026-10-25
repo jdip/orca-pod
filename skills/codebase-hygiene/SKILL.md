@@ -58,7 +58,7 @@ Use configured static analysis to locate candidates and inspect its entry points
 generated inputs, dynamic use, and exclusions before trusting an absence report.
 Report unavailable checks and unexamined areas instead of claiming full coverage.
 Bound independent delegated surveys by paths or concerns; retain one implementation
-owner for overlapping changes and the existing reviewer routing.
+owner for overlapping changes and `code-review`'s reviewer selection.
 
 ## Select actionable work
 

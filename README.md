@@ -6,9 +6,8 @@ installer that sets up a host with one command plus the two sign-ins. It
 replaces Agent Team.
 
 The work is tracked in the implementation [spec #7](https://github.com/jdip/orca-pod/issues/7);
-check it for current status. The installer is pending
-([#13](https://github.com/jdip/orca-pod/issues/13)), so nothing here installs
-yet.
+check it for current status. To set up a host, follow
+[docs/install.md](docs/install.md).
 
 Contributor and agent instructions are in [AGENTS.md](AGENTS.md); verification
 is in [docs/development.md](docs/development.md).

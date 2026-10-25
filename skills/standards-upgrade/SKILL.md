@@ -27,8 +27,9 @@ an adopted SHA. Preserve unrelated work and existing product behavior.
 Resolve the recorded source repository and the full adopted commit. For an ordinary
 upgrade, resolve that source's default-branch HEAD; honor an explicitly requested
 revision instead. Select and report one concrete target commit. Do not silently
-use the current source branch (Machine Reconciliation has a different selection
-rule), stale content, or another repository. Verify both revisions are from the
+use the current source branch (host installation through `machine/install.py`
+has a different selection rule; see `docs/install.md`), stale content, or another
+repository. Verify both revisions are from the
 recorded source before comparing them.
 
 Read the target standard and compare the relevant adopted-to-target source changes.

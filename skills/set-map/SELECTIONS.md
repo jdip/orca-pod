@@ -10,11 +10,16 @@ runtime is selected with `ORCA_POD_PYTHON` when needed.
 
 An **effort scope** is a stable identifier for independently selected work in one
 repository. It is not a branch, checkout path, issue number or permission to act.
-A **task owner** is the verified host task/session identity, or an explicit unique
-identity recorded with this task when the host provides none. Use path-safe
-identifiers accepted by the helper. Establish both from the current task's explicit
-context; missing or conflicting context is an error. Do not discover ownership
-by enumerating scope files or inheriting a shell environment from another task.
+A **task owner** is the task's Orca worktree identity, plus its dispatch ID when
+the task runs as a worker inside an Orca Run. Derive it with the selector's
+`owner` command (add `--dispatch <dispatch-id>` from the task's own dispatch
+context); it reads `orca worktree current` and verifies the dispatch's worktree
+through `orca orchestration worker-show`. Outside Orca, record an explicit unique
+path-safe identity with this task instead. Establish both from the current task's
+explicit context; missing or conflicting context is an error. Do not discover
+ownership by enumerating scope files or inheriting a shell environment from
+another task; Orca's `ORCA_WORKTREE_ID` can name the launching coordinator's
+worktree rather than the worker's.
 For a new effort, the agent may choose a unique scope and report it under existing
 selection authority. Reuse the established scope on continuation.
 
@@ -61,7 +66,9 @@ also selected by another task, establish that task's ownership and obtain the
 required handoff; creating another scope does not bypass claims.
 
 A resume or move among worktrees sharing the same Git common directory retains
-the explicit binding; checkout names and paths play no part. An independent fork
+the explicit binding; checkout names and paths play no part. A moved task keeps
+its retained owner rather than deriving a new one; another agent, worktree or
+dispatch derives a different owner, so continuing there is a handoff. An independent fork
 gets a new scope and task owner, and establishes its own authorized selections.
 It cannot reuse a copied parent binding. For a separate clone, no state follows
 automatically: preserve the old binding and require explicit validated selection
@@ -77,14 +84,19 @@ recipient, selections, included claims and execution scope. A finished turn,
 shared assignee, tool access or approval of this feature is not approval for an
 unrelated real transfer.
 
-1. Read the source and recipient task state with supported host tools, their
+1. Read the source and recipient task state with `orca worktree ps --json` and,
+   for Run workers, `orca orchestration worker-show --dispatch <id> --json`, their
    retained selection bindings, related issues, claims, dependencies and unfinished
    repository work. Present the concrete transfer when approval is missing.
    Preserve a recipient's conflicting selection until the operator resolves it.
-2. Stop source work in the transferred selections using available supported task
-   controls or an acknowledged handoff. Verify quiescence, including delegated
-   work and in-flight repository/tracker writes. Merely sending a message or seeing
-   an old status is insufficient. Missing evidence preserves ownership.
+2. Stop source work in the transferred selections through an acknowledged
+   handoff or, for a Run worker, its coordinator's `orca orchestration worker-stop`.
+   Verify quiescence, including delegated work and in-flight repository/tracker
+   writes. In a fresh `orca worktree ps --json`, the source worktree's row shows
+   no agent outside the `done` state; inside a Run, `worker-show` reports the
+   source dispatch settled (for example `completed`, with its worker terminal
+   released). Merely sending a message or seeing an old status is insufficient.
+   Missing or unverifiable evidence preserves ownership.
 3. Record approval, source-stop evidence, included claim transfers, unfinished
    changes/branch references, and the next permitted action in the existing task
    or tracker context. Keep private host/session details out of public tracker
@@ -95,7 +107,7 @@ unrelated real transfer.
    `--to-owner`, `--kinds map|backlog|both`, each selected kind's expected
    `--map-generation` / `--backlog-generation`, `--approval-ref`, and
    `--source-stopped-ref`. The references point to the actual evidence above.
-   The helper requires them but cannot establish human approval or host
+   The helper requires them but does not establish human approval or Orca
    quiescence: the supervising agent owns that verification.
 5. The helper atomically changes only the named entries' owners and generations
    in the same scope. Verify the recipient's `show` result, establish its new
@@ -112,8 +124,11 @@ cannot cancel an already-running command; verified source quiescence is essentia
 
 ## Legacy import and rename
 
-The old `orca-pod-wayfinder-map` and `orca-pod-implementation-backlog` files in Git's
-common directory are historical inputs, never fallback selections. With explicit
+The root pointer files in Git's common directory are historical inputs, never
+fallback selections: `orca-pod-wayfinder-map` and `orca-pod-implementation-backlog`,
+or their Agent Team-era names `codex-wayfinder-map` and
+`codex-implementation-backlog`. Import reads whichever exist and refuses
+pointers that disagree. With explicit
 migration authority, run the relevant selector's `import-legacy --scope <scope>
 --owner <task> --expect-absent`. It validates that one legacy URL belongs to the
 current repository and has the required issue role; closed historical issues are

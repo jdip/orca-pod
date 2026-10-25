@@ -31,7 +31,7 @@
       try {
         if (!navigator.clipboard) throw new Error('Clipboard unavailable');
         await navigator.clipboard.writeText(prompt.textContent);
-        status.textContent = 'Copied. Paste into Codex to start the discussion.';
+        status.textContent = 'Copied. Paste into a new Orca workspace to start the discussion.';
       } catch {
         panel.querySelector('details').open = true;
         const selection = window.getSelection();

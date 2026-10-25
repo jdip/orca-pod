@@ -8,8 +8,12 @@ the system routes work correctly.
 
 Check which descriptions and rules the host actually exposes, including truncation,
 shadowing, scoped rules, explicit-only settings, and installed/source drift when
-those surfaces are in scope. Static inventory is evidence of available files, not
-proof of runtime loading. Test a trigger against its intended request and a nearby
+those surfaces are in scope. The two providers load differently: Codex reads
+`AGENTS.md` and `agents/openai.yaml` (`allow_implicit_invocation`), while Claude
+reads `CLAUDE.md` with its imports and rules, subagent files and `SKILL.md`
+frontmatter (`disable-model-invocation`). Check that a deliberate invocation
+setting is mirrored on both and that a bridge reaches the same text. Static
+inventory is evidence of available files, not proof of runtime loading. Test a trigger against its intended request and a nearby
 request that should use another owner; broad synonyms can attract unrelated work.
 
 For each instruction pointer, establish its target and the branch that needs it.

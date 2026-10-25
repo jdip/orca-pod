@@ -9,7 +9,8 @@ Write an informed, readable news update for Orca Pod's operator: what thoughtful
 engineers are saying, trying, building, and learning, and which major AI developments
 change the possibilities or tradeoffs. Explain the substance and connect the ideas.
 The brief is useful even when its conclusion is to understand or watch, rather than
-change this repository. It runs on demand in Codex desktop.
+change this repository. It runs on demand in an Orca agent session; a recurring
+cadence is a separately approved `orca automations create` schedule.
 
 ## Establish the edition
 
@@ -74,7 +75,7 @@ Propose zero to three experiments only where a real uncertainty remains.
 
 Use [topic actions](references/topic-actions.md) for concise context seeds
 under substantive topics. Put the complete seed in each topic directive; the renderer collapses it.
-Supporting notes may retain duplicate seeds. Producing a brief creates no tasks.
+Supporting notes may retain duplicate seeds. Producing a brief creates no workspaces.
 
 ## Weekly watchlist review
 
@@ -95,7 +96,8 @@ as citation checks. A valid file or resolved URL does not establish a useful bri
 Save only the finished, checked edition through the history helper. Follow
 [HTML presentation](references/presentation.md) to rebuild the local blog archive
 and inspect the resulting article. Present a short summary, article/archive links,
-in conversation. Topic contexts are copied from the HTML into user-created tasks. The HTML article is the primary reader;
+in conversation. A topic the user picks launches as an Orca workspace seeded with its
+context, per [topic actions](references/topic-actions.md). The HTML article is the primary reader;
 keep generated reports and observations local and untracked. Standing source
 changes and proposed experiments enter the repository workflow when selected;
-invocation authorizes neither adoption nor scheduling.
+invocation authorizes neither adoption, workspace launches nor scheduling.

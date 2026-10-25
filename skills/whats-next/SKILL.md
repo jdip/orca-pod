@@ -15,10 +15,12 @@ choices, and resume after the human answers.
 
 Start with a lightweight overview: root README purpose, Git/worktree and dirty
 state, saved map/backlog selections, issue/PR status and labels, native dependencies,
-available task ownership evidence, current dependency alerts and existing
+Orca ownership evidence, current dependency alerts and existing
 remediation, and recent hygiene, adopted-verification and alignment assessment
 evidence.
-Use the host's supported task tools when available. Inspect detailed requirements,
+For ownership, read `orca worktree ps --json` (worktrees, their agents and live
+terminals) and, for a promising issue or PR, `orca reference find <url> --json`
+(workspaces and agents linked to it). Inspect detailed requirements,
 checks, reviews, and code only for promising candidates and their necessary
 eligibility checks.
 
@@ -43,13 +45,23 @@ not outrank an unrelated almost-delivered PR. Respect explicit user order,
 dependencies, claims, design gates, and scope even when selecting a later eligible
 backlog child. Do not do a sizing investigation just to rank work.
 
-Work actively performed by another running task is excluded from our candidates.
-Account for its expected outcome and its effect on dependencies and code stability.
+Work owned by another Orca worktree or agent is excluded from our candidates: an
+issue or PR linked to another workspace through `orca reference find`, a branch
+checked out in another worktree, or a selection owned by another worktree or
+dispatch. Recorded links and live agents establish ownership; workspace
+membership alone, or an archived workspace, does not. Account for its expected
+outcome and its effect on dependencies and code stability.
 When its turn finishes with work remaining, offer a concrete human-approved
 takeover through the selection handoff owner; verify source quiescence, included
 claims and recipient binding before assuming ownership. An assignee, inactivity, or a finished turn
-alone is not permission. If task status is unavailable, preserve uncertain claims
-and continue work whose ownership is established.
+alone is not permission. If Orca inventory is unavailable or `orca worktree ps`
+reports a host as not covered, preserve uncertain claims and continue work whose
+ownership is established.
+
+When starting selected work in a new Orca worktree, attach its issue at creation
+with `orca worktree create --reference <issue-url>`, or afterwards with
+`orca reference add <issue-url> --worktree <selector>`, so other sessions see the
+ownership.
 
 ## Plan the selected change
 
@@ -148,4 +160,5 @@ missing capability leaves no authorized progress. State delivered outcomes and t
 specific remaining decision or blocker, retaining the context to resume after an
 answer. Use existing conversation, Git, and tracker evidence rather than a new
 workflow ledger. Repeated unchanged assessment, indefinite polling, main promotion,
-Machine Reconciliation, and background scheduling are not implied by this loop.
+host installation (`machine/install.py --apply`, see `docs/install.md`), and
+background scheduling are not implied by this loop.

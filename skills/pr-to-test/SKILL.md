@@ -55,8 +55,12 @@ orca orchestration check --wait --types worker_done,escalation,question --timeou
 - **PR checks:** after the watch exits, confirm the current head, run and merge
   readiness as the runbook requires. The canonical script already waits this way
   for its own PR.
-- **A command in an Orca terminal:** after the wait, collect its terminal evidence
-  with `orca terminal read --terminal <handle> --json`.
+- **A command in an Orca terminal:** `--command` runs inside an interactive
+  shell, so `--for exit` only fires when the command ends with `; exit`. Orca
+  reports such exits as `exitCode: -1` (`stop_unverified`), so have the command
+  write its output and exit status to a file and read the result from there,
+  for example
+  `--command "<cmd> > <log> 2>&1; echo EXIT=\$? >> <log>; exit"`.
 - **A delegated worker:** `check --wait` emits NDJSON keepalive objects
   (`_keepalive`, legacy `_heartbeat`) on stderr before one final JSON object.
   Parse the last object as the `roster` skill's Commands section shows, and process

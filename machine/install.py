@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Install Orca Pod into the default agent homes on macOS; see docs/install.md.
 
---dry-run (the default) prints every planned action, diff, conflict and refusal and writes nothing.
---apply installs, recording owned paths and keys in a manifest and backing up anything it replaces.
---uninstall removes what the manifest owns and restores the backups.
+--dry-run (the default) prints every planned action, managed-block diff, conflict and refusal and writes nothing.
+--apply installs, recording owned paths, owned keys and their previous values in a private manifest.
+--uninstall removes what the manifest owns and restores the previous files and values.
 """
 import argparse
 import copy
@@ -13,7 +13,9 @@ import json
 import os
 from pathlib import Path
 import re
+import secrets
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -25,18 +27,36 @@ RULES = ROOT / 'machine' / 'global-rules.md'
 ORCA_SETTINGS = ROOT / 'machine' / 'orca_settings.py'
 GENERATE = ROOT / 'roster' / 'generate.py'
 ROLES = ROOT / 'roster' / 'roles.toml'
+PYTHON = os.environ.get('ORCA_POD_PYTHON') or sys.executable  # Interpreter for the child Python helpers.
 STATE = Path('.local/state/orca-pod')
 MANIFEST_VERSION = 1
+FILE_ROOTS = ('.agents/skills/', '.claude/', '.codex/')  # Whole files and links the manifest may own.
+KEY_FILES = ('.codex/config.toml', '.claude/settings.json', '.claude.json')  # Files owned key by key.
+DIR_ROOTS = ('.agents/skills', '.claude', '.codex', STATE.as_posix())  # Created directories lie on or below these.
 
 ORCA_SKILLS = ('orca-cli', 'orchestration')
-ORCA_PATCH = {'branchPrefix': 'custom', 'branchPrefixCustom': 'orca'}
+ORCA_PATCH = {'branchPrefix': 'custom', 'branchPrefixCustom': 'orca', 'agentPermissionDefault': 'full-access'}
 # roles.toml has no Codex ORC entry; the Codex coordinator alternative is pinned here (jdip/orca-pod#13).
 CODEX_ROOT = {'model': 'gpt-6.1-sol', 'model_reasoning_effort': 'high'}
 CODEX_TABLE_KEYS = {'agents': ('enabled', True), 'features': ('hooks', True)}
-ORCA_HOOK_MARK = ': orca-agent-hook-form='  # Prefix of every hook command Orca writes to hooks.json.
-HOOK_EVENTS = {'pre_tool_use', 'permission_request', 'post_tool_use', 'pre_compact', 'post_compact',
-               'pre_model_request', 'post_model_request', 'session_start', 'session_end',
-               'user_prompt_submit', 'subagent_start', 'subagent_stop', 'stop', 'interrupt'}
+BLOCKS = ('root', 'agents', 'features', 'hooks.state')
+
+# The exact command hooks each verified Orca version writes to ~/.codex/hooks.json, taken from Orca 1.4.240's
+# agent-hook generator (its Codex command builder and event table). Only an exact match is ever trusted.
+ORCA_HOOK_COMMAND_1 = (
+    ': orca-agent-hook-form=1; '
+    'if [ -n "${ORCA_PANE_KEY-}" ] && [ -n "${ORCA_AGENT_HOOK_ROOT-}" ] && '
+    '[ -f "${ORCA_AGENT_HOOK_ROOT-}/agent-hooks/codex-hook.sh" ]; '
+    'then /bin/sh "${ORCA_AGENT_HOOK_ROOT-}/agent-hooks/codex-hook.sh" || :; '
+    'elif [ -z "${ORCA_AGENT_HOOK_ROOT-}" ] && [ -n "${ORCA_PANE_KEY-}" ] && [ -n "${ORCA_AGENT_HOOK_PORT-}" ] && '
+    '[ -f "${HOME-}/.orca/agent-hooks/codex-hook.sh" ]; '
+    'then /bin/sh "${HOME-}/.orca/agent-hooks/codex-hook.sh" || :; '
+    'else { command -p cat 2>/dev/null || cat; } >/dev/null 2>&1 || :; fi')
+ORCA_CODEX_HOOKS = {
+    '1.4.240': {event: {'type': 'command', 'command': ORCA_HOOK_COMMAND_1, 'timeout': 3 if event == 'Interrupt' else 10}
+                for event in ('SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PermissionRequest', 'PostToolUse',
+                              'SubagentStart', 'SubagentStop', 'Stop', 'Interrupt')},
+}
 MATCHER_EVENTS = {'pre_tool_use', 'permission_request', 'post_tool_use', 'session_start', 'session_end',
                   'subagent_start', 'subagent_stop', 'pre_compact', 'post_compact'}
 CONTEXT_LIMIT_EVENTS = {'pre_tool_use', 'post_tool_use', 'session_start', 'user_prompt_submit', 'subagent_start'}
@@ -58,6 +78,87 @@ def sha(data):
 
 def run(*cmd, **kw):
     return subprocess.run(cmd, capture_output=True, text=True, **kw)
+
+
+# ---------- Path containment ----------
+
+def check_path(home, path, leaf_dir=False):
+    """Refuse unless path lies below home and each existing component above the leaf is a real directory.
+
+    The leaf may be absent or, unless leaf_dir, a file or symlink; nothing is ever resolved through a link.
+    """
+    try:
+        parts = path.relative_to(home).parts
+    except ValueError:
+        raise Refusal(f'{path} is outside {home}')
+    if '..' in parts or not (parts or leaf_dir):
+        raise Refusal(f'{path} is not a plain path below {home}')
+    current = home
+    for i, part in enumerate(parts):
+        current = current / part
+        try:
+            mode = os.lstat(current).st_mode
+        except FileNotFoundError:
+            return
+        if (i < len(parts) - 1 or leaf_dir) and not stat.S_ISDIR(mode):
+            kind = 'a symlink' if stat.S_ISLNK(mode) else 'not a directory'
+            raise Refusal(f'~/{Path(*parts[:i + 1]).as_posix()} is {kind}; refusing to work through it')
+
+
+def plain_rel(value):
+    """A non-empty relative POSIX path with no empty, '.' or '..' component."""
+    return (isinstance(value, str) and bool(value) and not value.startswith('/') and '\\' not in value
+            and all(part not in ('', '.', '..') for part in value.split('/')))
+
+
+def validate_manifest(old):
+    """Refuse a manifest whose entries could point outside the managed roots."""
+    def need(ok, what):
+        if not ok:
+            raise Refusal(f'the manifest has an invalid {what}')
+
+    def backup_ok(pointer, what):
+        need(pointer is None or (isinstance(pointer, dict) and plain_rel(pointer.get('path'))
+                                 and pointer['path'].startswith('backups/')
+                                 and (pointer.get('mode') is None or isinstance(pointer['mode'], int))), what)
+
+    files, keys, dirs = old.get('files', {}), old.get('keys', {}), old.get('dirs', [])
+    need(isinstance(files, dict) and isinstance(keys, dict) and isinstance(dirs, list), 'layout')
+    for rel, entry in files.items():
+        need(plain_rel(rel) and rel.startswith(FILE_ROOTS) and isinstance(entry, dict)
+             and isinstance(entry.get('sha256'), str), f'file entry {rel!r}')
+        backup_ok(entry.get('backup'), f'backup for {rel!r}')
+    for rel, entry in keys.items():
+        need(rel in KEY_FILES and isinstance(entry, dict)
+             and entry.get('format') == ('toml' if rel.endswith('.toml') else 'json'), f'key entry {rel!r}')
+        need(all(isinstance(k, str) for k in entry.get('hook_keys', [])), f'hook keys for {rel!r}')
+    for rel in dirs:
+        need(plain_rel(rel) and any(rel == r or rel.startswith(r + '/') or r.startswith(rel + '/')
+                                    for r in DIR_ROOTS), f'directory {rel!r}')
+    settings = old.get('orca_settings')
+    need(settings is None or (isinstance(settings, dict) and isinstance(settings.get('previous'), dict)
+                              and isinstance(settings.get('set'), dict)), 'Orca settings record')
+    if settings and settings.get('backup') is not None:
+        backup_ok({'path': settings['backup']}, 'Orca settings backup')
+
+
+def read_regular(path):
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+    with open(fd, 'rb') as handle:
+        return handle.read()
+
+
+def current_bytes(path):
+    """File bytes, or b'symlink:<target>' for a link, or None when absent."""
+    try:
+        mode = os.lstat(path).st_mode
+    except FileNotFoundError:
+        return None
+    if stat.S_ISLNK(mode):
+        return b'symlink:' + os.readlink(path).encode()
+    if stat.S_ISREG(mode):
+        return read_regular(path)
+    raise Refusal(f'{path} exists and is not a regular file or symlink')
 
 
 # ---------- Codex hook trust ----------
@@ -91,29 +192,49 @@ def hook_hash(event, matcher, handler):
     return 'sha256:' + sha(text.encode('utf-8'))
 
 
-def orca_hook_trust(home, notes):
-    """Return {state key: trusted_hash} for every Orca-written command hook in <home>/.codex/hooks.json."""
+def orca_hook_trust(home, notes, orca_version):
+    """Return {state key: trusted_hash} for each hook in <home>/.codex/hooks.json that exactly matches one
+    the installed Orca version is pinned to write; any other hook is reported and left untrusted."""
     path = home / '.codex' / 'hooks.json'
-    if not path.exists():
+    check_path(home, path)
+    data = current_bytes(path)
+    if data is None:
         notes.append('~/.codex/hooks.json is absent, so no Codex hook trust is seeded; '
                      'rerun --apply after Orca installs its hooks')
         return {}
-    events = json.loads(path.read_text(encoding='utf-8')).get('hooks', {})
+    pinned = ORCA_CODEX_HOOKS.get(orca_version)
+    if pinned is None:
+        notes.append(f'Orca {orca_version or "(not installed)"} has no pinned Codex hook commands, '
+                     'so no Codex hook trust is seeded')
+        return {}
+    raw = read_regular(path.resolve()) if data.startswith(b'symlink:') else data
+    events = json.loads(raw).get('hooks', {})
     source = path.resolve()  # Codex keys hook state by the canonical hooks.json path.
-    trust = {}
-    for name, groups in events.items():
-        event = snake(name)
-        if event not in HOOK_EVENTS:
-            notes.append(f'~/.codex/hooks.json: unknown hook event {name!r} skipped')
-            continue
-        for gi, group in enumerate(groups):
-            for hi, handler in enumerate(group.get('hooks', [])):
-                if handler.get('type') == 'command' and handler.get('command', '').startswith(ORCA_HOOK_MARK):
-                    trust[f'{source}:{event}:{gi}:{hi}'] = hook_hash(event, group.get('matcher'), handler)
+    trust, skipped = {}, []
+    for name, groups in events.items() if isinstance(events, dict) else ():
+        for gi, group in enumerate(groups if isinstance(groups, list) else []):
+            handlers = group.get('hooks', []) if isinstance(group, dict) else []
+            for hi, handler in enumerate(handlers if isinstance(handlers, list) else []):
+                if pinned.get(name) == handler and set(group) == {'hooks'}:
+                    trust[f'{source}:{snake(name)}:{gi}:{hi}'] = hook_hash(snake(name), None, handler)
+                else:
+                    skipped.append(f'{name}[{gi}][{hi}]')
+    if skipped:
+        notes.append(f'~/.codex/hooks.json: {len(skipped)} hook(s) are not ones Orca {orca_version} writes, '
+                     'so they get no trust: ' + ', '.join(skipped))
     return trust
 
 
 # ---------- TOML managed blocks ----------
+
+def toml_lines(text):
+    """Split on newlines only, terminating every line; the caller restores a missing final newline."""
+    return [line if line.endswith('\n') else line + '\n' for line in re.findall(r'[^\n]*\n|[^\n]+$', text)]
+
+
+def finish(text, eof_newline):
+    return text[:-1] if not eof_newline and text.endswith('\n') else text
+
 
 def single_path(doc):
     """Walk a one-key-per-level dict from tomllib down to its leaf; return (path, leaf)."""
@@ -139,33 +260,41 @@ def key_path(line):
             path, _ = single_path(tomllib.loads(line[:i] + '= 0'))
             return path
         i += 1
-    raise Refusal(f'cannot parse TOML line {line.strip()!r}')
+    raise Refusal('no key')
 
 
 def statements(lines, table=()):
-    """Split TOML lines into (start, end, kind, path) statements; kind is table, array, key or None (trivia)."""
+    """Split TOML lines into (start, end, kind, path) statements; kind is table, array, key or None (trivia).
+
+    A multi-line value is one statement, so comment-like lines inside a string are never trivia.
+    """
     out, i = [], 0
     while i < len(lines):
         text = lines[i].strip()
-        if not text or text.startswith('#'):
-            out.append((i, i + 1, None, None))
-            i += 1
-        elif text.startswith('['):
-            table, leaf = single_path(tomllib.loads(lines[i]))
-            out.append((i, i + 1, 'array' if isinstance(leaf, list) else 'table', table))
-            i += 1
-        else:
-            path, j = table + key_path(lines[i]), i + 1
-            while True:
-                try:
-                    tomllib.loads(''.join(lines[i:j]))
-                    break
-                except tomllib.TOMLDecodeError:
-                    if j >= len(lines):
-                        raise Refusal(f'cannot parse the TOML statement at line {i + 1}')
-                    j += 1
-            out.append((i, j, 'key', path))
-            i = j
+        try:
+            if not text or text.startswith('#'):
+                out.append((i, i + 1, None, None))
+                i += 1
+                continue
+            if text.startswith('['):
+                table, leaf = single_path(tomllib.loads(lines[i]))
+                out.append((i, i + 1, 'array' if isinstance(leaf, list) else 'table', table))
+                i += 1
+                continue
+            path = table + key_path(lines[i])
+        except (Refusal, tomllib.TOMLDecodeError):
+            raise Refusal(f'cannot parse the TOML statement at line {i + 1}')
+        j = i + 1
+        while True:
+            try:
+                tomllib.loads(''.join(lines[i:j]))
+                break
+            except tomllib.TOMLDecodeError:
+                if j >= len(lines):
+                    raise Refusal(f'cannot parse the TOML statement at line {i + 1}')
+                j += 1
+        out.append((i, j, 'key', path))
+        i = j
     return out
 
 
@@ -181,20 +310,27 @@ def table_at(stmts, index):
 
 
 def strip_blocks(lines):
-    """Remove managed blocks; return (base lines, {name: (base index, inner lines)})."""
+    """Remove managed blocks; return (base lines, {name: (base index, inner lines)}).
+
+    Markers count only as top-level comment lines, never inside a multi-line string or array.
+    """
+    trivia = {start for start, _, kind, _ in statements(lines) if kind is None}
+    begin = {i: m[1] for i in trivia if (m := BEGIN_RE.match(lines[i]))}
+    end = {i: m[1] for i in trivia if (m := END_RE.match(lines[i]))}
     base, blocks, i = [], {}, 0
     while i < len(lines):
-        if END_RE.match(lines[i]):
+        if i in end:
             raise Refusal(f'line {i + 1} closes an orca-pod block that was never opened')
-        begin = BEGIN_RE.match(lines[i])
-        if not begin:
+        if i not in begin:
             base.append(lines[i])
             i += 1
             continue
-        name, j = begin[1], i + 1
-        while j < len(lines) and not BEGIN_RE.match(lines[j]) and not END_RE.match(lines[j]):
+        name, j = begin[i], i + 1
+        if name not in BLOCKS:
+            raise Refusal(f'line {i + 1} opens an unknown orca-pod block {name!r}')
+        while j < len(lines) and j not in begin and j not in end:
             j += 1
-        if j == len(lines) or not END_RE.match(lines[j]) or END_RE.match(lines[j])[1] != name:
+        if j == len(lines) or end.get(j) != name:
             raise Refusal(f'the orca-pod block {name!r} opened at line {i + 1} is not closed')
         if name in blocks:
             raise Refusal(f'the orca-pod block {name!r} appears twice')
@@ -210,8 +346,8 @@ def overlaps(path, managed):
 def codex_managed(trust):
     """Managed key paths per block; a hooks.state path owns its whole table."""
     return {'root': [(key,) for key in CODEX_ROOT],
-             'agents': [('agents', 'enabled')], 'features': [('features', 'hooks')],
-             'hooks.state': [('hooks', 'state', key) for key in trust]}
+            'agents': [('agents', 'enabled')], 'features': [('features', 'hooks')],
+            'hooks.state': [('hooks', 'state', key) for key in trust]}
 
 
 def owns(kind, path, paths):
@@ -242,17 +378,45 @@ def set_path(doc, path, value):
     doc[path[-1]] = value
 
 
-def merge_codex_config(text, trust, old_hook_keys, adopt):
-    """Return (new text, conflicts, adopted {block: text}) for config.toml with managed blocks rewritten."""
-    tomllib.loads(text)  # Refuse invalid TOML before touching anything.
-    lines = text.splitlines(keepends=True)
-    base, old_blocks = strip_blocks(lines)
-    if base and not base[-1].endswith('\n'):
-        base[-1] += '\n'
+def get_path(doc, path):
+    for key in path:
+        if not isinstance(doc, dict) or key not in doc:
+            return None, False
+        doc = doc[key]
+    return doc, True
+
+
+def without(doc, paths):
+    """A copy of a parsed document with the given key paths removed."""
+    doc = copy.deepcopy(doc)
+    for path in paths:
+        node, found = get_path(doc, path[:-1])
+        if found and isinstance(node, dict):
+            node.pop(path[-1], None)
+    return doc
+
+
+def pruned(doc):
+    """Drop empty tables, which carry no value, so documents compare by their keys and values."""
+    if isinstance(doc, dict):
+        return {k: v for k, v in ((k, pruned(v)) for k, v in doc.items()) if v != {}}
+    if isinstance(doc, list):
+        return [pruned(v) for v in doc]
+    return doc
+
+
+def merge_codex_config(text, trust, old_hook_keys):
+    """Return (new text, moved, adopted {block: text}, previous {path: value}) for config.toml.
+
+    moved lists (line, dotted key) for managed keys defined outside the blocks; the caller refuses them
+    unless adopting. The result must equal the parsed original with only the managed paths replaced.
+    """
+    original = tomllib.loads(text)  # Refuse invalid TOML before touching anything.
+    base, old_blocks = strip_blocks(toml_lines(text))
     stmts = statements(base)
     managed = codex_managed(trust)
     domain = {**managed, 'hooks.state': managed['hooks.state'] + [('hooks', 'state', k) for k in old_hook_keys]}
-    conflicts, removed, adopted, first_removed, owned_tables = [], set(), {}, {}, set()
+    moved, removed, adopted, first_removed, owned_tables = [], set(), {}, {}, set()
     for start, end, kind, path in stmts:
         if kind is None:
             continue
@@ -262,7 +426,7 @@ def merge_codex_config(text, trust, old_hook_keys, adopt):
                 if kind != 'key':
                     owned_tables.add(path)
                 if kind != 'key' or path[:-1] not in owned_tables:  # Report a whole owned table once.
-                    conflicts.append((start + 1, ''.join(base[start:end]).rstrip('\n')))
+                    moved.append((start + 1, '.'.join(path)))
                 removed.update(range(start, end))
                 adopted[name] = adopted.get(name, '') + ''.join(base[start:end])
                 first_removed.setdefault(name, start)
@@ -274,11 +438,12 @@ def merge_codex_config(text, trust, old_hook_keys, adopt):
             below = [s for s in stmts if s[0] >= end and s[2] is not None]
             if above and below and above[-1][0] in removed and below[0][0] in removed:
                 removed.add(start)
-    if conflicts and not adopt:
-        return None, conflicts, {}
+    # An adopted key's original value is restored on uninstall; it cannot also sit in a block, or the
+    # original would not have parsed.
+    previous = {m: get_path(original, m)[0] for name in adopted for m in managed[name] if get_path(original, m)[1]}
     headers = {path: start for start, _, kind, path in stmts if kind == 'table'}
     inserts = {}  # base index -> [(block lines, foreign lines)]
-    for name in ('root', 'agents', 'features', 'hooks.state'):
+    for name in BLOCKS:
         old_index, inner = old_blocks.get(name, (None, []))
         foreign = []
         for start, end, kind, path in statements(inner, table_at(stmts, old_index or 0)):
@@ -289,6 +454,8 @@ def merge_codex_config(text, trust, old_hook_keys, adopt):
             index = headers[(name,)] + 1
         elif old_index is not None:
             index = old_index
+        elif header:  # A block carrying its own table header goes last, where it cannot capture other keys.
+            index = len(base)
         elif name in first_removed:
             index = first_removed[name]
         elif name == 'root':  # After any leading comments, before the first statement.
@@ -298,55 +465,99 @@ def merge_codex_config(text, trust, old_hook_keys, adopt):
         body = render_body(name, trust, header)
         block = [BEGIN.format(name), *body, END.format(name)] if body else []
         inserts.setdefault(index, []).append((block, foreign))
-
-    def assemble(with_blocks):
-        out = []
-        for i in range(len(base) + 1):
-            for block, foreign in inserts.get(i, []):
-                out += (block if with_blocks else []) + foreign
-            if i < len(base) and i not in removed:
-                out.append(base[i])
-        return ''.join(out)
-
-    new = assemble(True)
+    out = []
+    for i in range(len(base) + 1):
+        for block, foreign in inserts.get(i, []):
+            out += block + foreign
+        if i < len(base) and i not in removed:
+            out.append(base[i])
+    new = finish(''.join(out), not text or text.endswith('\n'))
+    expected = without(original, [p for paths in domain.values() for p in paths])
+    for path in managed['root']:
+        set_path(expected, path, CODEX_ROOT[path[0]])
+    for name, (key, value) in CODEX_TABLE_KEYS.items():
+        set_path(expected, (name, key), value)
+    for path in managed['hooks.state']:
+        set_path(expected, path, {'enabled': True, 'trusted_hash': trust[path[2]]})
     try:
-        expected = tomllib.loads(assemble(False))
-        for paths in managed.values():
-            for path in paths:
-                if path[0] == 'hooks':
-                    set_path(expected, path, {'enabled': True, 'trusted_hash': trust[path[2]]})
-                elif path[0] in CODEX_TABLE_KEYS:
-                    set_path(expected, path, CODEX_TABLE_KEYS[path[0]][1])
-                else:
-                    set_path(expected, path, CODEX_ROOT[path[0]])
-        ok = tomllib.loads(new) == expected
+        ok = pruned(tomllib.loads(new)) == pruned(expected)
     except tomllib.TOMLDecodeError:
         ok = False
     if not ok:
         raise Refusal('the managed blocks cannot be merged without changing other keys; edit config.toml by hand')
-    return new, [], adopted
+    return new, moved, adopted, previous
 
 
-def unmerge_codex_config(text, adopted, hook_keys):
-    """Remove managed blocks, keep foreign statements found inside them and restore adopted originals."""
-    base, blocks = strip_blocks(text.splitlines(keepends=True))
+def unmerge_codex_config(text, adopted, hook_keys, previous):
+    """Remove managed blocks, keep foreign statements found inside them and restore adopted originals.
+
+    The result must equal the parsed current file with only the owned paths removed or set back to their
+    previous values.
+    """
+    current = tomllib.loads(text)
+    base, blocks = strip_blocks(toml_lines(text))
     stmts = statements(base)
     domain = {**codex_managed({}), 'hooks.state': [('hooks', 'state', k) for k in hook_keys]}
     inserts = {}
     for name, (index, inner) in blocks.items():
-        keep = []
+        keep, header = [], []
         for start, end, kind, path in statements(inner, table_at(stmts, index)):
-            if kind is not None and not owns(kind, path, domain.get(name, [])):
+            if kind is None:
+                continue
+            if not owns(kind, path, domain[name]):
                 keep += inner[start:end]
+            elif kind == 'table' and path == (name,):
+                header = inner[start:end]
+        # The block's own table header still opens that table for foreign keys inside or just after it.
+        after = next((kind for start, _, kind, _ in stmts if start >= index and kind is not None), None)
+        if header and (keep or after == 'key'):
+            keep = header + keep
         inserts.setdefault(index, []).append(adopted.get(name, '') + ''.join(keep))
     out = []
     for i in range(len(base) + 1):
         out += inserts.get(i, [])
         if i < len(base):
             out.append(base[i])
-    new = ''.join(out)
-    tomllib.loads(new)
+    new = finish(''.join(out), not text or text.endswith('\n'))
+    expected = without(current, [p for paths in domain.values() for p in paths] + list(previous))
+    for path, value in previous.items():
+        set_path(expected, path, value)
+    try:
+        ok = pruned(tomllib.loads(new)) == pruned(expected)
+    except tomllib.TOMLDecodeError:
+        ok = False
+    if not ok:
+        raise Refusal('removing the managed blocks would change other keys')
     return new
+
+
+def block_view(text, domain):
+    """The owned statement lines of each managed block in text, and the number of every other line."""
+    base, blocks = strip_blocks(toml_lines(text))
+    stmts = statements(base)
+    shown, other = {}, len(base)
+    for name, (index, inner) in blocks.items():
+        shown[name] = []
+        for start, end, kind, path in statements(inner, table_at(stmts, index)):
+            if kind is not None and owns(kind, path, domain[name]):
+                shown[name] += [line.rstrip('\n') for line in inner[start:end]]
+            else:
+                other += sum(1 for line in inner[start:end] if line.strip())
+    return shown, other
+
+
+def managed_diff(old, new, domain):
+    """A diff of the owned lines in the managed blocks; unowned lines are only counted, never shown."""
+    before, _ = block_view(old, domain)
+    after, unowned = block_view(new, domain)
+    out = []
+    for name in BLOCKS:
+        if before.get(name, []) != after.get(name, []):
+            out.append(f'@@ block {name} @@')
+            out += list(difflib.unified_diff(before.get(name, []), after.get(name, []), lineterm='', n=0))[2:]
+    if unowned:
+        out.append(f'… {unowned} unowned line(s) not shown …')
+    return out
 
 
 # ---------- Planning ----------
@@ -358,6 +569,7 @@ class Plan:
         self.ops = []
         self.notes = []
         self.refusals = []
+        self.orca_version = None
 
     def show(self, path):
         try:
@@ -368,16 +580,15 @@ class Plan:
     def rel(self, path):
         return path.relative_to(self.home).as_posix()
 
-
-def current_bytes(path):
-    """File bytes, or b'symlink:<target>' for a link, or None when absent."""
-    if path.is_symlink():
-        return b'symlink:' + os.readlink(path).encode()
-    if path.is_file():
-        return path.read_bytes()
-    if path.exists():
-        raise Refusal(f'{path} exists and is not a regular file or symlink')
-    return None
+    def check(self, path, leaf_dir=False):
+        """Containment preflight: record a refusal and return False for an unsafe path."""
+        try:
+            check_path(self.home, path, leaf_dir)
+            return True
+        except Refusal as error:
+            if str(error) not in self.refusals:
+                self.refusals.append(str(error))
+            return False
 
 
 def text_diff(plan, path, old, new):
@@ -391,6 +602,8 @@ def text_diff(plan, path, old, new):
 
 def plan_file(plan, group, path, data, mode=0o644, diff=True):
     """Plan one owned whole file (or symlink when data starts with b'symlink:')."""
+    if not plan.check(path):
+        return
     rel = plan.rel(path)
     entry = plan.old.get('files', {}).get(rel)
     try:
@@ -398,7 +611,7 @@ def plan_file(plan, group, path, data, mode=0o644, diff=True):
     except Refusal as error:
         plan.refusals.append(str(error))
         return
-    cur_mode = None if cur is None or path.is_symlink() else path.stat().st_mode & 0o777
+    cur_mode = None if cur is None or cur.startswith(b'symlink:') else stat.S_IMODE(os.lstat(path).st_mode)
     is_link = data.startswith(b'symlink:')
     if cur is None:
         action = 'create'
@@ -409,10 +622,10 @@ def plan_file(plan, group, path, data, mode=0o644, diff=True):
     else:
         action = 'adopt (identical; backed up)' if cur == data and (is_link or cur_mode == mode) \
             else 'replace (backed up)'
+    # Only content Orca Pod wrote is diffed; a file it does not own yet, or one changed since, is not shown.
     plan.ops.append({'kind': 'file', 'group': group, 'path': path, 'rel': rel, 'data': data, 'mode': mode,
                      'action': action, 'current': cur, 'entry': entry,
-                     'diff': text_diff(plan, path, cur, data) if diff and action.startswith(('update', 'replace'))
-                     else []})
+                     'diff': text_diff(plan, path, cur, data) if diff and action == 'update' else []})
 
 
 def plan_skills(plan):
@@ -429,17 +642,16 @@ def plan_skills(plan):
         plan.notes.append('skills/ holds no skill packages')
     for name in skills:
         skill, dest = ROOT / 'skills' / name, plan.home / '.agents' / 'skills' / name
-        if dest.is_symlink():
-            plan.refusals.append(f'{plan.show(dest)} is a symlink; refusing to write through it')
+        if not plan.check(dest, leaf_dir=True):
             continue
         before = len(plan.ops)
         for src in sorted(files[name]):
             mode = 0o755 if src.stat().st_mode & 0o111 else 0o644
             plan_file(plan, 'skills', dest / src.relative_to(skill), src.read_bytes(), mode, diff=False)
-        if dest.is_dir() and not dest.is_symlink():
+        if dest.is_dir():
             ours = {op['path'] for op in plan.ops[before:]}
-            extra = [p for p in dest.rglob('*') if p.is_file() and p not in ours
-                     and plan.rel(p) not in plan.old.get('files', {})]
+            extra = [Path(d) / f for d, _, names in os.walk(dest) for f in names]
+            extra = [p for p in extra if p not in ours and plan.rel(p) not in plan.old.get('files', {})]
             if extra:
                 plan.notes.append(f'{plan.show(dest)} holds files Orca Pod does not own, left in place: '
                                   + ', '.join(p.relative_to(dest).as_posix() for p in extra[:5]))
@@ -449,11 +661,11 @@ def plan_skills(plan):
 
 
 def render_roles():
-    check = run(sys.executable, str(GENERATE), '--check')
+    check = run(PYTHON, str(GENERATE), '--check')
     if check.returncode:
         raise Refusal('roster tables are stale; run roster/generate.py and commit: ' + check.stderr.strip())
     with tempfile.TemporaryDirectory(prefix='orca-pod-roster-') as tmp:
-        result = run(sys.executable, str(GENERATE), '--out', tmp)
+        result = run(PYTHON, str(GENERATE), '--out', tmp)
         if result.returncode:
             raise Refusal('roster/generate.py failed: ' + (result.stderr or result.stdout).strip())
         return {p.relative_to(tmp).as_posix(): p.read_bytes() for p in Path(tmp).rglob('*') if p.is_file()}
@@ -478,25 +690,43 @@ def plan_stale(plan):
     for rel, entry in plan.old.get('files', {}).items():
         if rel not in planned:
             path = plan.home / rel
-            plan.ops.append({'kind': 'remove', 'group': 'stale', 'path': path, 'rel': rel, 'entry': entry,
-                             'action': 'restore backup' if entry.get('backup') else 'remove'})
+            if plan.check(path):
+                plan.ops.append({'kind': 'remove', 'group': 'stale', 'path': path, 'rel': rel, 'entry': entry,
+                                 'action': 'restore backup' if entry.get('backup') else 'remove'})
 
 
-def key_entry_base(plan, rel, cur, entry):
-    """Shared bookkeeping for a key-managed file: backup pointer, creation and pristine state."""
-    if entry:
-        pristine = entry['pristine'] and cur is not None and sha(cur) == entry['sha256']
-        return {'backup': entry.get('backup'), 'created': entry['created'], 'pristine': pristine}
-    return {'backup': None, 'created': cur is None, 'pristine': True}
+def read_key_file(plan, path):
+    """Current bytes of a key-managed file (None when absent), or False after recording a refusal."""
+    if not plan.check(path):
+        return False
+    if os.path.islink(path):
+        plan.refusals.append(f'{plan.show(path)} is a symlink; refusing to replace it')
+        return False
+    try:
+        return current_bytes(path)
+    except Refusal as error:
+        plan.refusals.append(str(error))
+        return False
+
+
+def json_style(text):
+    """The indent and final newline of a JSON document, so a rewrite keeps its look."""
+    indent = re.search(r'\n([ \t]+)\S', text)
+    return {'indent': indent[1] if indent else (None if text.strip() else 2),
+            'newline': text.endswith('\n') or not text.strip()}
+
+
+def dump_json(data, style):
+    return (json.dumps(data, indent=style['indent'], ensure_ascii=False)
+            + ('\n' if style['newline'] else '')).encode('utf-8')
 
 
 def plan_json(plan, group, path, sets, defaults):
     rel = plan.rel(path)
     entry = plan.old.get('keys', {}).get(rel)
-    if path.is_symlink():
-        plan.refusals.append(f'{plan.show(path)} is a symlink; refusing to replace it')
+    cur = read_key_file(plan, path)
+    if cur is False:
         return
-    cur = path.read_bytes() if path.exists() else None
     try:
         data = json.loads(cur) if cur else {}
     except ValueError as error:
@@ -505,7 +735,7 @@ def plan_json(plan, group, path, sets, defaults):
     if not isinstance(data, dict):
         plan.refusals.append(f'{plan.show(path)} is not a JSON object')
         return
-    owned = copy.deepcopy(entry['keys']) if entry else {}
+    owned = copy.deepcopy(entry['keys']) if entry else {}  # The previous value of each owned key.
     new, changes = dict(data), []
     wanted = dict(sets)
     for key, value in defaults.items():
@@ -519,54 +749,56 @@ def plan_json(plan, group, path, sets, defaults):
     for key in defaults:
         if key not in wanted and key not in owned:
             plan.notes.append(f'{plan.show(path)}: {key} is already set; left as is')
-    if new == data:
-        out = cur
-    else:
-        out = (json.dumps(new, indent=2, ensure_ascii=False) + '\n').encode('utf-8')
+    out = cur if new == data else dump_json(new, json_style(cur.decode('utf-8') if cur else ''))
     if not owned and out == cur:
         return
     plan.ops.append({'kind': 'keys', 'group': group, 'path': path, 'rel': rel, 'data': out, 'current': cur,
                      'action': 'unchanged' if out == cur else ('create' if cur is None else 'update keys'),
                      'changes': changes, 'diff': [],
-                     'entry': {'format': 'json', **key_entry_base(plan, rel, cur, entry), 'keys': owned}})
+                     'entry': {'format': 'json', 'created': entry['created'] if entry else cur is None,
+                               'keys': owned}})
 
 
 def plan_codex_config(plan, adopt):
     path = plan.home / '.codex' / 'config.toml'
     rel = plan.rel(path)
     entry = plan.old.get('keys', {}).get(rel)
-    if path.is_symlink():
-        plan.refusals.append(f'{plan.show(path)} is a symlink; refusing to replace it')
+    cur = read_key_file(plan, path)
+    if cur is False:
         return
-    cur = path.read_bytes() if path.exists() else None
-    trust = orca_hook_trust(plan.home, plan.notes)
+    trust = orca_hook_trust(plan.home, plan.notes, plan.orca_version)
     old_keys = entry.get('hook_keys', []) if entry else []
     text = cur.decode('utf-8') if cur else ''
     try:
-        new, conflicts, adopted = merge_codex_config(text, trust, old_keys, adopt)
-        if conflicts:
-            plan.refusals.append(f'{plan.show(path)} defines managed keys outside the orca-pod blocks; rerun with '
-                                 '--adopt-config to move them into the blocks:\n'
-                                 + '\n'.join(f'      line {n}: {line}' for n, line in conflicts))
-            shown, _, _ = merge_codex_config(text, trust, old_keys, True)
-            diff_note = ' (as it would be with --adopt-config)'
-        else:
-            shown, diff_note = new, ''
+        new, moved, adopted, previous = merge_codex_config(text, trust, old_keys)
+        domain = codex_managed(list(trust) + old_keys)
+        diff = managed_diff(text, new, domain)
     except (Refusal, tomllib.TOMLDecodeError) as error:
         plan.refusals.append(f'{plan.show(path)}: {error}')
         return
+    diff_note = ''
+    if moved:
+        lines = '\n'.join(f'      line {n}: {key}' for n, key in moved)
+        if adopt:
+            diff = [f'adopt line {n}: {key} (moved into the managed block)' for n, key in moved] + diff
+        else:
+            plan.refusals.append(f'{plan.show(path)} defines managed keys outside the orca-pod blocks; rerun with '
+                                 f'--adopt-config to move them into the blocks:\n{lines}')
+            diff_note = ' (as it would be with --adopt-config)'
     previous_adopted = copy.deepcopy(entry.get('adopted', {})) if entry else {}
     for name, original in adopted.items():
         previous_adopted[name] = previous_adopted.get(name, '') + original
-    data = shown.encode('utf-8')
+    recorded = {json.dumps(list(p)): v for p, v in previous.items()}
+    recorded.update(entry.get('previous', {}) if entry else {})  # The first recorded value is the original.
+    data = new.encode('utf-8')
     changes = [f'{len(trust)} Orca hook trust entr{"y" if len(trust) == 1 else "ies"} in [hooks.state]'
                + diff_note] if trust else []
     plan.ops.append({'kind': 'keys', 'group': 'codex config', 'path': path, 'rel': rel, 'data': data,
                      'current': cur, 'action': 'unchanged' if data == cur else ('create' if cur is None
                                                                                    else 'update managed blocks'),
-                     'changes': changes, 'diff': text_diff(plan, path, cur, data) if cur else [],
-                     'entry': {'format': 'toml', **key_entry_base(plan, rel, cur, entry),
-                               'adopted': previous_adopted, 'hook_keys': list(trust)}})
+                     'changes': changes, 'diff': diff if data != cur else [],
+                     'entry': {'format': 'toml', 'created': entry['created'] if entry else cur is None,
+                               'adopted': previous_adopted, 'previous': recorded, 'hook_keys': list(trust)}})
 
 
 def orc_claude_model():
@@ -589,7 +821,7 @@ def plan_claude(plan):
     plan_json(plan, 'claude settings', plan.home / '.claude' / 'settings.json',
               {'model': model, 'effortLevel': effort, 'skipDangerousModePermissionPrompt': True},
               {'theme': 'dark'})
-    # First-run keys only; Orca's "Trust the folder" covers per-project trust for the agents it launches.
+    # First-run keys only; Orca's "Trust the folder" covers project trust for every agent it launches (#14).
     first_run = {'hasCompletedOnboarding': True}
     version = claude_version()
     if version:
@@ -599,8 +831,16 @@ def plan_claude(plan):
     plan_json(plan, 'claude first run', plan.home / '.claude.json', {}, first_run)
 
 
+def orca_app_version():
+    module = orca_settings_module()
+    return module.app_version() if Path(module.APP).exists() else None
+
+
 def build_plan(home, old, args):
     plan = Plan(home, old)
+    plan.orca_version = orca_app_version()
+    for path, leaf_dir in ((home / STATE, True), (home / STATE / 'backups', True), (home / STATE / 'manifest.json', False)):
+        plan.check(path, leaf_dir)
     for step in (plan_skills, plan_roles, plan_rules, lambda p: plan_codex_config(p, args.adopt_config),
                  plan_claude, plan_stale):
         try:
@@ -714,74 +954,96 @@ def sign_in(args):
 # ---------- Applying ----------
 
 class Writer:
-    """Filesystem changes under home, with backups and created-directory bookkeeping."""
+    """Contained filesystem changes under home, with private backups and created-directory bookkeeping.
+
+    Every operation rechecks containment first, and every file is written to an exclusively created
+    temporary name in the same directory, then atomically renamed into place.
+    """
 
     def __init__(self, home, stamp, dirs):
         self.home = home
         self.state = home / STATE
         self.backup_root = self.state / 'backups' / stamp
         self.dirs = list(dirs)
+        self.saved = {}
         self.changed = 0
 
-    def ensure_dir(self, path):
+    def check(self, path, leaf_dir=False):
+        check_path(self.home, path, leaf_dir)
+
+    def ensure_dir(self, path, private=False, record=True):
+        self.check(path, leaf_dir=True)
         missing = []
-        while not path.exists() and not path.is_symlink():
+        while not os.path.lexists(path):
             missing.append(path)
             path = path.parent
         for path in reversed(missing):
-            path.mkdir()
+            path.mkdir(mode=0o700 if private else 0o777)
+            if private:
+                os.chmod(path, 0o700)
             rel = path.relative_to(self.home).as_posix()
-            if rel not in self.dirs:
+            if record and rel not in self.dirs:
                 self.dirs.append(rel)
 
-    def backup(self, path):
-        """Copy path (file, link or directory) into this run's backup directory; return its state-relative path."""
-        dest = self.backup_root / path.relative_to(self.home)
-        if dest.exists() or dest.is_symlink():
-            return dest.relative_to(self.state).as_posix()
-        self.ensure_dir(self.state)  # Backup directories themselves are never owned or pruned.
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        if path.is_dir() and not path.is_symlink():
-            shutil.copytree(path, dest, symlinks=True)
-        else:
-            shutil.copy2(path, dest, follow_symlinks=False)
-        return dest.relative_to(self.state).as_posix()
+    def state_dir(self):
+        """The private (0700) state directory, created when missing."""
+        self.ensure_dir(self.state)
+        os.chmod(self.state, 0o700)
+        return self.state
 
-    def put(self, path, data, mode=None):
-        """Atomically replace path with bytes, or with a symlink when data starts with b'symlink:'."""
-        if path.is_dir() and not path.is_symlink():
-            raise Refusal(f'{path} is a directory')
-        self.ensure_dir(path.parent)
-        temp = path.with_name(f'.{path.name}.orca-pod-{os.getpid()}.tmp')
+    def write(self, path, data, mode):
+        temp = path.with_name(f'.{path.name}.orca-pod-{secrets.token_hex(8)}.tmp')
         if data.startswith(b'symlink:'):
             os.symlink(data[8:].decode(), temp)
         else:
-            fd = os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, mode if mode is not None else 0o644)
-            with open(fd, 'wb') as handle:
-                handle.write(data)
-            os.chmod(temp, mode if mode is not None else 0o644)
+            fd = os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+            try:
+                with open(fd, 'wb') as handle:
+                    handle.write(data)
+                os.chmod(temp, mode)
+            except BaseException:
+                os.unlink(temp)
+                raise
         os.replace(temp, path)
+
+    def backup(self, path):
+        """Copy a whole owned file or link privately into this run's backups; return its manifest pointer."""
+        self.check(path)
+        dest = self.backup_root / path.relative_to(self.home)
+        if dest in self.saved:
+            return self.saved[dest]
+        data = current_bytes(path)
+        if data is None:
+            return None
+        self.state_dir()  # Backup directories themselves are never owned or pruned.
+        self.ensure_dir(dest.parent, private=True, record=False)
+        mode = None if data.startswith(b'symlink:') else stat.S_IMODE(os.lstat(path).st_mode)
+        self.write(dest, data, 0o600)
+        self.saved[dest] = {'path': dest.relative_to(self.state).as_posix(), 'mode': mode}
+        return self.saved[dest]
+
+    def put(self, path, data, mode=None):
+        """Atomically replace path with bytes, or with a symlink when data starts with b'symlink:'."""
+        self.check(path)
+        if os.path.isdir(path) and not os.path.islink(path):
+            raise Refusal(f'{path} is a directory')
+        self.ensure_dir(path.parent)
+        self.write(path, data, mode if mode is not None else 0o644)
         self.changed += 1
 
-    def restore(self, path, backup_rel):
-        src = self.state / backup_rel
-        if path.is_symlink() or path.is_file():
-            path.unlink()
-        elif path.exists():
-            shutil.rmtree(path)
-        self.ensure_dir(path.parent)
-        if src.is_dir() and not src.is_symlink():
-            shutil.copytree(src, path, symlinks=True)
-        else:
-            shutil.copy2(src, path, follow_symlinks=False)
-        self.changed += 1
+    def restore(self, path, pointer):
+        src = self.state / pointer['path']
+        self.check(src)
+        data = current_bytes(src)
+        if data is None:
+            raise Refusal(f'the backup {src} is missing')
+        self.put(path, data, pointer.get('mode'))
 
     def remove(self, path):
-        if path.is_symlink() or path.is_file():
+        self.check(path)
+        data = current_bytes(path)
+        if data is not None:
             path.unlink()
-            self.changed += 1
-        elif path.exists():
-            shutil.rmtree(path)
             self.changed += 1
 
     def prune_dirs(self, rels, empty_only=False):
@@ -792,13 +1054,30 @@ class Writer:
         kept, gone = [], []
         for rel in sorted(rels, key=lambda r: r.count('/'), reverse=True):
             try:
+                self.check(self.home / rel, leaf_dir=True)
                 (self.home / rel).rmdir()
                 gone.append(rel)
             except FileNotFoundError:
                 gone.append(rel)
-            except OSError:
+            except (OSError, Refusal):
                 kept.append(rel)
         return gone if empty_only else kept
+
+
+def write_manifest(writer, manifest):
+    """Write the manifest privately through an exclusively created temporary file and an atomic rename."""
+    state = writer.state_dir()
+    path = state / 'manifest.json'
+    writer.check(path)
+    fd, temp = tempfile.mkstemp(dir=state, prefix='.manifest-', suffix='.tmp')
+    try:
+        with open(fd, 'w', encoding='utf-8') as handle:
+            handle.write(json.dumps(manifest, indent=2, sort_keys=True, default=str) + '\n')
+        os.replace(temp, path)
+    except BaseException:
+        if os.path.lexists(temp):
+            os.unlink(temp)
+        raise
 
 
 def apply(plan, args, source, stamp):
@@ -832,33 +1111,24 @@ def apply(plan, args, source, stamp):
                     writer.remove(path)
                 del manifest['files'][op['rel']]
             else:
+                # Key-managed files hold credentials and private state, so they are never copied: the
+                # manifest records only the previous values of the owned keys and blocks.
                 record = dict(entry)
                 if op['data'] != op['current']:
-                    if op['current'] is not None:
-                        saved = writer.backup(path)
-                        if record['backup'] is None and not record['created']:
-                            record['backup'] = saved
-                    mode = path.stat().st_mode & 0o777 if path.exists() else \
+                    mode = stat.S_IMODE(os.lstat(path).st_mode) if os.path.lexists(path) else \
                         0o644 if path.name == 'settings.json' else 0o600
                     writer.put(path, op['data'], mode)
                 record['sha256'] = sha(op['data'])
                 manifest['keys'][op['rel']] = record
         writer.dirs = [rel for rel in writer.dirs if rel not in writer.prune_dirs(writer.dirs, empty_only=True)]
     finally:
-        writer.ensure_dir(plan.home / STATE)
+        writer.state_dir()
         manifest['dirs'] = writer.dirs
         manifest['source'] = {'revision': source['revision'], 'dirty': source['dirty']}
         if {k: v for k, v in old.items() if k != 'applied_at'} != manifest:
             manifest['applied_at'] = time.strftime('%Y-%m-%dT%H:%M:%S%z')
-            write_manifest(plan.home, manifest)
-    return writer.changed
-
-
-def write_manifest(home, manifest):
-    path = home / STATE / 'manifest.json'
-    temp = path.with_name('.manifest.json.tmp')
-    temp.write_text(json.dumps(manifest, indent=2, sort_keys=True) + '\n', encoding='utf-8')
-    os.replace(temp, path)
+            write_manifest(writer, manifest)
+    return writer, manifest
 
 
 def orca_settings_module():
@@ -867,30 +1137,69 @@ def orca_settings_module():
     return orca_settings
 
 
-def patch_orca(patch, state_dir, stamp):
-    """Run machine/orca_settings.py detached (it quits and relaunches Orca) and wait on its result file."""
-    result_path = state_dir / f'orca-settings-{stamp}.json'
-    with open(state_dir / f'orca-settings-{stamp}.log', 'wb') as log:
-        subprocess.Popen([sys.executable, str(ORCA_SETTINGS), '--patch', json.dumps(patch),
-                          '--result', str(result_path), '--backup-dir', str(state_dir / 'backups' / stamp / 'orca')],
+def patch_orca(writer, patch, stamp):
+    """Run machine/orca_settings.py detached (it quits and relaunches Orca) and wait on its result file.
+
+    Return the helper's result, or a failure without `written` when it does not finish in time.
+    """
+    state = writer.state_dir()
+    result_path, log_path = state / f'orca-settings-{stamp}.json', state / f'orca-settings-{stamp}.log'
+    backup = writer.backup_root / 'orca-settings.json'
+    writer.ensure_dir(backup.parent, private=True, record=False)
+    for path in (result_path, log_path, backup):
+        writer.check(path)
+    fd, temp = tempfile.mkstemp(dir=state, prefix='.orca-settings-log-', suffix='.tmp')
+    os.replace(temp, log_path)
+    with open(fd, 'wb') as log:
+        subprocess.Popen([PYTHON, str(ORCA_SETTINGS), '--patch', json.dumps(patch), '--result', str(result_path),
+                          '--backup', str(backup)],
                          stdin=subprocess.DEVNULL, stdout=log, stderr=log, start_new_session=True)
     print(f'Orca app settings: the detached helper quits, patches and relaunches Orca; waiting on {result_path}')
-    deadline = time.monotonic() + 420
+    deadline = time.monotonic() + 600
     while time.monotonic() < deadline:
         try:
-            result = json.loads(result_path.read_text(encoding='utf-8'))
+            result = json.loads(read_regular(result_path))
             if 'ok' in result:
-                print(f'Orca app settings: {"ok" if result["ok"] else "FAILED"} '
-                      f'{json.dumps(result.get("after") or result.get("error"))}')
-                return result['ok']
+                detail = result.get('after') if result['ok'] else result.get('error')
+                print(f'Orca app settings: {"ok" if result["ok"] else "FAILED"} {json.dumps(detail)}'
+                      + (f'; restored: {result.get("restore_verified", False)}' if result.get('written') else ''))
+                return result
         except (FileNotFoundError, ValueError):
             pass
         time.sleep(2)
-    print('Orca app settings: the helper did not finish within 7 minutes; check its result file and log')
-    return False
+    print('Orca app settings: the helper did not finish within 10 minutes; check its result file and log')
+    return {'ok': False, 'timeout': True}
 
 
-def orca_steps(args, state_dir, stamp):
+def record_orca_patch(writer, manifest, pre, patch):
+    """Record the previous Orca values before the helper starts; return the record set in the manifest."""
+    earlier = copy.deepcopy(manifest.get('orca_settings'))
+    record = copy.deepcopy(earlier) if earlier else {}
+    record['previous'] = {**pre['before'], **record.get('previous', {})}  # Keep the first original values.
+    record.update(set=dict(patch), status='pending',
+                  backup=(writer.backup_root / 'orca-settings.json').relative_to(writer.state).as_posix())
+    manifest['orca_settings'] = record
+    write_manifest(writer, manifest)
+    return earlier
+
+
+def settle_orca_record(writer, manifest, result, earlier):
+    """Keep the restoration record until the settings are verified as applied or verified as restored."""
+    if result.get('ok'):
+        manifest['orca_settings']['status'] = 'applied'
+    elif result.get('timeout'):
+        manifest['orca_settings']['status'] = 'unverified'
+    elif not result.get('written') or result.get('restore_verified'):
+        if earlier:
+            manifest['orca_settings'] = earlier
+        else:
+            manifest.pop('orca_settings', None)
+    else:
+        manifest['orca_settings']['status'] = 'failed'
+    write_manifest(writer, manifest)
+
+
+def orca_steps(args, writer, manifest, stamp):
     """Install Orca's own skills, then patch Orca's app settings, recording previous values in the manifest."""
     if args.scratch:
         return True
@@ -910,19 +1219,46 @@ def orca_steps(args, state_dir, stamp):
     if not pre['changes']:
         print('Orca app settings already match.')
         return ok
-    if not patch_orca(ORCA_PATCH, state_dir, stamp):
-        return False
-    manifest_path = state_dir / 'manifest.json'
-    manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
-    if not manifest.get('orca_settings'):
-        manifest['orca_settings'] = {'previous': pre['before'], 'set': ORCA_PATCH}
-        write_manifest(args.home_dir, manifest)
-    return ok
+    earlier = record_orca_patch(writer, manifest, pre, ORCA_PATCH)
+    result = patch_orca(writer, ORCA_PATCH, stamp)
+    settle_orca_record(writer, manifest, result, earlier)
+    return ok and result.get('ok', False)
 
 
 # ---------- Uninstall ----------
 
+def uninstall_preflight(home, old):
+    """Containment-check every path the manifest names before anything is written."""
+    problems = []
+
+    def check(path, leaf_dir=False):
+        try:
+            check_path(home, path, leaf_dir)
+        except Refusal as error:
+            problems.append(str(error))
+
+    for rel, entry in old.get('files', {}).items():
+        check(home / rel)
+        if entry.get('backup'):
+            check(home / STATE / entry['backup']['path'])
+    for rel in old.get('keys', {}):
+        check(home / rel)
+        if os.path.islink(home / rel):
+            problems.append(f'~/{rel} is a symlink; refusing to replace it')
+    for rel in old.get('dirs', []):
+        check(home / rel, leaf_dir=True)
+    for path in (home / STATE, home / STATE / 'backups'):
+        check(path, leaf_dir=True)
+    return list(dict.fromkeys(problems))
+
+
 def uninstall(home, old, args, stamp):
+    refused = uninstall_preflight(home, old)
+    if refused:
+        print(f'REFUSED ({len(refused)}); --uninstall writes nothing until these are resolved:')
+        for problem in refused:
+            print(f'  - {problem}')
+        return 2
     writer = Writer(home, stamp, [])
     problems = []
     print(f'Orca Pod uninstall from {home}')
@@ -940,18 +1276,13 @@ def uninstall(home, old, args, stamp):
             print(f'  removed      ~/{rel}')
     for rel, entry in sorted(old.get('keys', {}).items()):
         path = home / rel
-        cur = path.read_bytes() if path.exists() else None
+        cur = current_bytes(path)
         if cur is None:
             continue
-        if entry['pristine'] and sha(cur) == entry['sha256'] and (entry['backup'] or entry['created']):
-            if entry['backup']:
-                writer.restore(path, entry['backup'])
-                print(f'  restored     ~/{rel}')
-            else:
-                writer.remove(path)
-                print(f'  removed      ~/{rel}')
+        if entry['created'] and sha(cur) == entry.get('sha256'):
+            writer.remove(path)
+            print(f'  removed      ~/{rel}')
             continue
-        writer.backup(path)
         try:
             if entry['format'] == 'json':
                 data = json.loads(cur)
@@ -961,30 +1292,36 @@ def uninstall(home, old, args, stamp):
                             data[key] = record['previous']
                         else:
                             del data[key]
-                new = (json.dumps(data, indent=2, ensure_ascii=False) + '\n').encode('utf-8')
+                new = dump_json(data, json_style(cur.decode('utf-8')))
             else:
+                previous = {tuple(json.loads(p)): v for p, v in entry.get('previous', {}).items()}
                 new = unmerge_codex_config(cur.decode('utf-8'), entry.get('adopted', {}),
-                                           entry.get('hook_keys', [])).encode('utf-8')
+                                           entry.get('hook_keys', []), previous).encode('utf-8')
         except (ValueError, Refusal) as error:
-            problems.append(f'~/{rel}: could not remove managed keys ({error}); the pre-install copy is at '
-                            f'{home / STATE / entry["backup"]}' if entry['backup'] else f'~/{rel}: {error}')
+            problems.append(f'~/{rel}: could not remove the managed keys ({error}); left as is')
             continue
-        if new != cur:
-            writer.put(path, new, path.stat().st_mode & 0o777)
-            print(f'  removed keys ~/{rel} (changed since install, so managed keys were removed in place)')
+        if entry['created'] and not new.strip(b'{} \t\n'):
+            writer.remove(path)
+            print(f'  removed      ~/{rel} (only managed keys were left)')
+        elif new != cur:
+            writer.put(path, new, stat.S_IMODE(os.lstat(path).st_mode))
+            print(f'  removed keys ~/{rel} (restored the previous values of the managed keys)')
     settings = old.get('orca_settings')
     if settings and not args.scratch and not args.skip_orca_settings:
         pre = orca_settings_module().preflight(settings['previous'])
         if not pre['ok']:
             problems.append(f'Orca app settings not restored: {pre["error"]}')
+        elif pre['before'] == settings['previous']:
+            print('Orca app settings already have their previous values')
         elif pre['before'] != settings['set']:
             print('Orca app settings changed since install; left as they are')
-        elif not patch_orca(settings['previous'], home / STATE, stamp):
+        elif not patch_orca(writer, settings['previous'], stamp).get('ok'):
+            # The kept incomplete manifest still holds the previous values for a later restore.
             problems.append(f'Orca app settings not restored to {json.dumps(settings["previous"])}')
     kept = writer.prune_dirs(old.get('dirs', []))
     manifest = home / STATE / 'manifest.json'
     if problems:  # Keep the ownership record next to the backups for manual recovery.
-        manifest.rename(manifest.with_name(f'manifest-{stamp}.incomplete.json'))
+        os.replace(manifest, manifest.with_name(f'manifest-{stamp}.incomplete.json'))
     else:
         manifest.unlink()
     writer.prune_dirs(kept)
@@ -1012,6 +1349,21 @@ def source_state(allow):
     return {'revision': head, 'dirty': dirty, 'published': published}
 
 
+def load_manifest(home):
+    path = home / STATE / 'manifest.json'
+    check_path(home, path)
+    data = current_bytes(path)
+    if data is None:
+        return {}
+    if data.startswith(b'symlink:'):
+        raise Refusal(f'{path} is a symlink')
+    old = json.loads(data)
+    if old.get('version') != MANIFEST_VERSION:
+        raise Refusal(f'{path} has unknown version {old.get("version")}')
+    validate_manifest(old)
+    return old
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     mode = parser.add_mutually_exclusive_group()
@@ -1033,15 +1385,15 @@ def main():
     if not home.is_dir():
         raise SystemExit(f'install.py: {home} is not a directory')
     args.scratch = home.resolve() != Path.home().resolve()
-    args.home_dir = home
-    manifest_path = home / STATE / 'manifest.json'
-    old = json.loads(manifest_path.read_text(encoding='utf-8')) if manifest_path.exists() else {}
-    if old and old.get('version') != MANIFEST_VERSION:
-        raise SystemExit(f'install.py: {manifest_path} has unknown version {old.get("version")}')
+    try:
+        old = load_manifest(home)
+    except (Refusal, ValueError, OSError) as error:
+        print(f'install.py: REFUSED: {error}')
+        return 2
     stamp = time.strftime('%Y%m%dT%H%M%S') + f'-{os.getpid()}'
     if args.uninstall:
         if not old:
-            print(f'Nothing to uninstall: no manifest at {manifest_path}')
+            print(f'Nothing to uninstall: no manifest at {home / STATE / "manifest.json"}')
             return 0
         return uninstall(home, old, args, stamp)
     try:
@@ -1055,9 +1407,10 @@ def main():
     if not args.apply:
         print('Dry run complete; rerun with --apply to install.')
         return 0
-    changed = apply(plan, args, source, stamp)
-    print(f'\nApplied: {changed} change(s).' if changed else '\nNo changes: the managed targets are current.')
-    ok = orca_steps(args, home / STATE, stamp)
+    writer, manifest = apply(plan, args, source, stamp)
+    print(f'\nApplied: {writer.changed} change(s).' if writer.changed else
+          '\nNo changes: the managed targets are current.')
+    ok = orca_steps(args, writer, manifest, stamp)
     sign_in(args)
     return 0 if ok else 1
 

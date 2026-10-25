@@ -31,6 +31,7 @@ Standing instructions for each role are in [roles.md](roles.md).
 | **🧪 TST-proof** `tst-proof` | Write the independent failing proof that a fix must satisfy (tdd proof owner). | Codex · `gpt-6.1-sol` · high | orca | write-owned-files | Claude · `claude-opus-5-5` · medium: WRK ran on Codex |
 | **🖥️ BRW** `brw` | Verify rendered interfaces, interactions, accessibility, responsive layouts, and exported artifacts. | Codex · `gpt-6.1-sol` · medium | orca | read-only | — |
 | **🧭 EXP** `exp` | Map repositories, trace execution paths, and gather targeted evidence. | Codex · `gpt-6-luna` · high | native | read-only | Codex · `gpt-6-luna` · max: a tricky trace<br>Codex · `gpt-6.1-sol` · low: a tricky trace that Luna max does not resolve |
+| **🧭 EXP-lite** `exp-lite` | Answer a bounded few-file lookup for a Claude coordinator, in place of Claude Code's built-in Explore. | Claude · `claude-haiku-5-5` · low | native | read-only | — |
 | **⏳ MON** `mon` | Run or observe a bounded workflow where no deterministic wait will do, and return terminal evidence. | Codex · `gpt-6-luna` · medium | native | read-only | — |
 <!-- roster:roles:end -->
 
@@ -43,8 +44,9 @@ Standing instructions for each role are in [roles.md](roles.md).
   `~/.codex/agents/<id>.toml`) when the role's provider matches the
   coordinator's; otherwise an Orca worker. A role on the other provider is
   always an Orca worker.
-  - Claude ORC: PLN is native. For a trivial few-file lookup, Claude Code's
-    built-in Explore subagent may be used instead of EXP; anything that loops
+  - Claude ORC: PLN and EXP-lite are native. Send a trivial few-file lookup to
+    EXP-lite (`exp-lite`), never Claude Code's built-in Explore subagent, which
+    inherits the coordinator's model with no effort pin. Anything that loops
     goes to EXP.
   - Codex ORC: EXP and MON are native.
 - Native subagents are for short, read-only, single-provider help. Use an Orca
@@ -109,11 +111,19 @@ Standing instructions:
 
 ## Commands
 
-Bind one Run per objective, then start the whole independent wave before
-waiting:
+Bind one Run per coordinator session, then start the whole independent wave
+before waiting:
 
 ```bash
 orca orchestration run-create --objective "<objective>" --json
+```
+
+A coordinator consumes exactly one Run at a time. `run-create`, or binding any
+other Run, rebinds the caller, and mutations on its other Runs then fail with
+`consumer_fenced`. To switch back, rebind the original Run:
+
+```bash
+orca orchestration run-use --id <run_id> --json
 ```
 
 `worker-start` exits 0 only when the worker is ready. On a non-zero exit, do not

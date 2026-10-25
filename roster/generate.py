@@ -2,7 +2,9 @@
 """Render roster/roles.toml into native Claude and Codex agents, the SEC profile and skills/roster tables."""
 import argparse
 import json
+import os
 from pathlib import Path
+import re
 import sys
 import tomllib
 
@@ -21,10 +23,16 @@ LAYERS = {'pane', 'native', 'orca'}
 AUTHORITIES = {'read-only', 'write-owned-files', 'named-git-action'}
 SANDBOXES = {'read-only', 'workspace-write'}
 READ_ONLY_CLAUDE_TOOLS = 'Edit, Write, NotebookEdit'
+NAME = re.compile(r'[a-z0-9][a-z0-9-]*')  # Role ids and profiles become file names under --out.
+TOML_CONTROL = re.compile(r'[\x00-\x08\x0a-\x1f\x7f]')  # Forbidden raw in TOML basic strings; tab is allowed.
 
 
 def fail(message):
     raise SystemExit(f'roles.toml: {message}')
+
+
+def refuse(path, reason):
+    raise SystemExit(f'generate.py: refusing to write {path}: {reason}; nothing was written')
 
 
 def require(table, key, where, allowed=None):
@@ -55,6 +63,8 @@ def load(path=ROLES):
     seen = set()
     for role in roles:
         rid = require(role, 'id', 'a role')
+        if not NAME.fullmatch(rid):
+            fail(f'role id {rid!r} is not a safe name ({NAME.pattern})')
         if rid in seen:
             fail(f'duplicate role id {rid!r}')
         seen.add(rid)
@@ -73,7 +83,8 @@ def load(path=ROLES):
             fail(f'{rid} must set profile and launch together')
         if 'launch' in role:
             require(role, 'launch', rid, {'terminal'})
-            require(role, 'profile', rid)
+            if not NAME.fullmatch(require(role, 'profile', rid)):
+                fail(f'{rid} profile {role["profile"]!r} is not a safe name ({NAME.pattern})')
             if [entry['provider'] for entry in role['models']] != ['codex']:
                 fail(f'{rid} terminal launch needs exactly one Codex model')
     return roles
@@ -96,14 +107,17 @@ def has_native_file(role):
     return role['layer'] != 'pane' and 'launch' not in role
 
 
+def toml_escape(value, newlines=False):
+    escaped = value.replace('\\', '\\\\').replace('"', '\\"')
+    return TOML_CONTROL.sub(lambda m: m[0] if newlines and m[0] == '\n' else f'\\u{ord(m[0]):04x}', escaped)
+
+
 def toml_string(value):
-    # JSON string escapes are a subset of TOML basic-string escapes.
-    return json.dumps(value, ensure_ascii=False)
+    return f'"{toml_escape(value)}"'
 
 
 def toml_multiline(value):
-    escaped = value.replace('\\', '\\\\').replace('"""', '""\\"')
-    return f'"""\n{escaped}\n"""'
+    return f'"""\n{toml_escape(value, newlines=True)}"""'
 
 
 def claude_agent(role, entry):
@@ -111,7 +125,7 @@ def claude_agent(role, entry):
         '---',
         f'# {NOTICE}',
         f'name: {role["id"]}',
-        f'description: {toml_string(label(role) + ": " + role["purpose"])}',  # A JSON string is a YAML double-quoted scalar.
+        f'description: {json.dumps(label(role) + ": " + role["purpose"], ensure_ascii=False)}',  # A YAML double-quoted scalar.
         f'model: {entry["model"]}',
         f'effort: {entry["effort"]}',
     ]
@@ -122,20 +136,22 @@ def claude_agent(role, entry):
 
 
 def codex_agent(role, entry):
+    fields = {
+        'name': role['id'],
+        'description': label(role) + ': ' + role['purpose'],
+        'model': entry['model'],
+        'model_reasoning_effort': entry['effort'],
+        'sandbox_mode': entry['sandbox'],
+    }
     text = '\n'.join([
         f'# {NOTICE}',
-        f'name = {toml_string(role["id"])}',
-        f'description = {toml_string(label(role) + ": " + role["purpose"])}',
-        f'model = {toml_string(entry["model"])}',
-        f'model_reasoning_effort = {toml_string(entry["effort"])}',
-        f'sandbox_mode = {toml_string(entry["sandbox"])}',
+        *(f'{key} = {toml_string(value)}' for key, value in fields.items()),
         '',
         f'developer_instructions = {toml_multiline(instructions(role))}',
         '',
     ])
-    parsed = tomllib.loads(text)
-    if parsed['developer_instructions'].strip() != instructions(role):
-        fail(f'{role["id"]} instructions do not survive TOML rendering')
+    if tomllib.loads(text) != {**fields, 'developer_instructions': instructions(role)}:
+        fail(f'{role["id"]} does not survive TOML rendering')
     return text
 
 
@@ -217,12 +233,31 @@ def skill_text(roles, current):
     return f'{head}{BEGIN}\n{role_table(roles)}\n{END}{tail}'
 
 
+def contain(files, out):
+    """Refuse, before any write, a destination that escapes out or passes through a symlink below it."""
+    root = out.resolve()
+    for path in files:
+        if not path.is_relative_to(out):
+            refuse(path, f'outside {out}')
+        current = out
+        for part in path.relative_to(out).parts:
+            current = current / part
+            if current.is_symlink():
+                refuse(path, f'{current} is a symlink')
+        if not path.resolve().is_relative_to(root):
+            refuse(path, f'resolves outside {root}')
+        if path.exists() and not path.is_file():
+            refuse(path, 'not a regular file')
+
+
 def write(path, text):
     """Write only on change so a re-run touches nothing; return whether the file changed."""
     if path.exists() and path.read_text(encoding='utf-8') == text:
         return False
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text, encoding='utf-8')
+    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o644)
+    with open(descriptor, 'w', encoding='utf-8') as handle:
+        handle.write(text)
     return True
 
 
@@ -243,7 +278,14 @@ def main():
         if not stale:
             print('Roster tables are current.')
         return 1 if stale else 0
-    files = {**outputs(roles, args.out.expanduser()), **in_place}
+    out = args.out.expanduser().absolute()
+    generated = outputs(roles, out)
+    contain(generated, out)
+    # The two in-repo tables are the only destinations outside --out.
+    for path in in_place:
+        if path.is_symlink() or path.resolve() != path:
+            refuse(path, 'the in-repo table is or sits under a symlink')
+    files = {**generated, **in_place}
     for path, text in files.items():
         shown = path.relative_to(ROOT) if path.is_relative_to(ROOT) else path
         print(f'{"wrote" if write(path, text) else "unchanged"} {shown}')

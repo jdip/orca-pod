@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
-"""Check imported skills and the Standard for Agent Team leftovers, manual-only frontmatter and upstream licenses."""
+"""Check imported skills and the Standard for Agent Team leftovers, manual-only frontmatter and upstream licenses,
+and the repository for references to the retired code-review routing files."""
 from pathlib import Path
 import re
 import sys
 
 ROOTS = ('skills', 'standard')
+# code-review's routing files were folded into the roster skill; nothing may point at them again.
+RETIRED_ROOTS = (*ROOTS, 'docs', 'scripts', 'roster', 'machine')
+RETIRED = re.compile(r'reviewer-(?:routing|models)\b')
 # Skills referenced without a package here: external ones and retired Agent Team ones.
 UNPACKAGED = ('openai-docs', 'workflow-refresh', 'cleanup-schedule')
 # A `codex/` segment starting a token or following a Git ref prefix (origin/, refs/heads/) is a branch.
@@ -41,28 +45,38 @@ def shell_variables(path, text, names):
         text)}
 
 
+def texts(roots):
+    """Yield each readable UTF-8 file under the roots with its text."""
+    for root in roots:
+        for path in sorted(Path(root).rglob('*')):
+            if not path.is_file() or '__pycache__' in path.parts:
+                continue
+            try:
+                yield path, path.read_text(encoding='utf-8')
+            except UnicodeDecodeError:
+                continue
+
+
 def main():
     packages = sorted(path for path in Path('skills').iterdir() if path.is_dir())
     names = {path.name for path in packages}
     skills = names | {'roster', *UNPACKAGED}
     sigil = re.compile(r'\$(' + '|'.join(sorted(map(re.escape, skills), key=len, reverse=True)) + r')(?![\w-])')
     failures = []
-    for root in ROOTS:
-        for path in sorted(Path(root).rglob('*')):
-            if not path.is_file() or path.name == 'LICENSE':
-                continue
-            try:
-                text = path.read_text(encoding='utf-8')
-            except UnicodeDecodeError:
-                continue
-            variables = shell_variables(path, text, skills)
-            for number, line in enumerate(text.splitlines(), 1):
-                problems = [label for label, found in (('codex/ branch reference', branch(line)),
-                                                       ('Pi/Herdr delegation route', route(path, line)))
-                            if found]
-                if any(match[1] not in variables for match in sigil.finditer(line)):
-                    problems.append('$skill sigil')
-                failures += [f'{path}:{number}: {problem}' for problem in problems]
+    for path, text in texts(ROOTS):
+        if path.name == 'LICENSE':
+            continue
+        variables = shell_variables(path, text, skills)
+        for number, line in enumerate(text.splitlines(), 1):
+            problems = [label for label, found in (('codex/ branch reference', branch(line)),
+                                                   ('Pi/Herdr delegation route', route(path, line)))
+                        if found]
+            if any(match[1] not in variables for match in sigil.finditer(line)):
+                problems.append('$skill sigil')
+            failures += [f'{path}:{number}: {problem}' for problem in problems]
+    for path, text in texts(RETIRED_ROOTS):
+        failures += [f'{path}:{number}: retired code-review routing file reference'
+                     for number, line in enumerate(text.splitlines(), 1) if RETIRED.search(line)]
     upstream = set(UPSTREAM.findall(Path('skills/UPSTREAM.md').read_text(encoding='utf-8')))
     for package in packages:
         derived = package.name in upstream or any(

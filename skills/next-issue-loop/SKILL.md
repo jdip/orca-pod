@@ -19,6 +19,13 @@ selected parent URL and explicit scope/owner/generation binding from
 transferred ownership stops this run; never reload a newer generation to defeat
 the stop. Resume only through the authorized selection or handoff owner.
 
+Each issue routes execution ownership through the `roster` skill as next-issue
+describes: a fresh WRK `worker-start` with the roster's model and effort, its
+receipt's `launch.effective` verified, and the coordinator keeping claims, tracker
+writes and every Git mutation. Wait on workers with `orca orchestration check
+--wait`, as the roster shows. Release or retain each settled worker before
+claiming the next issue; a worker's `worker_done` alone never completes an issue.
+
 After resolving an issue, finish all tracker bookkeeping, refresh the bound
 parent's children/dependencies/claims, and recheck next-issue’s Design gate
 before selecting the next eligible issue. Under `whats-next`, return at this

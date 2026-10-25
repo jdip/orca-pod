@@ -41,35 +41,38 @@ contract and the local integration path.
 
 ## Execution ownership
 
-Before starting a long-running gate or delivery wait, explicitly choose its
-execution and observation owner. Normally assign a test verifier to run validation,
-or a workflow monitor to execute or observe a predefined bounded sequence, using
-the host's existing roles and their authority boundaries. Short checks may stay
-with the primary; when delegation is unavailable, state that limit and own the
-bounded operation directly.
+Each long-running gate or delivery wait has one owner: the primary, or the roster
+role it delegated the whole operation to. That owner waits with a deterministic,
+bounded command on the exact PR, terminal or Dispatch, inside the runbook's overall
+limit, rather than a monitor or clock-anchored polling:
 
-The assignment names the exact command and checkout/revision or existing run,
-required success evidence, failure and overall/stall boundaries, permitted
-task-owned cleanup, and reporting conditions: the delegate reports terminal
-evidence, actionable failure, required input or target drift, and stays quiet on
-unchanged healthy progress. Authorize any successful-path mutations explicitly
-within the task's scope. Before temporary compute starts, the primary uses
-`cleanup-task-artifacts` to establish resource ownership and teardown.
+```bash
+gh pr checks <pr> --watch --fail-fast --interval 10
+orca terminal wait --terminal <handle> --for exit --timeout-ms <ms> --json
+orca orchestration check --wait --types worker_done,escalation,question --timeout-ms <ms> --json
+```
 
-For work already running, transfer terminal observation with its run/session
-identity, current state and log/status location only after the delegate
-demonstrates access to that exact run/session; an identifier alone is not access.
-Otherwise the original owner keeps terminal completion, collecting the exit status
-and terminal evidence, and the operation keeps running rather than restarting to
-move ownership. A delegate may still observe progress on an existing shared or
-native status/log surface it demonstrably reaches. Each run has one terminal
-owner and each surface one observer: the primary uses delegated evidence for
-required progress updates rather than independently polling the same surface.
+- **PR checks:** after the watch exits, confirm the current head, run and merge
+  readiness as the runbook requires. The canonical script already waits this way
+  for its own PR.
+- **A command in an Orca terminal:** after the wait, collect its terminal evidence
+  with `orca terminal read --terminal <handle> --json`.
+- **A delegated worker:** `check --wait` emits NDJSON keepalive objects
+  (`_keepalive`, legacy `_heartbeat`) on stderr before one final JSON object.
+  Parse the last object as the `roster` skill's Commands section shows, and process
+  every message before acknowledging the delivery.
 
-Anchor a new observation assignment and its stall interval to a fresh UTC or
-monotonic clock reading, keeping the operation's existing overall limit.
-Unqualified file timestamps or an earlier assignment's window do not establish a
-new observation timeout. Inaccessible or contradictory evidence is a capability or
+Short checks stay with the primary. Delegate long or independent validation to TST
+per the `roster` skill, naming the exact command and checkout/revision, required
+success evidence, the overall limit, permitted task-owned cleanup and reporting
+conditions; authorize any successful-path mutations explicitly within the task's
+scope. Use MON only where none of these waits fits. Before temporary compute
+starts, the primary uses `cleanup-task-artifacts` to establish resource ownership
+and teardown.
+
+A timed-out wait is a checkpoint, not a failure: inspect the actual PR, terminal or
+Dispatch state before deciding. Keep a running operation running; never restart it
+to change who waits on it. Inaccessible or contradictory evidence is a capability or
 evidence limit to report, not a process failure.
 
 The primary retains interpretation, discretionary recovery, scope decisions and

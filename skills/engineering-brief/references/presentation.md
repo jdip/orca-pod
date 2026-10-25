@@ -10,8 +10,9 @@ currently supports macOS and other POSIX hosts; native Windows is not verified.
 After saving a checked brief or audit, run the package's `scripts/render.sh` from
 inside Orca Pod, selecting Python 3.11+ through `ORCA_POD_PYTHON` when needed.
 The entrypoint owns its isolated Python environment in the local archive and
-installs only the package's declared `requirements.txt`. Do not install dependencies
-globally or add this skill to Machine Reconciliation.
+installs only the package's declared `requirements.txt`, the named exception in
+the root AGENTS.md dependency rule. Do not install dependencies globally or add
+them to host installation (`machine/install.py`).
 
 ```sh
 ORCA_POD_PYTHON=python3.13 <skill-directory>/scripts/render.sh
@@ -40,5 +41,6 @@ in the article. Each HTML discussion panel includes a copy icon beside the promp
 toggle, available while the prompt is collapsed. It
 copies only that panel’s text, reports completion after clipboard success, and
 selects the text for manual copying when access is unavailable. Copying does not
-create a task; the user creates a new Orca Pod task and pastes the context. Do not invent desktop deep-link URLs or
-introduce a bridge/service to simulate direct HTML task creation.
+launch a workspace; topic launches follow [discussion seeds](topic-actions.md).
+Do not invent deep-link URLs or introduce a bridge/service to simulate direct
+HTML workspace creation.

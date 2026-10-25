@@ -19,9 +19,14 @@ from typing import Any
 
 STATE_VERSION = 1
 STATE_DIRECTORY = "orca-pod-selection-scopes"
-LEGACY_PATHS = {"map": "orca-pod-wayfinder-map", "backlog": "orca-pod-implementation-backlog"}
+# Agent Team-era pointers keep their codex-* names; both are read-only migration inputs.
+LEGACY_PATHS = {
+    "map": ("orca-pod-wayfinder-map", "codex-wayfinder-map"),
+    "backlog": ("orca-pod-implementation-backlog", "codex-implementation-backlog"),
+}
 LABELS = {"map": "wayfinder:map", "backlog": "implementation:backlog"}
 GIT_TIMEOUT_SECONDS = 10
+ORCA_TIMEOUT_SECONDS = 30
 SAFE_OWNER = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\Z")
 SAFE_SCOPE = re.compile(r"[a-z0-9][a-z0-9_-]{0,63}\Z")
 WINDOWS_DEVICES = {"con", "prn", "aux", "nul", *(f"com{number}" for number in range(1, 10)), *(f"lpt{number}" for number in range(1, 10))}
@@ -268,17 +273,69 @@ def tracker_issue(target: str, kind: str, allow_closed: bool) -> dict[str, str]:
     return {"url": url, "issue_id": issue_id, "title": title}
 
 
-def legacy_issue(store: StateStore, kind: str) -> dict[str, str]:
-    path = store.common_dir / LEGACY_PATHS[kind]
-    regular_file(path, "legacy selection pointer")
+def legacy_url(path: Path) -> str:
+    regular_file(path, f"legacy selection pointer {path.name}")
     try:
         contents = path.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
-        fail("legacy selection pointer cannot be read")
+        fail(f"legacy selection pointer {path.name} cannot be read")
     lines = contents.splitlines()
     if len(lines) != 1 or not lines[0] or "\r" in lines[0]:
-        fail("legacy selection pointer must contain exactly one URL line")
-    return tracker_issue(lines[0], kind, allow_closed=True)
+        fail(f"legacy selection pointer {path.name} must contain exactly one URL line")
+    return lines[0]
+
+
+def legacy_issue(store: StateStore, kind: str) -> dict[str, str]:
+    paths = [store.common_dir / name for name in LEGACY_PATHS[kind]]
+    present = [path for path in paths if path.exists() or path.is_symlink()]
+    if not present:
+        fail(f"no legacy {kind} pointer exists: {', '.join(LEGACY_PATHS[kind])}")
+    urls = {legacy_url(path) for path in present}
+    if len(urls) != 1:
+        fail(f"legacy {kind} pointers disagree: {', '.join(path.name for path in present)}")
+    return tracker_issue(urls.pop(), kind, allow_closed=True)
+
+
+def orca_result(*command: str) -> dict[str, Any]:
+    try:
+        completed = subprocess.run(
+            ["orca", *command, "--json"], check=True, capture_output=True, text=True, timeout=ORCA_TIMEOUT_SECONDS
+        )
+        payload = json.loads(completed.stdout)
+    except FileNotFoundError:
+        fail("the orca CLI is unavailable; record an explicit unique task identity instead")
+    except subprocess.TimeoutExpired:
+        fail(f"orca {' '.join(command[:2])} did not finish within {ORCA_TIMEOUT_SECONDS} seconds")
+    except (subprocess.CalledProcessError, json.JSONDecodeError):
+        fail(f"orca {' '.join(command[:2])} failed")
+    if not isinstance(payload, dict) or payload.get("ok") is not True or not isinstance(payload.get("result"), dict):
+        fail(f"orca {' '.join(command[:2])} returned malformed data")
+    return payload["result"]
+
+
+def command_owner(arguments: argparse.Namespace) -> None:
+    worktree = orca_result("worktree", "current").get("worktree")
+    identity = worktree.get("identity") if isinstance(worktree, dict) else None
+    key = identity.get("key") if isinstance(identity, dict) else None
+    worktree_id = worktree.get("id") if isinstance(worktree, dict) else None
+    if not isinstance(key, str) or not isinstance(worktree_id, str):
+        fail("the current directory has no stable Orca worktree identity")
+    owner = key
+    if arguments.dispatch is not None:
+        dispatch_id = safe_owner(arguments.dispatch, "dispatch ID")
+        shown = orca_result("orchestration", "worker-show", "--dispatch", dispatch_id)
+        dispatch = shown.get("dispatch")
+        worker = shown.get("worker")
+        if not isinstance(dispatch, dict) or dispatch.get("id") != dispatch_id:
+            fail(f"Orca did not report dispatch '{dispatch_id}'")
+        if not isinstance(worker, dict) or worker.get("worktreeId") != worktree_id:
+            fail(f"dispatch '{dispatch_id}' does not run in the current Orca worktree")
+        owner = f"{key}:{dispatch_id}"
+    print(json.dumps({
+        "owner": safe_owner(owner, "Orca owner"),
+        "worktree_identity": key,
+        "dispatch": arguments.dispatch,
+    }, sort_keys=True))
 
 
 def selection_output(scope: str, kind: str, entry: dict[str, Any]) -> None:
@@ -432,7 +489,7 @@ def parser() -> argparse.ArgumentParser:
 
     def scope_owner(command: argparse.ArgumentParser) -> None:
         command.add_argument("--scope", required=True, help="stable effort scope")
-        command.add_argument("--owner", required=True, help="task identity")
+        command.add_argument("--owner", required=True, help="task identity from the owner command")
 
     select = commands.add_parser("select", help="select an open issue with an explicit generation expectation")
     scope_owner(select)
@@ -450,6 +507,10 @@ def parser() -> argparse.ArgumentParser:
     scope_owner(check)
     check.add_argument("--generation", required=True, type=positive_generation)
     check.set_defaults(handler=command_check)
+
+    owner = commands.add_parser("owner", help="derive the task owner from the current Orca worktree and dispatch")
+    owner.add_argument("--dispatch", help="this task's dispatch ID when it runs inside an Orca Run")
+    owner.set_defaults(handler=command_owner)
 
     legacy = commands.add_parser("import-legacy", help="copy a validated legacy pointer into an empty scoped selection")
     scope_owner(legacy)

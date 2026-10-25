@@ -2,7 +2,7 @@
 
 Orca Pod maintains the portable, Orca-native AI development setup: skills,
 workflows, a Claude and Codex role roster, a repository standard and the host
-installer. Planned skills live under `skills/` (arriving in #10).
+installer. Skills live under `skills/`.
 
 The canonical GitHub repository is public and is intended to remain public.
 Changing visibility or licensing requires explicit owner approval.
@@ -23,7 +23,11 @@ work, and worktrees still backing live Orca agents.
 
 ## Languages and environments
 
-Tooling logic uses Python 3.11+ with the standard library only. Bash is accepted
+Tooling logic uses Python 3.11+ with the standard library only. One named
+exception: the `engineering-brief` renderer installs its hash-pinned
+Python-Markdown (`skills/engineering-brief/requirements.txt`) into a skill-owned
+virtual environment in its private local archive, never globally or through
+`machine/install.py`. Bash is accepted
 for canonical shell entry points and existing shell helpers; prefer Python for
 new logic. Keep this toolchain cohesive. Adding another language, runtime,
 build/package toolchain, dependency, or execution/deployment environment

@@ -29,7 +29,7 @@ METADATA = re.compile(r"^<!-- engineering-brief .* -->\n?", re.MULTILINE)
 H1 = re.compile(r"^# (?!#)(.+?)\s*$", re.MULTILINE)
 FOLLOWUP = re.compile(
     r"(?m)^[ \t]*(?:[-*+]\s+)?"
-    r":codex-followup\[(?P<label>[^\]]+)\]"
+    r":(?:topic-seed|codex-followup)\[(?P<label>[^\]]+)\]"
     r"\{prompt=\"(?P<prompt>(?:\\.|[^\"\\])*)\"\}[ \t]*$"
 )
 COPYABLE = re.compile(r"(?m)^\*\*Copyable request:\*\*[^\n]*(?:\n|$)")
@@ -152,8 +152,8 @@ def protect_discussions(source):
     source = FOLLOWUP.sub(replace, source)
     source = COPYABLE.sub("", source)
     source = COPYABLE_DETAILS.sub("", source)
-    if ":codex-followup[" in source:
-        raise ReportRenderError("unrecognized native follow-up directive; preserve the source report")
+    if ":topic-seed[" in source or ":codex-followup[" in source:
+        raise ReportRenderError("unrecognized topic seed directive; preserve the source report")
     return source, discussions
 
 

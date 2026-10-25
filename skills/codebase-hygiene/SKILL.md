@@ -23,7 +23,8 @@ for delivery when the request or local workflow authorizes it. Carry forward any
 approved batch and constraints without asking again for each edit. Substantial
 architectural refactoring needs explicit scope approval; prepare its concrete
 design decision while completing independent authorized work. Scheduling and
-Machine Reconciliation remain separate requests.
+host installation (`machine/install.py --apply`, see `docs/install.md`) remain
+separate requests.
 
 ## Survey and investigate
 

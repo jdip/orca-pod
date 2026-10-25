@@ -19,7 +19,7 @@ sanitized evidence and keep private originals outside this repository.
 Infer the repo from `git remote -v`; `gh` does this automatically when run inside a clone.
 
 Task, child and rollup branches use the `orca/` prefix. Skills named here live
-under `skills/<name>/` (arriving in #10).
+under `skills/<name>/`.
 
 ## Remediation findings and deduplication
 

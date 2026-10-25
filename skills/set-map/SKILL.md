@@ -8,6 +8,8 @@ description: Select a Wayfinder map in an explicit effort scope, or carry out an
 Read [selection scope and handoff](SELECTIONS.md) before selecting, reading,
 resuming, importing, refreshing or transferring a map. Establish the explicit
 scope and task-owner binding from the current task, preserving other efforts.
+The owner is this task's Orca worktree identity (plus its dispatch ID inside a
+Run), derived with `scripts/set-map.sh owner [--dispatch <dispatch-id>]`.
 
 Use the map URL supplied by the user or established by an authorized workflow.
 The human need not repeat the URL or invoke another command. Preserve competing

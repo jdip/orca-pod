@@ -23,8 +23,9 @@ An authorized Greenfield Initialization, Brownfield Adoption or Standards Upgrad
 handoff includes the selected standard's alert-only protection outcome. Carry
 that authority through supported setup and readback. Preserve explicit owner
 exceptions and return conflicting policy to the alignment owner. Breaking upgrades,
-new runtimes, other repositories, main promotion, Machine Reconciliation and
-background jobs retain their separate authority boundaries.
+new runtimes, other repositories, main promotion, host installation
+(`machine/install.py --apply`, see `docs/install.md`) and background jobs retain
+their separate authority boundaries.
 
 Read actual manifests, lockfiles, workspaces, CI actions, installed dependency
 sources and updater configuration, including `.github/dependabot.yml` or `.yaml`.

@@ -1,3 +1,3 @@
 interface:
   display_name: "Audit Agent Instructions"
-  short_description: "Audit skills, rules, and instruction workflows"
+  short_description: "Audit Claude and Codex skills, rules, and instruction workflows"

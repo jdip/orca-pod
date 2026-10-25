@@ -7,7 +7,9 @@ description: Select an implementation backlog in an explicit effort scope, or ca
 
 Read [selection scope and handoff](../set-map/SELECTIONS.md) to establish the
 explicit scope and task-owner binding for selection, continuation, import or
-handoff. Use GitHub through `gh` and read the repository's tracker instructions. Resolve
+handoff. Derive the owner with `scripts/set-backlog.sh owner [--dispatch
+<dispatch-id>]`, which reports this task's Orca worktree identity (plus its
+dispatch ID inside a Run). Use GitHub through `gh` and read the repository's tracker instructions. Resolve
 this repository with `gh repo view`. This entry point selects an existing parent;
 `triage` owns intake and grouping, while `to-spec` and `to-tickets` own preparing
 and publishing an approved specification and breakdown.

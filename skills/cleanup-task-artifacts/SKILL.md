@@ -10,7 +10,8 @@ Use before launching temporary compute and at the end of validation, a proof, a 
 promotion, and before pausing for failure, human input or final handoff. The
 authorized work includes cleanup of its own temporary resources; another cleanup
 request is unnecessary. Also use for the explicitly installed daily sweep.
-Cleanup does not authorize Machine Reconciliation, updates, unrelated repair,
+Cleanup does not authorize host installation (`machine/install.py --apply`, see
+`docs/install.md`), updates, unrelated repair,
 publication, or broader deletion. Read the relevant repository's AGENTS.md and
 local delivery/artifact guidance. Protect the current task's own environment.
 
@@ -41,9 +42,9 @@ by the supervisor or daily sweep, not a claim that exit handlers always ran.
 
 ## Discover participating repositories
 
-For a daily sweep, obtain exact known project roots from the host's supported project
-inventory, or use roots explicitly supplied by the supervising agent. On Codex, use
-the supported Codex project inventory. Pass those roots to this package's
+For a daily sweep, obtain exact known project roots from Orca's project inventory
+(each `path` in `orca repo list --json`), or use roots explicitly supplied by the
+supervising agent. Pass those roots to this package's
 `scripts/discover.py` with Python 3.9+ (resolve the script relative to this skill).
 It parses only the root AGENTS.md Repository Standard section and verifies the exact
 Orca Pod source and adopted commit through gh. It checks each distinct revision
@@ -70,6 +71,20 @@ target a different namespace from validation. Missing Docker/process access is a
 coverage limit, not proof of no leftovers. Do not start an unavailable engine or
 contact an unrelated remote context just to expand the sweep.
 
+## Inventory Orca resources
+
+Run this package's `scripts/orca_inventory.py` (Python 3.9+, resolved relative to
+this skill). It is always a dry run: it reads `orca worktree current`, `orca
+worktree ps`, `orca terminal list`, and `orca orchestration worker-list --run
+<id>` for every Run in `orca orchestration run-list`, plus each local checkout's
+Git state, and changes nothing. It marks each Orca worktree `retain`, with its
+reasons, or `candidate`, and lists settled workers whose terminals are
+reclaimable. A live Orca terminal or agent, an unsettled or unreleased worker,
+the main checkout, the sweep's own worktree, local changes or unpublished commits
+retain the worktree. Reported coverage limits, such as a host not covered or a
+truncated listing, retain everything they leave unseen. A failed inventory
+preserves every resource. A candidate is only a proposal for the checks below.
+
 ## Establish what can be removed
 
 Eligibility only establishes participation. For every candidate establish BOTH
@@ -86,27 +101,30 @@ branch's commits are delivered before deleting it. Inspect dirty state and curre
 users before considering a worktree. Never blanket-prune branches, worktrees,
 containers, or logs. Reinspect the exact resource immediately before mutation.
 
-Never remove a checkout still backing a task. Use supported host lifecycle
-operations for app-owned worktrees. On Codex, use Handoff only when supported,
-appropriate, and safe for both checkouts; the calling task cannot hand itself off,
-and shell cd does not change task attachment. Do not create helper tasks or edit
-internal app storage to evade this limitation. On a host without supported lifecycle
-evidence or handling, retain the checkout. Report actual cleanup separately from
-delivery completion.
+Never remove a worktree backing a live Orca agent, terminal or unsettled worker,
+and never remove the calling task's own worktree. Remove an Orca-managed worktree
+only with `orca worktree rm --worktree <selector>`, never with `git worktree
+remove` or by editing Orca's app storage; it keeps branches Orca cannot prove are
+merged, and repo archive hooks run only with `--run-hooks`. Release a settled
+worker's terminal with `orca orchestration worker-release --dispatch <id>`; leave
+`worker-retain`ed terminals alone. Without Orca inventory evidence, retain the
+checkout. Report actual cleanup separately from delivery completion.
 
-## Conservative automatic archival
+## Conservative sweep removal
 
-Automatic archival additionally requires positively verified completion, unpinned
-status, no active execution, no pending input/approval or unresolved work, and MORE
-THAN SEVEN DAYS since the task's exact observed last-turn timestamp. No timestamp
-or unclear completion means skip. Do not use file modification time, task title,
-creation date, or an invented timestamp as a substitute. Do not relax the threshold.
+A daily sweep is a dry run by default: it reports the inventory and dispositions.
+Removing a worktree the sweep did not create needs explicit removal authority from
+the installed sweep or the operator, an inventory `candidate` disposition,
+positively verified delivery of its work, no pending input/approval or unresolved
+work, and MORE THAN SEVEN DAYS since its Orca `lastActivityAt` (the inventory's
+`idle_days`). No timestamp or unclear completion means skip. Do not use file
+modification time, worktree name, creation date, or an invented timestamp as a
+substitute. Do not relax the threshold.
 
-Use supported task listing/reading to establish evidence, recheck current state,
-then use supported archival. Do not assume that archival physically removed its
-checkout; observe and report actual lifecycle results. Preserve any local state
-that archival/removal could endanger. Headless hosts without supported task evidence
-skip affected archival and checkout removal.
+Rerun the inventory immediately before each removal and recheck the exact
+worktree. Observe and report the actual result of `orca worktree rm`, including a
+retained branch. Preserve any local state that removal could endanger. A host
+without Orca inventory skips worktree removal.
 
 ## Verify the disposition before reporting
 
@@ -114,9 +132,9 @@ Recheck identity and current users immediately before a stop/removal. Invoke the
 existing exact-resource teardown and inspect the resulting container/process state;
 a launched cleanup command or successful validation exit is not teardown evidence.
 Account for stopped/removed resources, explicitly retained live resources and
-unresolved resources in the existing task/run evidence. Missing task timestamps or
-checkout lifecycle tools restrict archival/checkout removal, not independently
-provable cleanup of an ended operation's temporary compute.
+unresolved resources in the existing task/run evidence. Missing Orca timestamps or
+inventory restrict worktree removal, not independently provable cleanup of an
+ended operation's temporary compute.
 
 Investigate unexpected failures before further action; do not blindly retry destructive steps
 or build a cleanup journal/state machine. Batch genuine human decisions after

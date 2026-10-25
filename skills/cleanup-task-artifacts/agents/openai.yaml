@@ -1,0 +1,6 @@
+interface:
+  display_name: "Cleanup Task Artifacts"
+  short_description: "Release temporary resources at major work boundaries"
+  default_prompt: "Use cleanup-task-artifacts for this authorized cleanup."
+policy:
+  allow_implicit_invocation: false

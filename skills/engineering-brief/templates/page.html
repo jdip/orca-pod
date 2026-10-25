@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>$title · Engineering Brief</title>
+  <style>$styles</style>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to the brief</a>
+  <header class="masthead">
+    <div class="brand">AGENT TEAM <span>/</span> ENGINEERING BRIEF</div>
+    <nav aria-label="Archive navigation">$navigation</nav>
+  </header>
+  <div class="reading-layout">
+    <main id="main">$content</main>
+    <aside aria-label="Reading notes">$sidebar</aside>
+  </div>
+  <footer class="footer">A field journal of agentic engineering.<br><span>Practitioner perspectives, consequential developments, and ideas worth examining.</span></footer>
+<script>
+  for (const panel of document.querySelectorAll('.discussion')) {
+    const button = panel.querySelector('.copy-prompt');
+    const prompt = panel.querySelector('pre');
+    const status = panel.querySelector('.copy-status');
+    if (!button || !prompt || !status) continue;
+    button.hidden = false;
+    button.addEventListener('click', async () => {
+      button.disabled = true;
+      status.textContent = '';
+      try {
+        if (!navigator.clipboard) throw new Error('Clipboard unavailable');
+        await navigator.clipboard.writeText(prompt.textContent);
+        status.textContent = 'Copied. Paste into Codex to start the discussion.';
+      } catch {
+        panel.querySelector('details').open = true;
+        const selection = window.getSelection();
+        if (selection) {
+          const range = document.createRange();
+          range.selectNodeContents(prompt);
+          selection.removeAllRanges();
+          selection.addRange(range);
+          status.textContent = 'Copy unavailable. Text selected: press Ctrl+C or ⌘C.';
+        } else {
+          status.textContent = 'Copy unavailable. Select and copy the prompt below.';
+        }
+      } finally {
+        button.disabled = false;
+      }
+    });
+  }
+</script>
+</body>
+</html>

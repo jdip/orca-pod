@@ -1,0 +1,4 @@
+interface:
+  display_name: "Wayfinder"
+  short_description: "Plan changes with proportionate maps and decisions"
+  default_prompt: "Use wayfinder to assess this change and resolve a covering map before specification and implementation."

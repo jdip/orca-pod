@@ -1,0 +1,4 @@
+interface:
+  display_name: "What’s Next"
+  short_description: "Choose and advance useful repository work"
+  default_prompt: "Use whats-next to find and advance the next useful work in this repository."

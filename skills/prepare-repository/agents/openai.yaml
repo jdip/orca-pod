@@ -1,0 +1,6 @@
+interface:
+  display_name: "Prepare Repository"
+  short_description: "Retire obsolete guidance before adoption or upgrade"
+  default_prompt: "Use prepare-repository from Orca Pod to assess the specified target, resolve its target-owned Wayfinder plan, and prepare the approved guidance changes."
+policy:
+  allow_implicit_invocation: true

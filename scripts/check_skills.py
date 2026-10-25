@@ -5,19 +5,47 @@ import re
 import sys
 
 ROOTS = ('skills', 'standard')
-SCRIPTS = ('.py', '.sh')  # A `$name` there is a shell variable, not a skill sigil.
-# A `codex/` path segment inside a URL or path is Codex the product, not a branch prefix.
-BRANCH = re.compile(r'(?<![\w/.-])codex/')
-ROUTE = re.compile(r'(?i:herdr)|\bPI_CODING_AGENT_DIR\b|\bpi-fast\b|\b(?:On|When) Pi\b')
+# Skills referenced without a package here: external ones and retired Agent Team ones.
+UNPACKAGED = ('openai-docs', 'workflow-refresh', 'cleanup-schedule')
+# A `codex/` segment starting a token or following a Git ref prefix (origin/, refs/heads/) is a branch.
+BRANCH = re.compile(r'(?<![\w-])codex/')
+# Only Codex product URLs and the `.codex/` config directory may carry that segment.
+PRODUCT = re.compile(r'(?:https?://)?(?:(?:[\w-]+\.)*openai\.com/(?:[\w.~-]+/)*|github\.com/openai/)\Z|(?:.*/)?\.\Z')
+TOKEN = re.compile(r'[\s<>(\[`"\']')
+RUNTIME = re.compile(r'(?i:herdr)|\bPI_CODING_AGENT_DIR\b|\bpi-fast\b')
+PI = re.compile(r'\bPi\b|(?i:\b(?:to|via|through|ask|use)\s+pi\b)')
+# Pi remains only as a research source cited in the engineering brief.
+SOURCES = 'skills/engineering-brief/references/sources.md'
+RESEARCH = re.compile(r'\| .*\]\(https://(?:mariozechner\.at|github\.com/earendil-works/pi)/?\)')
+DELEGATE = re.compile(r'(?i)dispatch|delegat|hand(?:s|ed|ing)?[ -]?off|\brout|\bsend|spawn|review')
 MANUAL = re.compile(r'^\s*allow_implicit_invocation:\s*false\s*$', re.M)
 FRONTMATTER = re.compile(r'\A---\n(.*?)\n---\n', re.S)
 UPSTREAM = re.compile(r'^\| `([\w-]+)` \|', re.M)
 
 
+def branch(line):
+    return any(not PRODUCT.match(TOKEN.split(line[:match.start()])[-1]) for match in BRANCH.finditer(line))
+
+
+def route(path, line):
+    retained = path.as_posix() == SOURCES and RESEARCH.match(line) and not DELEGATE.search(line)
+    return bool(RUNTIME.search(line) or (PI.search(line) and not retained))
+
+
+def shell_variables(path, text, names):
+    """Return skill names a shell script assigns as variables; elsewhere a `$name` is always a sigil."""
+    if path.suffix != '.sh':
+        return set()
+    return {name for name in names if re.fullmatch(r'[A-Za-z_]\w*', name) and re.search(
+        rf'(?m)(?<![\w$-]){name}=|\bfor\s+{name}\s+in\b|^\s*(?:local|declare|readonly|export|read)\b[^\n#]*(?<![\w$-]){name}\b',
+        text)}
+
+
 def main():
     packages = sorted(path for path in Path('skills').iterdir() if path.is_dir())
-    names = {path.name for path in packages} | {'roster'}
-    sigil = re.compile(r'\$(' + '|'.join(sorted(map(re.escape, names), key=len, reverse=True)) + r')(?![\w-])')
+    names = {path.name for path in packages}
+    skills = names | {'roster', *UNPACKAGED}
+    sigil = re.compile(r'\$(' + '|'.join(sorted(map(re.escape, skills), key=len, reverse=True)) + r')(?![\w-])')
     failures = []
     for root in ROOTS:
         for path in sorted(Path(root).rglob('*')):
@@ -27,11 +55,12 @@ def main():
                 text = path.read_text(encoding='utf-8')
             except UnicodeDecodeError:
                 continue
+            variables = shell_variables(path, text, skills)
             for number, line in enumerate(text.splitlines(), 1):
-                problems = [label for label, pattern in (('codex/ branch reference', BRANCH),
-                                                         ('Pi/Herdr delegation route', ROUTE))
-                            if pattern.search(line)]
-                if path.suffix not in SCRIPTS and sigil.search(line):
+                problems = [label for label, found in (('codex/ branch reference', branch(line)),
+                                                       ('Pi/Herdr delegation route', route(path, line)))
+                            if found]
+                if any(match[1] not in variables for match in sigil.finditer(line)):
                     problems.append('$skill sigil')
                 failures += [f'{path}:{number}: {problem}' for problem in problems]
     upstream = set(UPSTREAM.findall(Path('skills/UPSTREAM.md').read_text(encoding='utf-8')))

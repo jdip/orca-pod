@@ -50,7 +50,10 @@ managed roots.
 | `--verbose` | Also list unchanged paths. |
 
 Re-running `--apply` is idempotent: when everything is current it changes no
-file, including the manifest. Rerun it after pulling a new Orca Pod revision,
+file, including the manifest. An owned JSON key that a newer revision no longer
+sets, such as the top-level `effortLevel` earlier revisions wrote, gets its
+previous value back on the next `--apply` and leaves the manifest, unless it
+changed since install. Rerun it after pulling a new Orca Pod revision,
 and after an Orca upgrade, which can change Orca's skills and its Codex hooks.
 
 ## Managed targets
@@ -63,7 +66,7 @@ and after an Orca upgrade, which can change Orca's skills and its Codex hooks.
 | `~/.codex/orca-pod-sec.config.toml` | The SEC Daybreak profile (`codex --profile orca-pod-sec`), also from the generator. |
 | `~/.codex/AGENTS.md`, `~/.claude/rules/orca-pod.md` | The global rules in [`machine/global-rules.md`](../machine/global-rules.md). |
 | `~/.codex/config.toml` | Managed blocks only (below): root `model = "gpt-6.1-sol"` and `model_reasoning_effort = "high"`, `[agents] enabled = true`, `[features] hooks = true`, and hook trust for Orca's hooks. Every other line, comment and the end of the file are preserved byte for byte. |
-| `~/.claude/settings.json` | `model` and `effortLevel` from the roster's ORC default, `skipDangerousModePermissionPrompt: true`, and `theme: "dark"` only when no theme is set. Orca's hooks and status line, and every other key, keep their order and values; the file keeps its indent style and final newline, though JSON spelling such as escapes may be normalized. |
+| `~/.claude/settings.json` | Top-level `model` and the nested `modelSettings.<model>.effortLevel`, both from the roster's ORC default, `skipDangerousModePermissionPrompt: true`, and `theme: "dark"` only when no theme is set. Claude Code takes a session's default effort from that model's `modelSettings` entry; it treats a top-level `effortLevel` as a legacy value and does not apply it at startup, so the installer does not own one. Other `modelSettings` entries, and other fields of the model's entry, are left alone; uninstall removes the entry, or `modelSettings`, only when the installer created it and nothing else is left in it. Orca's hooks and status line, and every other key, keep their order and values; the file keeps its indent style and final newline, though JSON spelling such as escapes may be normalized. |
 | `~/.claude.json` | First-run keys, set only when missing: `hasCompletedOnboarding: true` and `lastOnboardingVersion` (from `claude --version`). Running Claude sessions rewrite this file, so it is only written when a key is missing. |
 | Orca's skills | `orca skills install --skill orca-cli --skill orchestration --agent claude,codex`, then `orca skills update` for the same skills. Orca owns these copies. |
 | Orca app settings | `branchPrefix: "custom"`, `branchPrefixCustom: "orca"` and `agentPermissionDefault: "full-access"`, applied by [`machine/orca_settings.py`](../machine/orca_settings.py) (below). |

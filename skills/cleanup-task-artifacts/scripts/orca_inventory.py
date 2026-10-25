@@ -8,6 +8,7 @@ recheck and removal under explicit cleanup authority.
 import argparse
 import json
 from pathlib import Path
+import shlex
 import subprocess
 import time
 
@@ -120,7 +121,7 @@ def inventory():
         entry = {'worktree': worktree_id, 'branch': row.get('branch'), 'archived': row.get('isArchived', False),
                  'idle_days': idle_days, 'disposition': 'retain' if reasons else 'candidate', 'reasons': reasons}
         if not reasons:
-            entry['after_recheck'] = f'orca worktree rm --worktree id:{worktree_id}'
+            entry['after_recheck'] = f'orca worktree rm --worktree {shlex.quote("id:" + worktree_id)}'
         report.append(entry)
 
     listed = {row['worktreeId'] for row in listing.get('worktrees', [])}
@@ -130,7 +131,7 @@ def inventory():
     return {'dry_run': True, 'coverage_limits': coverage, 'worktrees': report,
             'terminals_outside_listed_worktrees': orphans,
             'settled_workers_with_reclaimable_terminals': [
-                {'dispatch': dispatch, 'after_recheck': f'orca orchestration worker-release --dispatch {dispatch}'}
+                {'dispatch': dispatch, 'after_recheck': f'orca orchestration worker-release --dispatch {shlex.quote(dispatch)}'}
                 for dispatch in releasable]}
 
 

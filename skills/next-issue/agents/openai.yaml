@@ -1,0 +1,4 @@
+interface:
+  display_name: "Next Implementation Issue"
+  short_description: "Implement and deliver one issue from the saved backlog"
+  default_prompt: "Use next-issue to complete the next eligible implementation issue in this repository. Use this task’s explicit effort scope and owner binding."

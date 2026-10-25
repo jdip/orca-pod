@@ -1,0 +1,4 @@
+interface:
+  display_name: "Next Waypoint"
+  short_description: "Continue this repository’s saved Wayfinder map"
+  default_prompt: "Use next-waypoint to continue the saved Wayfinder map. Use this task’s explicit effort scope and owner binding."

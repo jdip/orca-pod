@@ -1,0 +1,4 @@
+interface:
+  display_name: "Define Project Goal"
+  short_description: "Agree on project purpose for root READMEs"
+  default_prompt: "Use define-project-goal to clarify this project’s purpose and record the agreed README blurb."

@@ -33,6 +33,12 @@ MANIFEST_VERSION = 1
 FILE_ROOTS = ('.agents/skills/', '.claude/', '.codex/')  # Whole files and links the manifest may own.
 KEY_FILES = ('.codex/config.toml', '.claude/settings.json', '.claude.json')  # Files owned key by key.
 DIR_ROOTS = ('.agents/skills', '.claude', '.codex', STATE.as_posix())  # Created directories lie on or below these.
+# The top-level JSON keys the manifest may own, by file, with the type of the value set. Only manifests from earlier
+# revisions own the top-level effortLevel, so a reapply can restore it.
+JSON_KEYS = {'.claude/settings.json': {'model': str, 'skipDangerousModePermissionPrompt': bool, 'theme': str,
+                                       'effortLevel': str},
+             '.claude.json': {'hasCompletedOnboarding': bool, 'lastOnboardingVersion': str}}
+CLAUDE_MODEL = re.compile(r'claude-[a-z0-9]+(?:-[a-z0-9]+)*')  # A roster Claude model id, owned as a modelSettings key.
 
 ORCA_SKILLS = ('orca-cli', 'orchestration')
 ORCA_PATCH = {'branchPrefix': 'custom', 'branchPrefixCustom': 'orca', 'agentPermissionDefault': 'full-access'}
@@ -132,10 +138,11 @@ def validate_manifest(old):
         need(rel in KEY_FILES and isinstance(entry, dict)
              and entry.get('format') == ('toml' if rel.endswith('.toml') else 'json'), f'key entry {rel!r}')
         need(all(isinstance(k, str) for k in entry.get('hook_keys', [])), f'hook keys for {rel!r}')
-        need(all(isinstance(r, dict) and (r.get('path') is None or (
-            isinstance(r['path'], list) and r['path'] and all(isinstance(k, str) for k in r['path'])
-            and r.get('created_parents', 0) in range(len(r['path'])))) for r in entry.get('keys', {}).values()),
-             f'owned keys for {rel!r}')
+        if entry['format'] == 'json':
+            need(set(entry) == {'format', 'created', 'keys'} and isinstance(entry['created'], bool)
+                 and isinstance(entry['keys'], dict), f'key entry {rel!r}')
+            for name, record in entry['keys'].items():
+                need(owned_json_key(rel, name, record), f'owned key {name!r} for {rel!r}')
     for rel in dirs:
         need(plain_rel(rel) and any(rel == r or rel.startswith(r + '/') or r.startswith(rel + '/')
                                     for r in DIR_ROOTS), f'directory {rel!r}')
@@ -144,6 +151,23 @@ def validate_manifest(old):
                               and isinstance(settings.get('set'), dict)), 'Orca settings record')
     if settings and settings.get('backup') is not None:
         backup_ok({'path': settings['backup']}, 'Orca settings backup')
+
+
+def owned_json_key(rel, name, record):
+    """Whether a manifest record names a JSON key the installer owns in rel, with the shape the installer writes:
+    a listed top-level key, or the effortLevel of one Claude model under modelSettings in the Claude settings."""
+    if not (isinstance(record, dict) and isinstance(record.get('had'), bool) and 'set' in record
+            and 'previous' in record and (record['had'] or record['previous'] is None)):
+        return False
+    extra = set(record) - {'had', 'previous', 'set'}
+    if name in JSON_KEYS[rel]:
+        return not extra and type(record['set']) is JSON_KEYS[rel][name]
+    model = name.removeprefix('modelSettings.').removesuffix('.effortLevel')
+    return (rel == '.claude/settings.json' and name == f'modelSettings.{model}.effortLevel'
+            and bool(CLAUDE_MODEL.fullmatch(model)) and extra == {'path', 'created_parents'}
+            and record['path'] == ['modelSettings', model, 'effortLevel']
+            and type(record['created_parents']) is int and 0 <= record['created_parents'] <= 2
+            and type(record['set']) is str)
 
 
 def single_link(path, st):
@@ -809,8 +833,8 @@ def plan_json(plan, group, path, sets, defaults, keep=()):
             wanted[key] = value
     for key, value in wanted.items():
         name, missing = '.'.join(parts[key]), 0
-        for depth in range(1, len(parts[key])):
-            node, found = get_path(data, parts[key][:depth])
+        for depth in range(1, len(parts[key])):  # Parents count against the document after restoring stale keys.
+            node, found = get_path(new, parts[key][:depth])
             if not found:
                 missing = len(parts[key]) - depth
                 break
@@ -887,6 +911,8 @@ def orc_claude_model():
     model = orc['models'][0]
     if model['provider'] != 'claude':
         raise Refusal('roles.toml: the ORC default model is not a Claude model')
+    if not CLAUDE_MODEL.fullmatch(model['model']):
+        raise Refusal(f'roles.toml: the ORC default model {model["model"]!r} is not a plain Claude model id')
     return model['model'], model['effort']
 
 

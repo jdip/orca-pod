@@ -39,7 +39,11 @@ that is a regular file with more than one hard link is refused too, before it is
 read, backed up or replaced, because its contents also live outside the managed
 path. `--uninstall` runs the same checks on every path in the manifest, and
 refuses a manifest entry that is absolute, contains `..` or lies outside the
-managed roots.
+managed roots. Every run also refuses, before reading or writing anything, a
+manifest that records a JSON key other than those in [Managed targets](#managed-targets)
+(plus the top-level `effortLevel` earlier revisions owned, and the
+`modelSettings.<model>.effortLevel` of any Claude model id), or a record not in
+the shape the installer writes.
 
 | Option | Effect |
 | --- | --- |

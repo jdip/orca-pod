@@ -27,6 +27,7 @@ RULES = ROOT / 'machine' / 'global-rules.md'
 ORCA_SETTINGS = ROOT / 'machine' / 'orca_settings.py'
 GENERATE = ROOT / 'roster' / 'generate.py'
 ROLES = ROOT / 'roster' / 'roles.toml'
+AUTOMATIONS = ROOT / 'machine' / 'automations.toml'
 PYTHON = os.environ.get('ORCA_POD_PYTHON') or sys.executable  # Interpreter for the child Python helpers.
 STATE = Path('.local/state/orca-pod')
 MANIFEST_VERSION = 1
@@ -46,6 +47,17 @@ ORCA_PATCH = {'branchPrefix': 'custom', 'branchPrefixCustom': 'orca', 'agentPerm
 CODEX_ROOT = {'model': 'gpt-6.1-sol', 'model_reasoning_effort': 'high'}
 CODEX_TABLE_KEYS = {'agents': ('enabled', True), 'features': ('hooks', True)}
 BLOCKS = ('root', 'agents', 'features', 'hooks.state')
+# Each provider's --extra-agent-args for a roster model and effort; Orca 1.4.240 accepts only these options.
+AGENT_ARGS = {'claude': '--model {model} --effort {effort}',
+              'codex': '--model {model} -c model_reasoning_effort={effort}'}
+AUTOMATION_KEYS = {'name', 'role', 'trigger', 'prompt'}
+# Orca stores no ownership marker on an automation, so the installer only ever creates, edits or removes
+# automations named with this prefix, whatever the manifest records.
+AUTOMATION_PREFIX = 'Orca Pod: '
+AUTOMATION_ID = re.compile(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')  # Orca's UUIDs.
+CRON = re.compile(r'[0-9*,/-]+(?: [0-9*,/-]+){4}')
+PLAIN_TOKEN = re.compile(r'[A-Za-z0-9][A-Za-z0-9._-]*')
+ORCA_MISSED_RUN_GRACE = 720  # Orca 1.4.240's default missed-run grace window, in minutes.
 
 # The exact command hooks each verified Orca version writes to ~/.codex/hooks.json, taken from Orca 1.4.240's
 # agent-hook generator (its Codex command builder and event table). Only an exact match is ever trusted.
@@ -168,6 +180,22 @@ def validate_manifest(old):
                               and isinstance(settings.get('set'), dict)), 'Orca settings record')
     if settings and settings.get('backup') is not None:
         backup_ok({'path': settings['backup']}, 'Orca settings backup')
+    automations = old.get('automations', {})
+    need(isinstance(automations, dict), 'automations record')
+    for name, record in automations.items():
+        need(automation_name(name) and isinstance(record, dict) and set(record) == {'id', 'adopted'}
+             and type(record['id']) is str and bool(AUTOMATION_ID.fullmatch(record['id']))
+             and type(record['adopted']) is bool, f'automation record {name!r}')
+    ids = [record['id'] for record in automations.values()]
+    need(len(ids) == len(set(ids)), 'automations record (an id is recorded twice)')
+
+
+def automation_name(value):
+    """An Orca Pod automation name, stored by Orca as given: the managed prefix, no surrounding space and no
+    control characters."""
+    return (type(value) is str and value.startswith(AUTOMATION_PREFIX) and len(value) > len(AUTOMATION_PREFIX)
+            and value == value.strip() and len(value) <= 200
+            and not any(ord(ch) < 0x20 or 0x7f <= ord(ch) <= 0x9f for ch in value))
 
 
 def owned_json_key(rel, name, record):
@@ -643,6 +671,7 @@ class Plan:
         self.ops = []
         self.notes = []
         self.refusals = []
+        self.automations = []
         self.orca_version = None
 
     def show(self, path):
@@ -922,10 +951,17 @@ def plan_codex_config(plan, adopt):
                                'adopted': previous_adopted, 'previous': recorded, 'hook_keys': list(trust)}})
 
 
-def orc_claude_model():
+def role_model(role_id):
+    """The default provider, model and effort of one roster role."""
     roles = tomllib.loads(ROLES.read_text(encoding='utf-8'))['role']
-    (orc,) = [role for role in roles if role['id'] == 'orc']
-    model = orc['models'][0]
+    matches = [role for role in roles if role['id'] == role_id]
+    if len(matches) != 1:
+        raise Refusal(f'roles.toml has no single role {role_id!r}')
+    return matches[0]['models'][0]
+
+
+def orc_claude_model():
+    model = role_model('orc')
     if model['provider'] != 'claude':
         raise Refusal('roles.toml: the ORC default model is not a Claude model')
     if not CLAUDE_MODEL.fullmatch(model['model']):
@@ -957,6 +993,265 @@ def plan_claude(plan):
     plan_json(plan, 'claude first run', plan.home / '.claude.json', {}, first_run, keep=('lastOnboardingVersion',))
 
 
+# ---------- Orca automations ----------
+
+def automation_definitions():
+    """The automations in machine/automations.toml, each run by its roster role's default model and effort."""
+    table = tomllib.loads(AUTOMATIONS.read_text(encoding='utf-8'))
+    if set(table) - {'automation'} or not isinstance(table.get('automation', []), list):
+        raise Refusal('machine/automations.toml must hold only [[automation]] tables')
+    definitions = []
+    for entry in table.get('automation', []):
+        if not (isinstance(entry, dict) and set(entry) == AUTOMATION_KEYS
+                and all(isinstance(value, str) and value.strip() for value in entry.values())):
+            raise Refusal('machine/automations.toml: each automation needs exactly '
+                          f'{", ".join(sorted(AUTOMATION_KEYS))}, as non-empty text')
+        name = entry['name']
+        if not automation_name(name) or any(d['name'] == name for d in definitions):
+            raise Refusal(f'machine/automations.toml: the automation name {name!r} is invalid or repeated')
+        if not CRON.fullmatch(entry['trigger']):
+            raise Refusal(f'machine/automations.toml: {name}: {entry["trigger"]!r} is not a 5-field cron expression')
+        model = role_model(entry['role'])
+        if model['provider'] not in AGENT_ARGS or not all(PLAIN_TOKEN.fullmatch(model[k]) for k in ('model', 'effort')):
+            raise Refusal(f'roles.toml: the {entry["role"]} default model cannot run an Orca automation')
+        definitions.append({'name': name, 'role': entry['role'], 'trigger': entry['trigger'],
+                            'prompt': entry['prompt'].strip(), 'provider': model['provider'],
+                            'extra_args': AGENT_ARGS[model['provider']].format(**model)})
+    return definitions
+
+
+def orca_cli():
+    return shutil.which('orca') or orca_settings_module().ORCA_CLI
+
+
+def orca_json(*args):
+    """Run one `orca ... --json` command and return its result, or raise Refusal with Orca's error."""
+    command = ' '.join(args[:2])
+    try:
+        result = run(orca_cli(), *args, '--json', timeout=120)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise Refusal(f'`orca {command}` failed: {error}')
+    try:
+        data = json.loads(result.stdout)
+    except ValueError:
+        data = None
+    if not (isinstance(data, dict) and data.get('ok') is True and isinstance(data.get('result'), dict)):
+        error = data.get('error') if isinstance(data, dict) else None
+        detail = error.get('message') if isinstance(error, dict) else (result.stderr or result.stdout).strip()
+        raise Refusal(f'`orca {command}` failed: {detail or f"exit {result.returncode}"}')
+    return data['result']
+
+
+def orca_list(*args, key):
+    """The object rows of one list in an `orca ... --json` result."""
+    rows = orca_json(*args).get(key)
+    if not isinstance(rows, list):
+        raise Refusal(f'`orca {" ".join(args[:2])}` returned no {key} list')
+    return [row for row in rows if isinstance(row, dict)]
+
+
+def primary_workspace():
+    """The Orca worktree (id, path) of this repository's primary checkout."""
+    common = Path(subprocess.run(['git', '-C', str(ROOT), 'rev-parse', '--path-format=absolute', '--git-common-dir'],
+                                 capture_output=True, text=True, check=True).stdout.strip())
+    if common.name != '.git':
+        raise Refusal(f'{ROOT} has no primary checkout (its Git directory is {common})')
+    primary = common.parent.resolve()
+    repos = [repo for repo in orca_list('repo', 'list', key='repos')
+             if isinstance(repo.get('path'), str) and Path(repo['path']).resolve() == primary]
+    if len(repos) != 1:
+        raise Refusal(f'the primary checkout {primary} is not an Orca repository; add it with '
+                      f'`orca repo add --path {primary}` and rerun')
+    mains = [tree for tree in orca_list('worktree', 'list', '--repo', f'id:{repos[0].get("id")}', key='worktrees')
+             if tree.get('isMainWorktree') is True and tree.get('repoId') == repos[0].get('id')]
+    if len(mains) != 1 or not all(isinstance(mains[0].get(k), str) for k in ('id', 'path')):
+        raise Refusal(f'Orca lists no single main worktree for {primary}')
+    return mains[0]['id'], mains[0]['path']
+
+
+def automation_changes(current, definition):
+    """The managed fields in which a live Orca automation differs from its definition."""
+    wanted = {'name': definition['name'], 'prompt': definition['prompt'], 'agentId': definition['provider'],
+              'extraAgentArgs': definition['extra_args'], 'rrule': definition['trigger'],
+              'workspaceMode': 'existing', 'workspaceId': definition['workspace_id'], 'reuseSession': False}
+    return [field for field, value in wanted.items() if current.get(field) != value]
+
+
+def host_timezone():
+    """The host's IANA timezone, which Orca gives a new automation, or None when /etc/localtime names none."""
+    path = os.path.realpath('/etc/localtime')
+    return path.split('/zoneinfo/', 1)[1] if '/zoneinfo/' in path else None
+
+
+def unmanaged_options(current):
+    """The execution-affecting options of a live Orca automation that automations.toml does not declare and that
+    are set to other than what `orca automations create` gives a new one."""
+    defaults = {'precheck': None, 'timezone': host_timezone(), 'missedRunGraceMinutes': ORCA_MISSED_RUN_GRACE,
+                'executionTargetType': 'local', 'baseBranch': None, 'setupDecision': None}
+    return [field for field, value in defaults.items()
+            if current.get(field) is not None and (value is None or current[field] != value)]
+
+
+def name_mismatch(name, record_id, current):
+    return (f'the manifest records "{name}" as the Orca automation {record_id}, but Orca names that automation '
+            f'{json.dumps(current.get("name"))}; Orca Pod does not change or remove an automation whose name does '
+            'not match its record. Rename it back in Orca, or remove its record from the manifest, then rerun')
+
+
+def confirm_live(record_id, name):
+    """Re-read an owned automation immediately before changing it, refusing unless its name still matches."""
+    current = orca_json('automations', 'show', '--id', record_id).get('automation')
+    if not isinstance(current, dict) or current.get('id') != record_id:
+        raise Refusal(f'`orca automations show` returned no automation {record_id}')
+    if current.get('name') != name:
+        raise Refusal(name_mismatch(name, record_id, current))
+
+
+def automation_args(definition):
+    """The `orca automations create/edit` flags that set every managed field."""
+    return ['--name', definition['name'], '--prompt', definition['prompt'], '--provider', definition['provider'],
+            f'--extra-agent-args={definition["extra_args"]}', '--trigger', definition['trigger'],
+            '--workspace', f'id:{definition["workspace_id"]}', '--workspace-mode', 'existing', '--fresh-session']
+
+
+def plan_automations(plan, args):
+    """Plan the managed automations against Orca's live list. A scratch run, or --skip-orca-settings, only lists
+    them and never reads or changes the live Orca."""
+    definitions = automation_definitions()
+    if args.scratch or args.skip_orca_settings:
+        action, reason = ('planned', 'not created: scratch --home run') if args.scratch else ('skip', '--skip-orca-settings')
+        plan.automations = [{'action': action, 'name': d['name'], 'definition': d, 'reason': reason} for d in definitions]
+        return
+    owned = plan.old.get('automations', {})
+    owned_ids = {record['id'] for record in owned.values()}
+    workspace_id, workspace_path = primary_workspace()
+    live = orca_list('automations', 'list', key='automations')
+    by_id = {entry.get('id'): entry for entry in live}
+    ops = []
+    for definition in definitions:
+        definition = {**definition, 'workspace_id': workspace_id, 'workspace_path': workspace_path}
+        name, record = definition['name'], owned.get(definition['name'])
+        current = by_id.get(record['id']) if record else None
+        if current is not None and current.get('name') != name:
+            plan.refusals.append(name_mismatch(name, record['id'], current))
+            continue
+        if current is not None:
+            changes = automation_changes(current, definition)
+            ops.append({'action': 'update' if changes else 'unchanged', 'name': name, 'id': record['id'],
+                        'definition': definition, 'changes': changes})
+            if current.get('enabled') is False:
+                plan.notes.append(f'the Orca automation "{name}" is disabled in Orca; left disabled')
+            continue
+        if record:
+            plan.notes.append(f'the recorded Orca automation "{name}" ({record["id"]}) is gone from Orca; '
+                              'it is created again')
+        same = [entry for entry in live if entry.get('name') == name and entry.get('id') not in owned_ids]
+        if not same:
+            ops.append({'action': 'create', 'name': name, 'definition': definition, 'changes': []})
+        elif len(same) == 1 and AUTOMATION_ID.fullmatch(str(same[0].get('id'))) \
+                and not automation_changes(same[0], definition) and not unmanaged_options(same[0]):
+            ops.append({'action': 'adopt (identical)', 'name': name, 'id': same[0]['id'], 'definition': definition,
+                        'changes': []})
+        else:
+            differs = automation_changes(same[0], definition) if len(same) == 1 else []
+            unmanaged = unmanaged_options(same[0]) if len(same) == 1 else []
+            plan.refusals.append(
+                f'Orca already has {len(same)} automation(s) named "{name}" that Orca Pod does not own ('
+                + ', '.join(str(entry.get('id')) for entry in same) + ')'
+                + (f', differing in {", ".join(differs)}' if differs else '')
+                + (f'{" and" if differs else ","} setting {", ".join(unmanaged)}, which automations.toml does not '
+                   'declare and Orca Pod neither adopts nor clears' if unmanaged else '')
+                + '; rename or remove them in Orca, then rerun')
+    names = {d['name'] for d in definitions}
+    for name, record in owned.items():
+        if name in names:
+            continue
+        if record['adopted'] or record['id'] not in by_id:
+            reason = 'adopted; left in Orca' if record['adopted'] else 'already gone from Orca'
+            ops.append({'action': 'forget', 'name': name, 'id': record['id'], 'reason': f'no longer managed; {reason}'})
+        elif by_id[record['id']].get('name') != name:
+            plan.refusals.append(name_mismatch(name, record['id'], by_id[record['id']]))
+        else:
+            ops.append({'action': 'remove', 'name': name, 'id': record['id'], 'reason': 'no longer managed'})
+    plan.automations = ops
+
+
+def apply_automations(plan, writer, manifest):
+    """Carry out the planned automation changes, recording each owned id in the manifest as soon as it changes."""
+    ok, records = True, manifest.setdefault('automations', {})
+    for op in plan.automations:
+        action, name = op['action'], op['name']
+        if action in ('unchanged', 'planned', 'skip'):
+            continue
+        try:
+            if action == 'create':
+                created = orca_json('automations', 'create', *automation_args(op['definition']), '--enabled')
+                automation = created.get('automation')
+                new_id = automation.get('id') if isinstance(automation, dict) else None
+                if not (isinstance(new_id, str) and AUTOMATION_ID.fullmatch(new_id)):
+                    raise Refusal(f'Orca returned no automation id ({new_id!r})')
+                records[name] = {'id': new_id, 'adopted': False}
+                done = f'created {new_id}'
+            elif action == 'update':
+                confirm_live(op['id'], name)
+                orca_json('automations', 'edit', '--id', op['id'], *automation_args(op['definition']))
+                done = f'updated {op["id"]} ({", ".join(op["changes"])})'
+            elif action.startswith('adopt'):
+                records[name] = {'id': op['id'], 'adopted': True}
+                done = f'adopted {op["id"]}'
+            else:
+                if action == 'remove':
+                    confirm_live(op['id'], name)
+                    orca_json('automations', 'remove', '--id', op['id'])
+                del records[name]
+                done = f'{"removed" if action == "remove" else "forgot"} {op["id"]} ({op["reason"]})'
+        except Refusal as error:
+            print(f'Orca automation "{name}": FAILED: {error}')
+            ok = False
+            continue
+        print(f'Orca automation "{name}": {done}')
+        write_manifest(writer, manifest)
+    return ok
+
+
+def uninstall_automations(old, args):
+    """Remove the automations Orca Pod created, before any other uninstall step; adopted ones stay in Orca. Returns
+    the refusals found before any removal and the failures of attempted removals."""
+    records = old.get('automations', {})
+    created = {name: record for name, record in sorted(records.items()) if not record['adopted']}
+    if created and (args.scratch or args.skip_orca_settings):
+        names = ', '.join(f'"{name}"' for name in created)
+        rerun = 'for the real home' if args.scratch else 'without --skip-orca-settings'
+        return [f'the Orca automations Orca Pod created ({names}) cannot be checked or removed '
+                f'{"from a scratch --home run" if args.scratch else "with --skip-orca-settings"}; '
+                f'rerun --uninstall {rerun}'], []
+    live = {}
+    if created:
+        try:
+            live = {entry.get('id'): entry for entry in orca_list('automations', 'list', key='automations')}
+        except Refusal as error:
+            return [f'the Orca automations Orca Pod created cannot be checked: {error}'], []
+    mismatched = [name_mismatch(name, record['id'], live[record['id']]) for name, record in created.items()
+                  if record['id'] in live and live[record['id']].get('name') != name]
+    if mismatched:
+        return mismatched, []
+    failures = []
+    for name, record in created.items():
+        if record['id'] not in live:
+            print(f'  gone         Orca automation "{name}" (already removed from Orca)')
+            continue
+        try:
+            confirm_live(record['id'], name)
+            orca_json('automations', 'remove', '--id', record['id'])
+            print(f'  removed      Orca automation "{name}" ({record["id"]})')
+        except Refusal as error:
+            failures.append(f'Orca automation "{name}" not removed: {error}')
+    if not failures:
+        for name in sorted(set(records) - set(created)):
+            print(f'  kept         Orca automation "{name}" (adopted, not created by Orca Pod)')
+    return [], failures
+
+
 def orca_app_version():
     module = orca_settings_module()
     return module.app_version() if Path(module.APP).exists() else None
@@ -968,7 +1263,7 @@ def build_plan(home, old, args):
     for path, leaf_dir in ((home / STATE, True), (home / STATE / 'backups', True), (home / STATE / 'manifest.json', False)):
         plan.check(path, leaf_dir)
     for step in (plan_skills, plan_roles, plan_rules, lambda p: plan_codex_config(p, args.adopt_config),
-                 plan_claude, plan_stale):
+                 plan_claude, plan_stale, lambda p: plan_automations(p, args)):
         try:
             step(plan)
         except (Refusal, ValueError, OSError, subprocess.CalledProcessError) as error:
@@ -1012,6 +1307,8 @@ def print_plan(plan, args, source):
     else:
         print(f'  run          orca skills install {" ".join("--skill " + s for s in ORCA_SKILLS)} --agent claude,codex')
         print(f'  run          orca skills update {" ".join("--skill " + s for s in ORCA_SKILLS)}')
+    print_automations(plan)
+    if not args.scratch:
         if args.skip_orca_settings:
             print('  skip         Orca app settings (--skip-orca-settings)')
         else:
@@ -1035,6 +1332,19 @@ def print_plan(plan, args, source):
             print(f'  - {refusal}')
     summary = ', '.join(f'{n} {action}' for action, n in sorted(counts.items()))
     print(f'\nSummary: {summary or "no managed paths"}.')
+
+
+def print_automations(plan):
+    for op in plan.automations:
+        definition = op.get('definition')
+        detail = f' ({op["reason"]})' if op.get('reason') else f' {op["id"]}' if op.get('id') else ''
+        print(f'  {op["action"]:<12} automation "{op["name"]}"{detail}')
+        if definition and op['action'] != 'unchanged':
+            workspace = definition.get('workspace_path', 'the primary checkout (not resolved on this run)')
+            print(f'      {definition["provider"]} {definition["extra_args"]} (roster {definition["role"]}); '
+                  f'cron "{definition["trigger"]}"; workspace {workspace} (existing); fresh session per run')
+        if op.get('changes'):
+            print(f'      changes: {", ".join(op["changes"])}')
 
 
 SIGN_IN = {'claude': (('claude', 'auth', 'status', '--json'), ('claude', 'auth', 'login', '--claudeai')),
@@ -1216,6 +1526,8 @@ def apply(plan, args, source, stamp):
                 'keys': copy.deepcopy(old.get('keys', {}))}
     if old.get('orca_settings'):
         manifest['orca_settings'] = old['orca_settings']
+    if 'automations' in old:
+        manifest['automations'] = copy.deepcopy(old['automations'])
     try:
         for op in plan.ops:
             path, entry = op['path'], op['entry']
@@ -1326,8 +1638,9 @@ def settle_orca_record(writer, manifest, result, earlier):
     write_manifest(writer, manifest)
 
 
-def orca_steps(args, writer, manifest, stamp):
-    """Install Orca's own skills, then patch Orca's app settings, recording previous values in the manifest."""
+def orca_steps(plan, args, writer, manifest, stamp):
+    """Install Orca's own skills, apply the managed automations, then patch Orca's app settings, recording owned
+    automation ids and previous settings values in the manifest."""
     if args.scratch:
         return True
     ok = True
@@ -1339,6 +1652,7 @@ def orca_steps(args, writer, manifest, stamp):
         ok &= subprocess.run(cmd).returncode == 0
     if args.skip_orca_settings:
         return ok
+    ok &= apply_automations(plan, writer, manifest)  # Before the settings patch, which restarts Orca.
     pre = orca_settings_module().preflight(ORCA_PATCH)
     if not pre['ok']:
         print(f'Orca app settings refused: {pre["error"]}')
@@ -1388,9 +1702,18 @@ def uninstall(home, old, args, stamp):
         for problem in refused:
             print(f'  - {problem}')
         return 2
+    print(f'Orca Pod uninstall from {home}')
+    # The automations go first: a schedule left in Orca after its skills and rules are removed would keep running
+    # without them, so a refused or failed removal stops the uninstall with every file and the manifest in place.
+    refused, failed = uninstall_automations(old, args)
+    if refused or failed:
+        print(f'{"REFUSED" if refused else "STOPPED"}: --uninstall changed no files, keys or Orca settings and kept '
+              'the manifest; resolve these, then rerun:')
+        for problem in refused + failed:
+            print(f'  - {problem}')
+        return 2 if refused else 1
     writer = Writer(home, stamp, [])
     problems = []
-    print(f'Orca Pod uninstall from {home}')
     for rel, entry in sorted(old.get('files', {}).items()):
         path = home / rel
         cur = current_bytes(path)
@@ -1513,7 +1836,8 @@ def main():
                         help='home directory holding every target (default: ~); another directory is a scratch run')
     parser.add_argument('--adopt-config', action='store_true',
                         help='move unmarked managed keys in ~/.codex/config.toml into the managed blocks')
-    parser.add_argument('--skip-orca-settings', action='store_true', help='leave Orca app settings alone')
+    parser.add_argument('--skip-orca-settings', action='store_true',
+                        help="leave Orca's app settings and automations alone")
     parser.add_argument('--allow-unpublished', action='store_true',
                         help='testing only: install from a dirty or unpublished checkout')
     parser.add_argument('--verbose', action='store_true', help='also list unchanged paths')
@@ -1549,7 +1873,7 @@ def main():
     writer, manifest = apply(plan, args, source, stamp)
     print(f'\nApplied: {writer.changed} change(s).' if writer.changed else
           '\nNo changes: the managed targets are current.')
-    ok = orca_steps(args, writer, manifest, stamp)
+    ok = orca_steps(plan, args, writer, manifest, stamp)
     sign_in(args)
     return 0 if ok else 1
 

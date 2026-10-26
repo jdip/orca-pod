@@ -22,10 +22,14 @@ if [[ ! -d "$archive_dir" ]]; then
   exit 1
 fi
 venv_dir="$archive_dir/.render-venv"
-if [[ -L "$venv_dir" ]]; then
+tmp_dir="$archive_dir/.render-tmp"
+if [[ -L "$venv_dir" || -L "$tmp_dir" ]]; then
   printf 'render: preserve symlinked render environment\n' >&2
   exit 1
 fi
+# Keep everything the render writes inside the archive: no bytecode beside the skill, no pip cache, archive temp.
+mkdir -p -m 700 "$tmp_dir"
+export PYTHONDONTWRITEBYTECODE=1 PIP_NO_CACHE_DIR=1 TMPDIR="$tmp_dir"
 if [[ ! -x "$venv_dir/bin/python" ]]; then
   "$python_bin" -m venv "$venv_dir"
 fi

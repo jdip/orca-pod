@@ -2,7 +2,8 @@
 
 `machine/install.py` sets up a macOS host for Orca Pod: the shared skills, the
 generated Claude and Codex roles, the global rules, the managed keys in both
-agents' settings, Orca's own skills and Orca's app settings. It owns specific
+agents' settings, Orca's own skills, Orca's app settings and two scheduled Orca
+automations. It owns specific
 paths and keys inside the default agent homes (`~/.claude`, `~/.codex`,
 `~/.agents`) and never takes over a whole home. It needs Python 3.11+ (standard
 library only) and runs on macOS only.
@@ -29,7 +30,8 @@ up)`, `adopt`, `remove`). It shows a diff only for content Orca Pod owns: a file
 it wrote, and the owned lines of the managed `config.toml` blocks. Other lines of
 `config.toml` are counted (`… N unowned line(s) not shown …`), never printed, and
 the JSON files show only the owned keys being set. It also lists the Orca steps,
-sign-in status, notes and any refusals. It exits 2 when something is refused;
+including each automation it would create, update, adopt or remove, the sign-in
+status, notes and any refusals. It exits 2 when something is refused;
 `--apply` then writes nothing.
 
 Before reading or writing anything, every target, state and backup path is
@@ -43,13 +45,14 @@ managed roots. Every run also refuses, before reading or writing anything, a
 manifest that records a JSON key other than those in [Managed targets](#managed-targets)
 (plus the top-level `effortLevel` earlier revisions owned, and the
 `modelSettings.<model>.effortLevel` of any Claude model id), or a record not in
-the shape the installer writes.
+the shape the installer writes. An automation record must be exactly an Orca
+automation UUID and an `adopted` flag under a plain name, with no id recorded twice.
 
 | Option | Effect |
 | --- | --- |
-| `--home <dir>` | Resolve every target under `<dir>` instead of `~`. Any other directory is a scratch run, which skips Orca's skills and app settings and the sign-in checks. |
+| `--home <dir>` | Resolve every target under `<dir>` instead of `~`. Any other directory is a scratch run, which skips Orca's skills and app settings and the sign-in checks, and lists the automations as planned without reading or changing Orca's live automations. |
 | `--adopt-config` | Move managed keys that `~/.codex/config.toml` defines outside the Orca Pod blocks into those blocks. Without it, such keys are refused. |
-| `--skip-orca-settings` | Leave Orca's app settings alone. |
+| `--skip-orca-settings` | Leave Orca's app settings and automations alone. |
 | `--allow-unpublished` | For testing only: install from a dirty or unpublished checkout. |
 | `--verbose` | Also list unchanged paths. |
 
@@ -74,6 +77,7 @@ and after an Orca upgrade, which can change Orca's skills and its Codex hooks.
 | `~/.claude.json` | First-run keys, set only when missing: `hasCompletedOnboarding: true` and `lastOnboardingVersion` (from `claude --version`). Running Claude sessions rewrite this file, so it is only written when a key is missing. |
 | Orca's skills | `orca skills install --skill orca-cli --skill orchestration --agent claude,codex`, then `orca skills update` for the same skills. Orca owns these copies. |
 | Orca app settings | `branchPrefix: "custom"`, `branchPrefixCustom: "orca"` and `agentPermissionDefault: "full-access"`, applied by [`machine/orca_settings.py`](../machine/orca_settings.py) (below). |
+| Orca automations | The automations in [`machine/automations.toml`](../machine/automations.toml), through `orca automations create/edit/remove` (below). |
 
 Credentials are never copied or written. `config.toml`, `settings.json` and
 `~/.claude.json` can hold credentials and private state, so the installer never
@@ -158,6 +162,67 @@ restarted. On an unverified Orca version it refuses and changes nothing; set
 **Branch prefix** to custom `orca` and the default agent permission to full
 access by hand in Orca's settings and rerun with `--skip-orca-settings`.
 
+### Orca automations
+
+[`machine/automations.toml`](../machine/automations.toml) declares two
+automations. Each names a roster role, and runs with that role's default
+provider, model and effort from [`roster/roles.toml`](../roster/roles.toml),
+passed as `--extra-agent-args`:
+
+| Automation | Schedule (host local time) | Role · provider · model · effort | Runs |
+| --- | --- | --- | --- |
+| `Orca Pod: daily cleanup sweep` | `30 6 * * *`, daily at 06:30 | OPS · Codex · `gpt-6.1-sol` · high (`--model gpt-6.1-sol -c model_reasoning_effort=high`) | The `cleanup-task-artifacts` daily sweep as a dry run. It reports Orca-owned leftovers and their dispositions and removes nothing; its prompt grants no removal authority. |
+| `Orca Pod: engineering brief` | `0 7 * * 1,4`, Mondays and Thursdays at 07:00 | WRK · Claude · `claude-opus-5-5` · high (`--model claude-opus-5-5 --effort high`) | The `engineering-brief` skill's scheduled edition, with the weekly watchlist review when it is due. Every draft, note, report and render output stays in the archive the skill's `history.py context` returns. It authorizes no topic workspaces, repository changes, commits, pushes, publication, tracker writes or prerequisite repairs elsewhere. Its renderer writes no bytecode or pip cache and keeps its temporary files in the archive. |
+
+The sweep is operational diagnosis on the host, which is the OPS role. The brief
+is researched writing with its own acceptance check, saved to the skill's
+private archive. That makes it a bounded piece of owned output, which is the WRK
+role, and map #1 found Opus 5.5 leads document work. OPS's
+`workspace-write` sandbox is not passed, since Orca accepts only model and effort
+as extra arguments. Each run gets Orca's default Codex permission instead.
+
+Both run in the repository's primary checkout as an existing workspace
+(`--workspace-mode existing`, a fresh session per run). The installer resolves
+that checkout from the Git common directory of the checkout it runs from, then
+finds it in `orca repo list` and its main worktree in `orca worktree list`. If
+Orca does not know the checkout, the dry run and `--apply` refuse; add it with
+`orca repo add --path <primary checkout>` and rerun.
+
+Each run compares Orca's live automations (`orca automations list`) with the
+manifest:
+
+- Orca Pod owns an automation only when the manifest records its id and Orca's
+  live automation with that id still has the recorded name. Orca's CLI offers no
+  field that could carry an installer marker, so the name and id together are the
+  ownership check. When the names differ, the dry run and `--apply` refuse and
+  change nothing: rename the automation back in Orca, or remove its record from
+  the manifest. `--apply` rereads the automation with `orca automations show` just
+  before each edit or removal and refuses if its name no longer matches.
+- An automation the manifest owns is left alone when its name, prompt, provider,
+  extra arguments, trigger, workspace and session mode match. Otherwise `--apply`
+  updates it in place with `orca automations edit`.
+- An owned automation that is gone from Orca is created again.
+- A new automation is created enabled. Disabling it in Orca is kept; the dry run
+  notes it.
+- An automation with the same name that the manifest does not own is adopted
+  when it already matches the definition and sets none of the options the table
+  does not declare: no precheck (or precheck timeout), the host's own timezone,
+  Orca's default missed-run grace window, the local host, and no base branch or
+  setup decision. Otherwise the installer refuses, since adopting it would either
+  keep configuration Orca Pod does not manage or silently clear it: rename or
+  remove it in Orca, then rerun.
+- An owned automation the table no longer declares is removed. An adopted one is
+  only dropped from the manifest.
+
+The manifest records each owned automation's id as soon as it is created or
+adopted. `--apply` handles the automations before the Orca settings patch, which
+restarts Orca.
+
+On-demand runs stay available. Run an automation now with
+`orca automations run <id>`, using the full id from `orca automations list`, and
+follow it with `orca automations runs --id <id>`. You can also invoke either
+skill directly in an agent session.
+
 ## What stays manual
 
 Sign in to both agents once per host. When `--apply` finds an agent signed out
@@ -172,8 +237,9 @@ codex login --device-auth
 
 The installer records what it owns in `~/.local/state/orca-pod/manifest.json`:
 each owned path with its content hash and backup, each owned key and block with
-its previous value, the directories it created, the source revision and, around
-an Orca settings change, the previous Orca values. Before replacing a whole file
+its previous value, the directories it created, the source revision, the id of
+each automation it owns and, around an Orca settings change, the previous Orca
+values. Before replacing a whole file
 it did not write, it copies the original to
 `~/.local/state/orca-pod/backups/<timestamp>/`, mirroring the path under the
 home. The state and backup directories are owner-only (0700) and their files
@@ -182,6 +248,12 @@ renamed into place.
 
 `--uninstall`:
 
+- first removes the Orca automations it created, keeping adopted ones, so no
+  schedule outlives the skills and rules it runs. Each removal is checked against
+  the recorded name as above. With a scratch `--home` or `--skip-orca-settings`,
+  when Orca's automations cannot be listed, when a name does not match or when a
+  removal fails, it stops before changing any file, key or Orca setting and keeps
+  the manifest, so a rerun can finish the uninstall;
 - removes every owned path, restoring the backed-up original where one exists;
   a copy you changed since install is backed up first;
 - removes only the managed blocks and keys from `config.toml`, `settings.json`
@@ -207,3 +279,11 @@ atomically swaps a directory or link in the home while the installer runs (for
 example with `renamex_np` and `RENAME_SWAP`) can redirect a write. Such a process
 can already change anything in that account, so this race is accepted, as for
 the roster generator ([#9](https://github.com/jdip/orca-pod/issues/9)).
+
+Orca keeps no ownership marker on an automation, so the installer recognizes the
+automations it owns by the ID and name recorded in its private manifest, and
+re-reads each one just before changing it. It only ever creates, edits or removes
+automations whose name starts with `Orca Pod: `, so a tampered manifest cannot
+reach your other automations. A process that can rewrite the manifest runs as you
+and could change any automation directly, so the remaining case (a forged record
+for another `Orca Pod: ` automation) is accepted like the race above.

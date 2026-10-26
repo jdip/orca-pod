@@ -33,6 +33,12 @@ MANIFEST_VERSION = 1
 FILE_ROOTS = ('.agents/skills/', '.claude/', '.codex/')  # Whole files and links the manifest may own.
 KEY_FILES = ('.codex/config.toml', '.claude/settings.json', '.claude.json')  # Files owned key by key.
 DIR_ROOTS = ('.agents/skills', '.claude', '.codex', STATE.as_posix())  # Created directories lie on or below these.
+# The top-level JSON keys the manifest may own, by file, with the type of the value set. Only manifests from earlier
+# revisions own the top-level effortLevel, so a reapply can restore it.
+JSON_KEYS = {'.claude/settings.json': {'model': str, 'skipDangerousModePermissionPrompt': bool, 'theme': str,
+                                       'effortLevel': str},
+             '.claude.json': {'hasCompletedOnboarding': bool, 'lastOnboardingVersion': str}}
+CLAUDE_MODEL = re.compile(r'claude-[a-z0-9]+(?:-[a-z0-9]+)*')  # A roster Claude model id, owned as a modelSettings key.
 
 ORCA_SKILLS = ('orca-cli', 'orchestration')
 ORCA_PATCH = {'branchPrefix': 'custom', 'branchPrefixCustom': 'orca', 'agentPermissionDefault': 'full-access'}
@@ -131,7 +137,29 @@ def validate_manifest(old):
     for rel, entry in keys.items():
         need(rel in KEY_FILES and isinstance(entry, dict)
              and entry.get('format') == ('toml' if rel.endswith('.toml') else 'json'), f'key entry {rel!r}')
-        need(all(isinstance(k, str) for k in entry.get('hook_keys', [])), f'hook keys for {rel!r}')
+        hook_keys = entry.get('hook_keys', [])
+        need(isinstance(hook_keys, list) and all(isinstance(k, str) for k in hook_keys), f'hook keys for {rel!r}')
+        if entry['format'] == 'toml':
+            adopted, previous = entry.get('adopted', {}), entry.get('previous', {})
+            need(set(entry) <= {'format', 'created', 'adopted', 'previous', 'hook_keys'}
+                 and isinstance(entry.get('created'), bool) and isinstance(adopted, dict)
+                 and all(name in BLOCKS and isinstance(text, str) for name, text in adopted.items())
+                 and isinstance(previous, dict), f'key entry {rel!r}')
+            # Recorded hooks.state values outlive the current trust list, so any hooks.state table is accepted.
+            managed = [p for paths in codex_managed([]).values() for p in paths]
+            for key in previous:
+                try:
+                    path = json.loads(key)
+                except ValueError:
+                    path = None
+                need(isinstance(path, list) and path and all(isinstance(part, str) for part in path)
+                     and (any(tuple(path[:len(m)]) == m for m in managed)
+                          or (len(path) >= 3 and path[:2] == ['hooks', 'state'])), f'previous value {key!r} for {rel!r}')
+        if entry['format'] == 'json':
+            need(set(entry) == {'format', 'created', 'keys'} and isinstance(entry['created'], bool)
+                 and isinstance(entry['keys'], dict), f'key entry {rel!r}')
+            for name, record in entry['keys'].items():
+                need(owned_json_key(rel, name, record), f'owned key {name!r} for {rel!r}')
     for rel in dirs:
         need(plain_rel(rel) and any(rel == r or rel.startswith(r + '/') or r.startswith(rel + '/')
                                     for r in DIR_ROOTS), f'directory {rel!r}')
@@ -140,6 +168,23 @@ def validate_manifest(old):
                               and isinstance(settings.get('set'), dict)), 'Orca settings record')
     if settings and settings.get('backup') is not None:
         backup_ok({'path': settings['backup']}, 'Orca settings backup')
+
+
+def owned_json_key(rel, name, record):
+    """Whether a manifest record names a JSON key the installer owns in rel, with the shape the installer writes:
+    a listed top-level key, or the effortLevel of one Claude model under modelSettings in the Claude settings."""
+    if not (isinstance(record, dict) and isinstance(record.get('had'), bool) and 'set' in record
+            and 'previous' in record and (record['had'] or record['previous'] is None)):
+        return False
+    extra = set(record) - {'had', 'previous', 'set'}
+    if name in JSON_KEYS[rel]:
+        return not extra and type(record['set']) is JSON_KEYS[rel][name]
+    model = name.removeprefix('modelSettings.').removesuffix('.effortLevel')
+    return (rel == '.claude/settings.json' and name == f'modelSettings.{model}.effortLevel'
+            and bool(CLAUDE_MODEL.fullmatch(model)) and extra == {'path', 'created_parents'}
+            and record['path'] == ['modelSettings', model, 'effortLevel']
+            and type(record['created_parents']) is int and 0 <= record['created_parents'] <= 2
+            and type(record['set']) is str)
 
 
 def single_link(path, st):
@@ -749,11 +794,30 @@ def json_style(text):
 
 
 def dump_json(data, style):
-    return (json.dumps(data, indent=style['indent'], ensure_ascii=False)
+    return (json.dumps(data, indent=style['indent'], ensure_ascii=False, allow_nan=False)
             + ('\n' if style['newline'] else '')).encode('utf-8')
 
 
-def plan_json(plan, group, path, sets, defaults):
+def restore_key(doc, path, record):
+    """Put back one owned JSON key that still holds the value set, dropping any parents the installer created
+    and left empty; return False when the key changed since install, so it stays as is."""
+    value, found = get_path(doc, path)
+    if not found or value != record['set']:
+        return False
+    if record['had']:
+        set_path(doc, path, record['previous'])
+        return True
+    del get_path(doc, path[:-1])[0][path[-1]]
+    for depth in range(len(path) - 1, len(path) - 1 - record.get('created_parents', 0), -1):
+        if get_path(doc, path[:depth])[0] != {}:
+            break
+        del get_path(doc, path[:depth - 1])[0][path[depth - 1]]
+    return True
+
+
+def plan_json(plan, group, path, sets, defaults, keep=()):
+    """Plan the owned keys of a JSON file. A key is a top-level name or a tuple key path; an owned key the plan no
+    longer sets or keeps gets its previous value back and leaves the manifest."""
     rel = plan.rel(path)
     entry = plan.old.get('keys', {}).get(rel)
     cur = read_key_file(plan, path)
@@ -768,21 +832,46 @@ def plan_json(plan, group, path, sets, defaults):
         plan.refusals.append(f'{plan.show(path)} is not a JSON object')
         return
     owned = copy.deepcopy(entry['keys']) if entry else {}  # The previous value of each owned key.
-    new, changes = dict(data), []
+    new, changes = copy.deepcopy(data), []
+    parts = {key: key if isinstance(key, tuple) else (key,) for key in [*sets, *defaults]}
+    names = {'.'.join(p) for p in parts.values()} | set(keep)
+    for name in [name for name in owned if name not in names]:
+        record = owned.pop(name)
+        if not restore_key(new, record.get('path', [name]), record):
+            plan.notes.append(f'{plan.show(path)}: {name} is no longer managed and changed since install; left as is')
+        elif record['had']:
+            changes.append(f'restore {name} = {json.dumps(record["previous"])} (no longer managed)')
+        else:
+            changes.append(f'remove {name} (no longer managed; unset before install)')
     wanted = dict(sets)
     for key, value in defaults.items():
-        if key not in data or data[key] is None or data[key] is False:
+        current, found = get_path(data, parts[key])
+        if not found or current is None or current is False:
             wanted[key] = value
     for key, value in wanted.items():
-        owned.setdefault(key, {'had': key in data, 'previous': data.get(key)})['set'] = value
-        if key not in data or data[key] != value:
-            changes.append(f'set {key} = {json.dumps(value)} (was {json.dumps(data[key]) if key in data else "unset"})')
-        new[key] = value
+        name, missing = '.'.join(parts[key]), 0
+        for depth in range(1, len(parts[key])):  # Parents count against the document after restoring stale keys.
+            node, found = get_path(new, parts[key][:depth])
+            if not found:
+                missing = len(parts[key]) - depth
+                break
+            if not isinstance(node, dict):
+                plan.refusals.append(f'{plan.show(path)}: {".".join(parts[key][:depth])} is not a JSON object')
+                return
+        current, found = get_path(data, parts[key])
+        record = owned.setdefault(name, {'had': found, 'previous': current})
+        if len(parts[key]) > 1:
+            record['path'] = list(parts[key])
+            record['created_parents'] = max(record.get('created_parents', 0), missing)
+        record['set'] = value
+        if not found or current != value:
+            changes.append(f'set {name} = {json.dumps(value)} (was {json.dumps(current) if found else "unset"})')
+        set_path(new, parts[key], value)
     for key in defaults:
-        if key not in wanted and key not in owned:
-            plan.notes.append(f'{plan.show(path)}: {key} is already set; left as is')
+        if key not in wanted and '.'.join(parts[key]) not in owned:
+            plan.notes.append(f'{plan.show(path)}: {".".join(parts[key])} is already set; left as is')
     out = cur if new == data else dump_json(new, json_style(cur.decode('utf-8') if cur else ''))
-    if not owned and out == cur:
+    if not owned and not entry and out == cur:
         return
     plan.ops.append({'kind': 'keys', 'group': group, 'path': path, 'rel': rel, 'data': out, 'current': cur,
                      'action': 'unchanged' if out == cur else ('create' if cur is None else 'update keys'),
@@ -839,6 +928,8 @@ def orc_claude_model():
     model = orc['models'][0]
     if model['provider'] != 'claude':
         raise Refusal('roles.toml: the ORC default model is not a Claude model')
+    if not CLAUDE_MODEL.fullmatch(model['model']):
+        raise Refusal(f'roles.toml: the ORC default model {model["model"]!r} is not a plain Claude model id')
     return model['model'], model['effort']
 
 
@@ -850,8 +941,11 @@ def claude_version():
 
 def plan_claude(plan):
     model, effort = orc_claude_model()
+    # Claude Code reads the session's default effort from modelSettings.<model>.effortLevel; a top-level
+    # effortLevel is a legacy value it does not apply at startup.
     plan_json(plan, 'claude settings', plan.home / '.claude' / 'settings.json',
-              {'model': model, 'effortLevel': effort, 'skipDangerousModePermissionPrompt': True},
+              {'model': model, ('modelSettings', model, 'effortLevel'): effort,
+               'skipDangerousModePermissionPrompt': True},
               {'theme': 'dark'})
     # First-run keys only; Orca's "Trust the folder" covers project trust for every agent it launches (#14).
     first_run = {'hasCompletedOnboarding': True}
@@ -860,7 +954,7 @@ def plan_claude(plan):
         first_run['lastOnboardingVersion'] = version
     else:
         plan.notes.append('claude is not on PATH, so lastOnboardingVersion is not seeded')
-    plan_json(plan, 'claude first run', plan.home / '.claude.json', {}, first_run)
+    plan_json(plan, 'claude first run', plan.home / '.claude.json', {}, first_run, keep=('lastOnboardingVersion',))
 
 
 def orca_app_version():
@@ -1323,11 +1417,7 @@ def uninstall(home, old, args, stamp):
                     raise ValueError('not a JSON object')
                 before = copy.deepcopy(data)
                 for key, record in entry['keys'].items():
-                    if key in data and data[key] == record['set']:
-                        if record['had']:
-                            data[key] = record['previous']
-                        else:
-                            del data[key]
+                    restore_key(data, record.get('path', [key]), record)
                 new = cur if data == before else dump_json(data, json_style(cur.decode('utf-8')))
                 empty = data == {}
             else:
@@ -1398,7 +1488,15 @@ def load_manifest(home):
         return {}
     if data.startswith(b'symlink:'):
         raise Refusal(f'{path} is a symlink')
-    old = json.loads(data)
+    def finite(constant):
+        raise ValueError(f'non-finite number {constant}')
+
+    try:
+        old = json.loads(data, parse_constant=finite)
+    except (ValueError, RecursionError) as error:
+        raise Refusal(f'{path} is not valid JSON ({error})')
+    if not isinstance(old, dict):
+        raise Refusal(f'{path} is not a JSON object')
     if old.get('version') != MANIFEST_VERSION:
         raise Refusal(f'{path} has unknown version {old.get("version")}')
     validate_manifest(old)
@@ -1428,7 +1526,7 @@ def main():
     args.scratch = home.resolve() != Path.home().resolve()
     try:
         old = load_manifest(home)
-    except (Refusal, ValueError, OSError) as error:
+    except (Refusal, ValueError, OSError, RecursionError) as error:
         print(f'install.py: REFUSED: {error}')
         return 2
     stamp = time.strftime('%Y%m%dT%H%M%S') + f'-{os.getpid()}'

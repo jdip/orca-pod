@@ -9,8 +9,8 @@ Write an informed, readable news update for Orca Pod's operator: what thoughtful
 engineers are saying, trying, building, and learning, and which major AI developments
 change the possibilities or tradeoffs. Explain the substance and connect the ideas.
 The brief is useful even when its conclusion is to understand or watch, rather than
-change this repository. It runs on demand in an Orca agent session; a recurring
-cadence is a separately approved `orca automations create` schedule.
+change this repository. It runs on demand in an Orca agent session, and twice a week
+from the installer-managed Orca automation (see `docs/install.md`).
 
 ## Establish the edition
 

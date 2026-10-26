@@ -1,0 +1,31 @@
+# The Orca automations machine/install.py manages; see docs/install.md.
+#
+# Each [[automation]] holds exactly:
+#   name     the automation's name in Orca, also its key in the installer manifest
+#   role     a roster/roles.toml role id; its default provider, model and effort run the automation
+#   trigger  a 5-field cron expression in the host's local time
+#   prompt   the prompt each scheduled run starts with
+#
+# Every automation runs in the repository's primary checkout (an existing Orca workspace, resolved
+# from Orca at install time) with a fresh session per run.
+
+[[automation]]
+name = "Orca Pod: daily cleanup sweep"
+role = "ops"
+trigger = "30 6 * * *"
+prompt = """
+$cleanup-task-artifacts Run the installed daily sweep exactly as this skill defines it. \
+It is a dry run: report the Orca-owned leftovers you find, with their dispositions, coverage limits and discovery failures, \
+and remove, stop or release nothing. This automation grants no removal authority; \
+removal needs the operator's explicit authorization.
+"""
+
+[[automation]]
+name = "Orca Pod: engineering brief"
+role = "wrk"
+trigger = "0 7 * * 1,4"
+prompt = """
+Use the engineering-brief skill to write this scheduled edition of the brief, including the weekly watchlist review \
+when the skill says it is due. Save and render it as the skill defines, then finish with its short summary and links. \
+This run authorizes no topic workspaces, repository changes, tracker writes or schedule changes.
+"""

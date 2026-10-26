@@ -54,6 +54,7 @@ AUTOMATION_KEYS = {'name', 'role', 'trigger', 'prompt'}
 AUTOMATION_ID = re.compile(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')  # Orca's UUIDs.
 CRON = re.compile(r'[0-9*,/-]+(?: [0-9*,/-]+){4}')
 PLAIN_TOKEN = re.compile(r'[A-Za-z0-9][A-Za-z0-9._-]*')
+ORCA_MISSED_RUN_GRACE = 720  # Orca 1.4.240's default missed-run grace window, in minutes.
 
 # The exact command hooks each verified Orca version writes to ~/.codex/hooks.json, taken from Orca 1.4.240's
 # agent-hook generator (its Codex command builder and event table). Only an exact match is ever trusted.
@@ -1071,6 +1072,36 @@ def automation_changes(current, definition):
     return [field for field, value in wanted.items() if current.get(field) != value]
 
 
+def host_timezone():
+    """The host's IANA timezone, which Orca gives a new automation, or None when /etc/localtime names none."""
+    path = os.path.realpath('/etc/localtime')
+    return path.split('/zoneinfo/', 1)[1] if '/zoneinfo/' in path else None
+
+
+def unmanaged_options(current):
+    """The execution-affecting options of a live Orca automation that automations.toml does not declare and that
+    are set to other than what `orca automations create` gives a new one."""
+    defaults = {'precheck': None, 'timezone': host_timezone(), 'missedRunGraceMinutes': ORCA_MISSED_RUN_GRACE,
+                'executionTargetType': 'local', 'baseBranch': None, 'setupDecision': None}
+    return [field for field, value in defaults.items()
+            if current.get(field) is not None and (value is None or current[field] != value)]
+
+
+def name_mismatch(name, record_id, current):
+    return (f'the manifest records "{name}" as the Orca automation {record_id}, but Orca names that automation '
+            f'{json.dumps(current.get("name"))}; Orca Pod does not change or remove an automation whose name does '
+            'not match its record. Rename it back in Orca, or remove its record from the manifest, then rerun')
+
+
+def confirm_live(record_id, name):
+    """Re-read an owned automation immediately before changing it, refusing unless its name still matches."""
+    current = orca_json('automations', 'show', '--id', record_id).get('automation')
+    if not isinstance(current, dict) or current.get('id') != record_id:
+        raise Refusal(f'`orca automations show` returned no automation {record_id}')
+    if current.get('name') != name:
+        raise Refusal(name_mismatch(name, record_id, current))
+
+
 def automation_args(definition):
     """The `orca automations create/edit` flags that set every managed field."""
     return ['--name', definition['name'], '--prompt', definition['prompt'], '--provider', definition['provider'],
@@ -1096,6 +1127,9 @@ def plan_automations(plan, args):
         definition = {**definition, 'workspace_id': workspace_id, 'workspace_path': workspace_path}
         name, record = definition['name'], owned.get(definition['name'])
         current = by_id.get(record['id']) if record else None
+        if current is not None and current.get('name') != name:
+            plan.refusals.append(name_mismatch(name, record['id'], current))
+            continue
         if current is not None:
             changes = automation_changes(current, definition)
             ops.append({'action': 'update' if changes else 'unchanged', 'name': name, 'id': record['id'],
@@ -1110,15 +1144,18 @@ def plan_automations(plan, args):
         if not same:
             ops.append({'action': 'create', 'name': name, 'definition': definition, 'changes': []})
         elif len(same) == 1 and AUTOMATION_ID.fullmatch(str(same[0].get('id'))) \
-                and not automation_changes(same[0], definition):
+                and not automation_changes(same[0], definition) and not unmanaged_options(same[0]):
             ops.append({'action': 'adopt (identical)', 'name': name, 'id': same[0]['id'], 'definition': definition,
                         'changes': []})
         else:
             differs = automation_changes(same[0], definition) if len(same) == 1 else []
+            unmanaged = unmanaged_options(same[0]) if len(same) == 1 else []
             plan.refusals.append(
                 f'Orca already has {len(same)} automation(s) named "{name}" that Orca Pod does not own ('
                 + ', '.join(str(entry.get('id')) for entry in same) + ')'
                 + (f', differing in {", ".join(differs)}' if differs else '')
+                + (f'{" and" if differs else ","} setting {", ".join(unmanaged)}, which automations.toml does not '
+                   'declare and Orca Pod neither adopts nor clears' if unmanaged else '')
                 + '; rename or remove them in Orca, then rerun')
     names = {d['name'] for d in definitions}
     for name, record in owned.items():
@@ -1127,6 +1164,8 @@ def plan_automations(plan, args):
         if record['adopted'] or record['id'] not in by_id:
             reason = 'adopted; left in Orca' if record['adopted'] else 'already gone from Orca'
             ops.append({'action': 'forget', 'name': name, 'id': record['id'], 'reason': f'no longer managed; {reason}'})
+        elif by_id[record['id']].get('name') != name:
+            plan.refusals.append(name_mismatch(name, record['id'], by_id[record['id']]))
         else:
             ops.append({'action': 'remove', 'name': name, 'id': record['id'], 'reason': 'no longer managed'})
     plan.automations = ops
@@ -1149,6 +1188,7 @@ def apply_automations(plan, writer, manifest):
                 records[name] = {'id': new_id, 'adopted': False}
                 done = f'created {new_id}'
             elif action == 'update':
+                confirm_live(op['id'], name)
                 orca_json('automations', 'edit', '--id', op['id'], *automation_args(op['definition']))
                 done = f'updated {op["id"]} ({", ".join(op["changes"])})'
             elif action.startswith('adopt'):
@@ -1156,6 +1196,7 @@ def apply_automations(plan, writer, manifest):
                 done = f'adopted {op["id"]}'
             else:
                 if action == 'remove':
+                    confirm_live(op['id'], name)
                     orca_json('automations', 'remove', '--id', op['id'])
                 del records[name]
                 done = f'{"removed" if action == "remove" else "forgot"} {op["id"]} ({op["reason"]})'
@@ -1168,31 +1209,42 @@ def apply_automations(plan, writer, manifest):
     return ok
 
 
-def uninstall_automations(old, args, problems):
-    """Remove the automations the manifest records as created by Orca Pod; adopted ones stay in Orca."""
+def uninstall_automations(old, args):
+    """Remove the automations Orca Pod created, before any other uninstall step; adopted ones stay in Orca. Returns
+    the refusals found before any removal and the failures of attempted removals."""
     records = old.get('automations', {})
-    if not records:
-        return
-    if args.scratch or args.skip_orca_settings:
-        reason = 'scratch --home run' if args.scratch else '--skip-orca-settings'
-        problems.append(f'Orca automations not removed ({reason}): ' + ', '.join(f'"{n}"' for n in sorted(records)))
-        return
-    try:
-        live = {entry.get('id') for entry in orca_list('automations', 'list', key='automations')}
-    except Refusal as error:
-        problems.append(f'Orca automations not removed: {error}')
-        return
-    for name, record in sorted(records.items()):
-        if record['adopted']:
-            print(f'  kept         Orca automation "{name}" (adopted, not created by Orca Pod)')
-        elif record['id'] not in live:
+    created = {name: record for name, record in sorted(records.items()) if not record['adopted']}
+    if created and (args.scratch or args.skip_orca_settings):
+        names = ', '.join(f'"{name}"' for name in created)
+        rerun = 'for the real home' if args.scratch else 'without --skip-orca-settings'
+        return [f'the Orca automations Orca Pod created ({names}) cannot be checked or removed '
+                f'{"from a scratch --home run" if args.scratch else "with --skip-orca-settings"}; '
+                f'rerun --uninstall {rerun}'], []
+    live = {}
+    if created:
+        try:
+            live = {entry.get('id'): entry for entry in orca_list('automations', 'list', key='automations')}
+        except Refusal as error:
+            return [f'the Orca automations Orca Pod created cannot be checked: {error}'], []
+    mismatched = [name_mismatch(name, record['id'], live[record['id']]) for name, record in created.items()
+                  if record['id'] in live and live[record['id']].get('name') != name]
+    if mismatched:
+        return mismatched, []
+    failures = []
+    for name, record in created.items():
+        if record['id'] not in live:
             print(f'  gone         Orca automation "{name}" (already removed from Orca)')
-        else:
-            try:
-                orca_json('automations', 'remove', '--id', record['id'])
-                print(f'  removed      Orca automation "{name}" ({record["id"]})')
-            except Refusal as error:
-                problems.append(f'Orca automation "{name}" not removed: {error}')
+            continue
+        try:
+            confirm_live(record['id'], name)
+            orca_json('automations', 'remove', '--id', record['id'])
+            print(f'  removed      Orca automation "{name}" ({record["id"]})')
+        except Refusal as error:
+            failures.append(f'Orca automation "{name}" not removed: {error}')
+    if not failures:
+        for name in sorted(set(records) - set(created)):
+            print(f'  kept         Orca automation "{name}" (adopted, not created by Orca Pod)')
+    return [], failures
 
 
 def orca_app_version():
@@ -1645,9 +1697,18 @@ def uninstall(home, old, args, stamp):
         for problem in refused:
             print(f'  - {problem}')
         return 2
+    print(f'Orca Pod uninstall from {home}')
+    # The automations go first: a schedule left in Orca after its skills and rules are removed would keep running
+    # without them, so a refused or failed removal stops the uninstall with every file and the manifest in place.
+    refused, failed = uninstall_automations(old, args)
+    if refused or failed:
+        print(f'{"REFUSED" if refused else "STOPPED"}: --uninstall changed no files, keys or Orca settings and kept '
+              'the manifest; resolve these, then rerun:')
+        for problem in refused + failed:
+            print(f'  - {problem}')
+        return 2 if refused else 1
     writer = Writer(home, stamp, [])
     problems = []
-    print(f'Orca Pod uninstall from {home}')
     for rel, entry in sorted(old.get('files', {}).items()):
         path = home / rel
         cur = current_bytes(path)
@@ -1694,7 +1755,6 @@ def uninstall(home, old, args, stamp):
             print(f'  removed keys ~/{rel} (restored the previous values of the managed keys)')
         if entry['created']:
             print(f'  kept         ~/{rel} (created by the installer, but it now holds content Orca Pod does not own)')
-    uninstall_automations(old, args, problems)  # Before the settings restore, which restarts Orca.
     settings = old.get('orca_settings')
     if settings and not args.scratch and not args.skip_orca_settings:
         pre = orca_settings_module().preflight(settings['previous'])

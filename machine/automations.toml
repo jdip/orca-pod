@@ -27,5 +27,9 @@ trigger = "0 7 * * 1,4"
 prompt = """
 Use the engineering-brief skill to write this scheduled edition of the brief, including the weekly watchlist review \
 when the skill says it is due. Save and render it as the skill defines, then finish with its short summary and links. \
-This run authorizes no topic workspaces, repository changes, tracker writes or schedule changes.
+Write every draft, note, report and render output of this run only inside the archive that the skill's \
+`history.py context` returns, with drafts in its `drafts` directory, and write nothing anywhere else. \
+This run authorizes no topic workspaces, repository changes, commits, pushes, publication, tracker writes or \
+schedule changes, and no installing or repairing prerequisites outside that archive: if one is missing or broken, \
+stop and report it.
 """

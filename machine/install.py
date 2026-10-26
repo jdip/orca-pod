@@ -137,7 +137,22 @@ def validate_manifest(old):
     for rel, entry in keys.items():
         need(rel in KEY_FILES and isinstance(entry, dict)
              and entry.get('format') == ('toml' if rel.endswith('.toml') else 'json'), f'key entry {rel!r}')
-        need(all(isinstance(k, str) for k in entry.get('hook_keys', [])), f'hook keys for {rel!r}')
+        hook_keys = entry.get('hook_keys', [])
+        need(isinstance(hook_keys, list) and all(isinstance(k, str) for k in hook_keys), f'hook keys for {rel!r}')
+        if entry['format'] == 'toml':
+            adopted, previous = entry.get('adopted', {}), entry.get('previous', {})
+            need(set(entry) <= {'format', 'created', 'adopted', 'previous', 'hook_keys'}
+                 and isinstance(entry.get('created'), bool) and isinstance(adopted, dict)
+                 and all(name in BLOCKS and isinstance(text, str) for name, text in adopted.items())
+                 and isinstance(previous, dict), f'key entry {rel!r}')
+            managed = [p for paths in codex_managed(hook_keys).values() for p in paths]
+            for key in previous:
+                try:
+                    path = json.loads(key)
+                except ValueError:
+                    path = None
+                need(isinstance(path, list) and path and all(isinstance(part, str) for part in path)
+                     and any(tuple(path[:len(m)]) == m for m in managed), f'previous value {key!r} for {rel!r}')
         if entry['format'] == 'json':
             need(set(entry) == {'format', 'created', 'keys'} and isinstance(entry['created'], bool)
                  and isinstance(entry['keys'], dict), f'key entry {rel!r}')
@@ -1471,7 +1486,12 @@ def load_manifest(home):
         return {}
     if data.startswith(b'symlink:'):
         raise Refusal(f'{path} is a symlink')
-    old = json.loads(data)
+    try:
+        old = json.loads(data)
+    except ValueError as error:
+        raise Refusal(f'{path} is not valid JSON ({error})')
+    if not isinstance(old, dict):
+        raise Refusal(f'{path} is not a JSON object')
     if old.get('version') != MANIFEST_VERSION:
         raise Refusal(f'{path} has unknown version {old.get("version")}')
     validate_manifest(old)

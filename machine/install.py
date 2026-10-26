@@ -145,14 +145,16 @@ def validate_manifest(old):
                  and isinstance(entry.get('created'), bool) and isinstance(adopted, dict)
                  and all(name in BLOCKS and isinstance(text, str) for name, text in adopted.items())
                  and isinstance(previous, dict), f'key entry {rel!r}')
-            managed = [p for paths in codex_managed(hook_keys).values() for p in paths]
+            # Recorded hooks.state values outlive the current trust list, so any hooks.state table is accepted.
+            managed = [p for paths in codex_managed([]).values() for p in paths]
             for key in previous:
                 try:
                     path = json.loads(key)
                 except ValueError:
                     path = None
                 need(isinstance(path, list) and path and all(isinstance(part, str) for part in path)
-                     and any(tuple(path[:len(m)]) == m for m in managed), f'previous value {key!r} for {rel!r}')
+                     and (any(tuple(path[:len(m)]) == m for m in managed)
+                          or (len(path) >= 3 and path[:2] == ['hooks', 'state'])), f'previous value {key!r} for {rel!r}')
         if entry['format'] == 'json':
             need(set(entry) == {'format', 'created', 'keys'} and isinstance(entry['created'], bool)
                  and isinstance(entry['keys'], dict), f'key entry {rel!r}')
@@ -792,7 +794,7 @@ def json_style(text):
 
 
 def dump_json(data, style):
-    return (json.dumps(data, indent=style['indent'], ensure_ascii=False)
+    return (json.dumps(data, indent=style['indent'], ensure_ascii=False, allow_nan=False)
             + ('\n' if style['newline'] else '')).encode('utf-8')
 
 
@@ -1486,9 +1488,12 @@ def load_manifest(home):
         return {}
     if data.startswith(b'symlink:'):
         raise Refusal(f'{path} is a symlink')
+    def finite(constant):
+        raise ValueError(f'non-finite number {constant}')
+
     try:
-        old = json.loads(data)
-    except ValueError as error:
+        old = json.loads(data, parse_constant=finite)
+    except (ValueError, RecursionError) as error:
         raise Refusal(f'{path} is not valid JSON ({error})')
     if not isinstance(old, dict):
         raise Refusal(f'{path} is not a JSON object')
@@ -1521,7 +1526,7 @@ def main():
     args.scratch = home.resolve() != Path.home().resolve()
     try:
         old = load_manifest(home)
-    except (Refusal, ValueError, OSError) as error:
+    except (Refusal, ValueError, OSError, RecursionError) as error:
         print(f'install.py: REFUSED: {error}')
         return 2
     stamp = time.strftime('%Y%m%dT%H%M%S') + f'-{os.getpid()}'

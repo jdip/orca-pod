@@ -51,6 +51,9 @@ BLOCKS = ('root', 'agents', 'features', 'hooks.state')
 AGENT_ARGS = {'claude': '--model {model} --effort {effort}',
               'codex': '--model {model} -c model_reasoning_effort={effort}'}
 AUTOMATION_KEYS = {'name', 'role', 'trigger', 'prompt'}
+# Orca stores no ownership marker on an automation, so the installer only ever creates, edits or removes
+# automations named with this prefix, whatever the manifest records.
+AUTOMATION_PREFIX = 'Orca Pod: '
 AUTOMATION_ID = re.compile(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')  # Orca's UUIDs.
 CRON = re.compile(r'[0-9*,/-]+(?: [0-9*,/-]+){4}')
 PLAIN_TOKEN = re.compile(r'[A-Za-z0-9][A-Za-z0-9._-]*')
@@ -188,8 +191,10 @@ def validate_manifest(old):
 
 
 def automation_name(value):
-    """A non-empty automation name, stored by Orca as given: no surrounding space and no control characters."""
-    return (type(value) is str and bool(value) and value == value.strip() and len(value) <= 200
+    """An Orca Pod automation name, stored by Orca as given: the managed prefix, no surrounding space and no
+    control characters."""
+    return (type(value) is str and value.startswith(AUTOMATION_PREFIX) and len(value) > len(AUTOMATION_PREFIX)
+            and value == value.strip() and len(value) <= 200
             and not any(ord(ch) < 0x20 or 0x7f <= ord(ch) <= 0x9f for ch in value))
 
 

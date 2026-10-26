@@ -279,3 +279,11 @@ atomically swaps a directory or link in the home while the installer runs (for
 example with `renamex_np` and `RENAME_SWAP`) can redirect a write. Such a process
 can already change anything in that account, so this race is accepted, as for
 the roster generator ([#9](https://github.com/jdip/orca-pod/issues/9)).
+
+Orca keeps no ownership marker on an automation, so the installer recognizes the
+automations it owns by the ID and name recorded in its private manifest, and
+re-reads each one just before changing it. It only ever creates, edits or removes
+automations whose name starts with `Orca Pod: `, so a tampered manifest cannot
+reach your other automations. A process that can rewrite the manifest runs as you
+and could change any automation directly, so the remaining case (a forged record
+for another `Orca Pod: ` automation) is accepted like the race above.

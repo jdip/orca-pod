@@ -19,6 +19,7 @@ import time
 
 TIMEOUT_SECONDS = 60
 LIVE_TERMINAL_STATES = {'active', 'retained', 'release_pending', 'release_unknown'}
+IDLE_TERMINAL_STATES = {'reclaimable', 'released'}  # Orca 1.4.241's other terminal states; any other is a gap.
 SETTLED_WORKER_STATES = {'succeeded', 'failed'}
 # Every discovered repository adopts the Repository Standard, which delivers through PR-to-test.
 DELIVERY_BRANCH = 'test'
@@ -112,6 +113,8 @@ def workers():
     for worker in rows:
         for name in ('dispatchId', 'workerState', 'terminalState'):
             field(worker, name, str, 'worker')
+        if worker['terminalState'] not in LIVE_TERMINAL_STATES | IDLE_TERMINAL_STATES:
+            raise Gap(f'worker terminalState {worker["terminalState"]!r} is unknown')
         field(field(worker, 'resource', dict, 'worker'), 'worktreeId', str, 'worker resource')
     return runs, rows
 
@@ -283,9 +286,12 @@ def inventory(discovery):
         coverage.append('no orchestration Runs listed')
     live_workers = {}
     for worker in worker_rows:
-        if worker['terminalState'] in LIVE_TERMINAL_STATES or worker['workerState'] not in SETTLED_WORKER_STATES:
+        if worker['terminalState'] not in IDLE_TERMINAL_STATES or worker['workerState'] not in SETTLED_WORKER_STATES:
             live_workers.setdefault(worker['resource']['worktreeId'], []).append(worker['dispatchId'])
 
+    ids = [row.get('worktreeId') if isinstance(row, dict) else None for row in rows]
+    if any(type(i) is not str or not i for i in ids) or len(set(ids)) != len(ids):
+        gaps.append('worktree ps: a worktreeId is missing, empty or repeated')
     report = [disposition(row, repos, current, by_worktree, live_workers, gaps) for row in rows]
     listed = {entry['worktree'] for entry in report}
     orphans = [terminal.get('handle') for terminal in terminals

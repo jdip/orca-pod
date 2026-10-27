@@ -1,7 +1,6 @@
 ---
 name: standards-upgrade
 description: Upgrade an adopted repository from its recorded Repository Standard revision to the selected source revision.
-disable-model-invocation: true
 ---
 
 # Standards Upgrade

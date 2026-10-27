@@ -47,7 +47,11 @@ for skill metadata and invocation, also read its `SKILL-MECHANICS.md` companion.
 If a required reference is unavailable, continue supported checks and report the
 missing coverage. Verify host-specific metadata semantics against the actual
 host or current official documentation before recommending an invocation change.
-Discovery, invocation, and permission to act are different questions.
+Discovery, invocation, and permission to act are different questions. A set
+Claude `disable-model-invocation` means the model never invokes the skill, even
+when another skill or an authorized workflow chains it; Codex
+`allow_implicit_invocation: false` blocks only implicit selection. Treat them as
+different settings, and reserve the Claude flag for genuinely human-only skills.
 
 Read every in-scope instruction and pointer. Apply each relevant writing criterion:
 context and cognitive load, trigger branches, information hierarchy, co-location,

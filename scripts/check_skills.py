@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check imported skills and the Standard for Agent Team leftovers, manual-only frontmatter and upstream licenses,
+"""Check imported skills and the Standard for Agent Team leftovers, human-only Codex policy and upstream licenses,
 and the repository for references to the retired code-review routing files."""
 from pathlib import Path
 import re
@@ -22,7 +22,7 @@ PI = re.compile(r'\bPi\b|(?i:\b(?:to|via|through|ask|use)\s+pi\b)')
 SOURCES = 'skills/engineering-brief/references/sources.md'
 RESEARCH = re.compile(r'\| .*\]\(https://(?:mariozechner\.at|github\.com/earendil-works/pi)/?\)')
 DELEGATE = re.compile(r'(?i)dispatch|delegat|hand(?:s|ed|ing)?[ -]?off|\brout|\bsend|spawn|review')
-MANUAL = re.compile(r'^\s*allow_implicit_invocation:\s*false\s*$', re.M)
+EXPLICIT = re.compile(r'^\s*allow_implicit_invocation:\s*false\s*$', re.M)
 FRONTMATTER = re.compile(r'\A---\n(.*?)\n---\n', re.S)
 UPSTREAM = re.compile(r'^\| `([\w-]+)` \|', re.M)
 
@@ -84,11 +84,12 @@ def main():
             for path in package.glob('SKILL.md'))
         if derived and not (package / 'LICENSE').is_file():
             failures.append(f'{package}: upstream-derived package lacks LICENSE')
-        manifest = package / 'agents' / 'openai.yaml'
-        if manifest.is_file() and MANUAL.search(manifest.read_text(encoding='utf-8')):
-            match = FRONTMATTER.match((package / 'SKILL.md').read_text(encoding='utf-8'))
-            if not match or not re.search(r'^disable-model-invocation:\s*true\s*$', match[1], re.M):
-                failures.append(f'{package}: manual-only package lacks disable-model-invocation: true')
+        # Claude's flag blocks all model invocation, so a human-only skill is at least explicit-only in Codex.
+        match = FRONTMATTER.match((package / 'SKILL.md').read_text(encoding='utf-8'))
+        if match and re.search(r'^disable-model-invocation:\s*true\s*$', match[1], re.M):
+            manifest = package / 'agents' / 'openai.yaml'
+            if not manifest.is_file() or not EXPLICIT.search(manifest.read_text(encoding='utf-8')):
+                failures.append(f'{package}: human-only package lacks allow_implicit_invocation: false')
     for name in sorted(upstream - names):
         failures.append(f'skills/UPSTREAM.md: {name} has no package')
     for failure in failures:

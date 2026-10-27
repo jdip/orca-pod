@@ -1,7 +1,6 @@
 ---
 name: pr-to-test
 description: Deliver the intended task changes through the repository’s canonical PR-to-test workflow and actual test verification.
-disable-model-invocation: true
 ---
 
 # PR to Test

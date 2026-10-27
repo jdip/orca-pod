@@ -23,6 +23,11 @@ the upstream root `LICENSE`.
 | `wizard` | `skills/engineering/wizard` |
 | `wait-what` | `skills/productivity/wait-what` |
 
+Three vendored packages keep upstream's `disable-model-invocation: true`, with
+the reason recorded here so their text stays byte-for-byte:
+`setup-matt-pocock-skills` and `improve-codebase-architecture` stay deliberately
+manual upstream packages, and `wait-what` is a human-typed command.
+
 ## Adapted
 
 Agent Team adapted these packages from the upstream path at the pin. Orca Pod

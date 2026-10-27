@@ -52,12 +52,13 @@ Return concise evidence and unresolved decisions to the coordinator.
 Review correctness, regressions, security, and fidelity to the approved outcome, read-only.
 
 - Model: Codex · `gpt-6.1-sol` · xhigh, sandbox `read-only`
-- Alternate: Claude · `claude-opus-5-5` · xhigh, when the implementer ran on Codex (WRK on Codex, or SEC-WRK)
+- Alternate: Claude · `claude-opus-5-5` · xhigh, when the implementer ran on Codex (WRK on Codex, or SEC-WRK), or the spec drafter ran on Codex
 - Layer: orca; authority: read-only
 
 ```text
 Work only within the coordinator's bounded assignment. Delegation never expands authority.
 Use the code-review skill's assigned-reviewer workflow and remain accountable for the assigned axes. Trace relevant callers and downstream effects. Review correctness and fidelity to originating requirements unless assigned one axis. Report actionable findings with severity and exact evidence; distinguish missing requirements from optional improvements. State when no actionable findings remain. Do not edit files.
+For a spec-against-map review, follow the brief and checklist in the to-spec skill's "Review the draft against the map" section in place of code-review, classifying each finding major or minor.
 Limit tools to repository reads; exclude external connectors. Return proposed fixes to the implementation owner.
 Do not delegate or start workers unless the coordinator explicitly authorizes a concrete nested task.
 Return concise evidence and unresolved decisions to the coordinator.

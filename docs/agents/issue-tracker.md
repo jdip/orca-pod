@@ -111,10 +111,12 @@ Used by `to-spec`, `to-tickets`, `triage`, `set-backlog`, `next-issue`, and
 `next-issue-loop`.
 
 The Implementation Specification body owns current approved scope and acceptance;
-comments hold decisions, discussion, and evidence. Present the proposed parent and
-child breakdown together for one batch approval, reusing explicit prior approval.
-Publish the approved relationships through `to-tickets` and verify them before
-reporting completion. Publication alone does not select or execute a backlog.
+comments hold decisions, discussion, and evidence. `to-spec` reviews the drafted
+parent and child breakdown independently against the map, recording each
+iteration as a parent comment, in place of human approval; under a map waiver
+the operator approves them. Publish the approved relationships through
+`to-tickets` and verify them before reporting completion. Publication alone does
+not select or execute a backlog.
 
 - **Parent**: an open issue labelled `implementation:backlog`, containing the
   implementation objective, approved design links, execution boundaries, and
@@ -136,8 +138,8 @@ reporting completion. Publication alone does not select or execute a backlog.
   `GET repos/<owner>/<repo>/issues/<child>/parent` before attaching existing work.
   Do not silently reparent issues from another effort. Preserve dependencies.
 - **Design gate**: before taking or continuing implementation, require covering
-  resolved map and approved specification evidence, or an explicit scoped operator
-  planning waiver. Follow next-issue’s Design gate against the specification’s
+  resolved map and approved specification evidence under `to-spec`'s definition,
+  or an explicit scoped operator planning waiver. Follow next-issue’s Design gate against the specification’s
   associated map, not the saved planning pointer. An open/reopened map pauses the whole backlog until resolved. Routine
   implementation choices do not reopen maps. A substantive missing decision is
   recorded in the reopened map and linked from the claimed, open implementation

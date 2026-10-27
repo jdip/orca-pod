@@ -313,8 +313,14 @@ notice such as "This content can't be shown" where the result belongs, and no
 1. Salvage the evidence still visible with
    `orca orchestration worker-read --dispatch <dispatch_id> --source terminal --json`,
    and hand any defect it shows to the implementation owner.
-2. Stop the dispatch with `orca orchestration worker-stop --dispatch <dispatch_id> --json`,
-   then `orca terminal close --terminal <handle>`.
+2. Confirm the turn has ended before teardown: the terminal is idle at the
+   Codex prompt (`orca terminal wait --terminal <handle> --for tui-idle --json`
+   succeeds and the last screen shows the input prompt, not a running turn).
+   Then stop the dispatch with
+   `orca orchestration worker-stop --dispatch <dispatch_id> --json` and run
+   `orca terminal close --terminal <handle>`. If the turn may still be running
+   or its state is unverifiable, keep the terminal and dispatch, and report
+   them as retained.
 3. Route the targeted security re-review to REV2 (Claude Opus 5.5 xhigh) with
    the salvaged evidence, and report it as an exception.
 

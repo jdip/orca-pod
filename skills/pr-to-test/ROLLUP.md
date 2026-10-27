@@ -103,10 +103,10 @@ commits remain in the rollup; closed issues alone are insufficient. An explicitl
 accepted workflow exception needs its own completion evidence. Preserve separate
 scope decisions rather than silently excluding unfinished work.
 
-Fetch current test. Merge any new test changes into the rollup using ordinary merge
-commits; investigate conflicts, review resolutions and repeat affected checks. Review
-aggregate behavior and the complete test-bound diff, reusing child reviews only
-where they cover the final result. Resolve target drift through the local runbook.
+Review aggregate behavior and the complete test-bound diff, reusing child reviews
+only where they cover the final result. The canonical script catches the rollup up
+with new test changes like any task branch, including its conflict path. Resolve
+other target drift through the local runbook.
 
 Classify the combined change once through `pr-to-test`'s Version classification.
 Invoke the canonical `scripts/pr-to-test.sh` from the completed named rollup branch

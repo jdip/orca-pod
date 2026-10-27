@@ -85,6 +85,13 @@ Standing instructions for each role are in [roles.md](roles.md).
 8. **Every managed agent is a `worker-start` dispatch.** Never use bare
    `orca agent launch` for work you manage: its sessions cannot be read or closed
    from the CLI.
+9. **PLN drafts maps and specifications.** For a substantive map,
+   implementation specification or material revision, delegate drafting to PLN
+   with the operator's actual answers and the relevant repository evidence, and
+   reuse that PLN for later revisions. ORC keeps the live dialogue, reconciles
+   PLN's proposed text, obtains the human decisions and approvals, and publishes
+   through the owning workflow. ORC may draft a compact, fully settled record
+   itself and makes administrative updates without PLN.
 
 Launch failures are reported, never rerouted. Delegation never expands
 authority: workers do not commit, push, merge or publish unless that action is

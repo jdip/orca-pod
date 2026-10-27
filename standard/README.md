@@ -105,10 +105,10 @@ preserving each phase's authorization and completion boundary. If the target
 tracker is unavailable, continue conversational planning and resolve the artifact
 location before implementation. Follow publication policy for planning writes.
 
-Before implementation, resolve the map and approve the specification and executable
-breakdown through the existing planning owners, unless the operator explicitly
-waives planning. A workflow invocation carries its normal authorized outcome; it
-does not waive planning. Keep small plans brief. Plan actual changes, including
+Before implementation, resolve the map and obtain an approved specification and
+executable breakdown, as `to-spec` defines approval, through the existing
+planning owners, unless the operator explicitly waives planning. A workflow
+invocation carries its normal authorized outcome; it does not waive planning. Keep small plans brief. Plan actual changes, including
 executable verification alignment, prerequisites, explicit blockers, separately
 owned work and evidence for the target's completion boundary, rather than create
 a universal bootstrap program. Research and planning records may precede approval;

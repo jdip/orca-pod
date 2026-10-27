@@ -11,7 +11,8 @@ Copyright (c) 2026 Matt Pocock. This adaptation is licensed under the included [
 Turn resolved Wayfinder design into the draft for one implementation
 specification parent and its executable ticket breakdown. The parent is also the
 implementation backlog; do not create a parallel planning or queue issue.
-`to-tickets` owns publication after the batch is approved.
+`to-tickets` publishes the parent as the review subject, and the children after
+the draft passes independent review against the map.
 
 When resolving or changing a saved selection, read
 [selection scope and handoff](../set-map/SELECTIONS.md). Carry the explicit
@@ -98,21 +99,87 @@ explicitly requests that observation as the outcome. Prefer a clean replacement
 that removes superseded callers and configuration; use expand--contract only when
 a concrete blast radius requires both forms to coexist temporarily.
 
-Present the parent draft and the full ticket breakdown together in one ordinary
-text batch. Ask for approval of the scope, acceptance criteria, ticket granularity,
-and real dependency edges together. Reuse an explicit approval that covers this
-same draft; a material change needs review of the changed scope. Do not use timed
-or disappearing questions.
+## Review the draft against the map
 
-After approval, complete Wayfinder's resolution/handoff bookkeeping if its map is
-still open with all decisions settled, reusing this draft rather than replanning.
-Hand the approved draft and sources to `to-tickets` after the map closes (or under
-the explicit map waiver); it can publish the parent body earlier as the map's
-follow-up. It creates
-the parent and children, records separate native membership and dependency
-edges, and reads them back. That publication does not select the parent as
-active or authorize execution; use `set-backlog` and `next-issue` or
-`next-issue-loop` with the required authorization, carrying the implementation
-request forward without separate administrative prompts when it already covers
-publication, selection and execution. A planning-only request does not supply
-execution authority.
+With a map, the Chart-the-map confirmation is the only human planning gate. An
+independent review of the parent and full breakdown against the map replaces
+human spec and ticket approval.
+
+Under a recorded, scoped map waiver there is no map to review against: present
+the parent and its full breakdown to the operator in one ordinary-text batch and
+wait for their approval, which `to-tickets` records on the parent. That waiver
+covers the map alone; every other gate still applies. Otherwise run this loop:
+
+1. **Publish the review subject.** Through `to-tickets`, publish or update the
+   parent body, without children, as the map's implementation follow-up. The map
+   stays open.
+2. **Dispatch a fresh reviewer.** Per `roster`, dispatch REV on the other provider
+   from the drafter (PLN, or the primary for a compact record), as a new dispatch
+   each iteration. The brief carries:
+   - the map URL with its Destination, Decisions so far and Out of scope text;
+   - the parent URL with its current body;
+   - the child breakdown: each ticket's outcome, acceptance criteria, source
+     links and blockers; and
+   - every earlier iteration's findings with their dispositions.
+
+   Leave out the drafter's reasoning; the reviewer works from the brief and the
+   repository.
+3. **Review against the checklist.** The reviewer reports each finding with
+   evidence, checking:
+   - scope fidelity: every map decision is reflected and none is contradicted;
+   - acceptance criteria and the completion boundary against the map;
+   - ticket granularity: each child is an independently verifiable outcome;
+   - dependency edges: only real blockers;
+   - the `Delivery` mode and, for `rollup`, its named branch; and
+   - source links to the map and material decisions.
+4. **Classify and dispose.** The reviewer flags each finding major or minor and the
+   primary confirms. A finding is **major** when it shows a missing or
+   contradicted map decision, a scope expansion or reduction, or a new decision the
+   map does not record. A disagreement over major versus minor makes the finding
+   major. Return a major finding to the map under Wayfinder's Implementation
+   handoff; the spec never absorbs it. Once the map settles that decision,
+   redraft and start a fresh loop of up to 3 iterations. Fix each minor finding
+   or reject it with a recorded rationale, then run the next iteration; its
+   reviewer receives that disposition.
+5. **Record the iteration.** Post one comment on the parent per iteration,
+   sanitized under the target's publication policy: `Spec review <n>/3`, the
+   reviewer role and its receipt-verified model and effort, each finding with its
+   classification and disposition, and the result: `pass`, `revise`,
+   `returned to map` or `escalated`.
+
+An iteration passes when the reviewer reports no actionable findings for the
+current parent body and breakdown. Run at most 3 iterations per loop. Escalate
+findings that remain after the 3rd to the human in ordinary text, with the parent
+link and iteration comments, and record the human's decision on the parent.
+
+An **approved specification** is a parent with one of:
+
+- a latest spec review comment that passed and is fresh: the body's GraphQL
+  `lastEditedAt`, or its `createdAt` when `lastEditedAt` is null (never edited),
+  is strictly earlier than that comment's `createdAt`; an equal or unclear order
+  is not fresh, so review again;
+- the human's approval after escalation;
+- a human approval recorded before this loop existed; or
+- the operator's approval under a recorded, scoped map waiver.
+
+An in-scope amendment to the body goes back through this loop, or to the operator
+under a map waiver.
+
+## Publish and continue
+
+Once the parent is an approved specification, normally through a fresh pass, and
+every map decision is settled, complete Wayfinder's resolution/handoff
+bookkeeping and close the map, reusing this draft rather than replanning; a map
+waiver has no map to close. Then hand the approved draft and sources to
+`to-tickets`. It creates the children, records separate native membership and
+dependency edges, reads them back and sends the human its spec-link report
+without waiting for a reply.
+
+Publication does not select the parent or authorize execution. Under `whats-next`
+or an implementation request, the Chart-the-map confirmation, or the operator's
+approval under a map waiver, carries on with no further prompt: `triage` admits
+the parent to `implementation:ready`, `set-backlog` activates it when no parent is
+active in that scope, and `next-issue` or `next-issue-loop` carries it to
+verified test delivery. Keep an active parent from
+another effort in that scope; report it and stop, leaving any switch to the human.
+A planning-only request ends at the approved, published spec.

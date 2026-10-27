@@ -60,16 +60,18 @@ or change scope.
 
 ## End conditions
 
-Pause for required human input or approval. Otherwise continue until the map is
-complete, the user stops the run, or no actionable frontier remains.
+Pause for required human input: a waypoint's human decision, a spec review
+escalated after its 3rd iteration, a major review finding returned to the map, or
+changed scope. Otherwise continue until the map is complete, the user stops the
+run, or no actionable frontier remains.
 
 For a map with direction confirmed through Wayfinder's entry and no decision
 children, complete Wayfinder's implementation
 handoff and resolution directly; do not create work just to populate the
-frontier. Once the map is resolved, carry an existing implementation request
-through the specification, publication and backlog owners, asking only for
-missing approval of the concrete draft. A planning-only request ends with its
-planning outcome.
+frontier. Once every decision is settled, carry `whats-next` or an existing
+implementation request through `to-spec`'s review against the map, publication
+and the backlog owners under the Chart-the-map confirmation. A planning-only
+request ends at the approved, published spec.
 
 An empty frontier is not necessarily a complete map: distinguish completion
 from tickets blocked or claimed elsewhere, and from remaining fog. If a precise

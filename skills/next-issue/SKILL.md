@@ -72,7 +72,8 @@ remaining fog. Distinguish this effort's map from incidental historical
 references. Use the specification's sources, not the independently selected
 planning map, which may belong to an unrelated effort. Require a resolved map
 and approved specification that cover this child, unless the operator explicitly waived the
-missing planning requirement for this scope. Record and honor only that
+missing planning requirement for this scope. Approval follows `to-spec`'s
+approved-specification definition. Record and honor only that
 exception. Small fixes, standalone decisions and direct implementation requests
 do not self-exempt. Missing coverage returns to Wayfinder and `to-spec` through
 the invoking owner; continue read-only discovery and preserve claims while

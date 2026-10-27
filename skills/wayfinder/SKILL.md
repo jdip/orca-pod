@@ -20,7 +20,7 @@ change another effort's selections or grant takeover authority.
 
 ## Plan, don't do
 
-Wayfinder is **planning** by default: each ticket resolves a decision, and the map is done when the way is clear, with nothing left to decide before someone goes and does the thing. The pull to just do the work is usually the signal you've reached the edge of the map and it's time to hand off. Record standing preferences in **Notes**. Execute associated implementation through `next-issue` only after the entire map is resolved and the user authorizes execution. Decision-unblocking tasks remain part of planning.
+Wayfinder is **planning** by default: each ticket resolves a decision, and the map is done when the way is clear, with nothing left to decide before someone goes and does the thing. The pull to just do the work is usually the signal you've reached the edge of the map and it's time to hand off. Record standing preferences in **Notes**. Execute associated implementation through `next-issue` only after the entire map is resolved and its spec is an [approved specification](../to-spec/SKILL.md#review-the-draft-against-the-map), normally through a pass of `to-spec`'s review against the map, under the execution authority of **Chart the map**. Decision-unblocking tasks remain part of planning.
 
 ## Refer by name
 
@@ -143,9 +143,13 @@ the boundary between establishing the destination and mapping its remaining desi
 
 Before creating a map, summarize the shared understanding and obtain the user's
 explicit confirmation. A detailed request, agent proposal, or reading the skill
-does not establish completed grilling. Record the confirmed direction and a concise
-summary of the actual dialogue in the map's existing Notes/Decisions so far;
-use available conversation evidence without publishing private transcripts.
+does not establish completed grilling. This confirmation is the single human
+planning gate. Under `whats-next` or an implementation request it carries through
+spec review, publication, backlog selection, execution and verified test
+delivery; a planning-only request ends at the reviewed, published spec. Record
+the confirmed direction and a concise summary of the actual dialogue in the
+map's existing Notes/Decisions so far; use available conversation evidence
+without publishing private transcripts.
 Reuse supported prior answers on approved continuations and reopen dialogue when
 scope, assumptions, or outcome materially changes. Preserve the global Planning
 before implementation rule and its explicit-waiver boundary.
@@ -165,8 +169,10 @@ before implementation rule and its explicit-waiver boundary.
    use `next-waypoint-loop` under that authority. Reusing an already resolved map
    needs no new selection; retain its source links and existing pointer.
    A compact map with confirmed direction proceeds directly to the Implementation handoff:
-   prepare its specification and executable breakdown, record resolution and close
-   the map after verifying that no decision remains. No dummy frontier is needed.
+   draft its specification and executable breakdown, then record resolution and
+   close the map once the spec is approved under `to-spec`, normally through a
+   pass of its review, and no decision remains.
+   No dummy frontier is needed.
 
 ### Map-entry evidence
 
@@ -220,10 +226,12 @@ may cover several decisions. Record its intended outcome and references to the
 approved decisions. Once every decision is settled, use `to-spec` to draft one
 specification/backlog parent and its executable breakdown. For a settled compact
 map, record its agreed direction in the map's resolution comment. The follow-up
-can be the approved specification parent: `to-tickets` publishes its body, with no
-children, before closure. Record resolution and close the map once its open
-follow-up is verified; `to-tickets` publishes the approved children after the map
-closes. While design remains
+can be the drafted specification parent under `to-spec`'s review: `to-tickets`
+publishes its body, with no children, before closure. Record resolution and close
+the map once the parent is an approved specification under `to-spec`, normally
+through a pass of that review, and its open follow-up is verified; a major
+finding keeps the map open for its decision. `to-tickets` publishes the approved
+children after the map closes. While design remains
 unsettled, keep the follow-up explicitly awaiting planning rather than inventing
 executable scope.
 

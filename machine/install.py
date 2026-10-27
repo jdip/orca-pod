@@ -528,6 +528,8 @@ def merge_codex_config(text, trust, old_hook_keys):
     original = tomllib.loads(text)  # Refuse invalid TOML before touching anything.
     base, old_blocks = strip_blocks(toml_lines(text))
     stmts = statements(base)
+    # Report the original file's line numbers: each stripped block sat, with its two markers, before its base index.
+    shifts = [(index, len(inner) + 2) for index, inner in old_blocks.values()]
     managed = codex_managed(trust)
     domain = {**managed, 'hooks.state': managed['hooks.state'] + [('hooks', 'state', k) for k in old_hook_keys]}
     moved, removed, owner, first_removed, owned_tables, moved_paths = [], set(), {}, {}, set(), {}
@@ -540,7 +542,7 @@ def merge_codex_config(text, trust, old_hook_keys):
                 if kind != 'key':
                     owned_tables.add(path)
                 if kind != 'key' or path[:-1] not in owned_tables:  # Report a whole owned table once.
-                    moved.append((start + 1, '.'.join(path)))
+                    moved.append((start + 1 + sum(n for index, n in shifts if index <= start), '.'.join(path)))
                 removed.update(range(start, end))
                 owner[start] = name
                 moved_paths.setdefault(name, []).append(path)

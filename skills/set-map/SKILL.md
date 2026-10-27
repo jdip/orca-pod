@@ -1,13 +1,14 @@
 ---
 name: set-map
-description: Select a Wayfinder map in an explicit effort scope, or carry out an approved map handoff or legacy import.
+description: Select a Wayfinder map in an explicit effort scope, inventory existing selections, or carry out an approved map handoff or legacy import.
 ---
 
 # Set Map
 
 Read [selection scope and handoff](SELECTIONS.md) before selecting, reading,
-resuming, importing, refreshing or transferring a map. Establish the explicit
-scope and task-owner binding from the current task, preserving other efforts.
+resuming, importing, refreshing or transferring a map, or assessing which efforts
+hold selections. Establish the explicit scope and task-owner binding from the
+current task, preserving other efforts.
 The owner is this task's Orca worktree identity (plus its dispatch ID inside a
 Run), derived with `scripts/set-map.sh owner [--dispatch <dispatch-id>]`.
 
@@ -28,5 +29,6 @@ result. Completion requires successful readback, not just a launched script.
 
 For human-approved handoff/takeover, explicit legacy migration or repository
 rename, follow the corresponding branch in the shared contract and use
-`transfer`, `import-legacy` or `refresh`. Selection and ownership transfer never
-substitute for planning, execution or tracker claim authority.
+`transfer`, `import-legacy` or `refresh`. For read-only assessment use `list`,
+which establishes no binding. Selection and ownership transfer never substitute
+for planning, execution or tracker claim authority.

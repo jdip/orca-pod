@@ -44,7 +44,9 @@ CLAUDE_MODEL = re.compile(r'claude-[a-z0-9]+(?:-[a-z0-9]+)*')  # A roster Claude
 ORCA_SKILLS = ('orca-cli', 'orchestration')
 ORCA_PATCH = {'branchPrefix': 'custom', 'branchPrefixCustom': 'orca', 'agentPermissionDefault': 'full-access'}
 # roles.toml has no Codex ORC entry; the Codex coordinator alternative is pinned here (jdip/orca-pod#13).
-CODEX_ROOT = {'model': 'gpt-6.1-sol', 'model_reasoning_effort': 'high'}
+# Codex runs with Full Access, as Orca launches agents (jdip/orca-pod#43); a --profile file layers on top of these.
+CODEX_ROOT = {'model': 'gpt-6.1-sol', 'model_reasoning_effort': 'high', 'default_permissions': ':danger-full-access',
+              'approval_policy': 'never', 'approvals_reviewer': 'auto_review'}
 CODEX_TABLE_KEYS = {'agents': ('enabled', True), 'features': ('hooks', True)}
 BLOCKS = ('root', 'agents', 'features', 'hooks.state')
 # Each provider's --extra-agent-args for a roster model and effort; Orca 1.4.240 and 1.4.241 accept only these options.
@@ -526,7 +528,7 @@ def merge_codex_config(text, trust, old_hook_keys):
     stmts = statements(base)
     managed = codex_managed(trust)
     domain = {**managed, 'hooks.state': managed['hooks.state'] + [('hooks', 'state', k) for k in old_hook_keys]}
-    moved, removed, owner, first_removed, owned_tables = [], set(), {}, {}, set()
+    moved, removed, owner, first_removed, owned_tables, moved_paths = [], set(), {}, {}, set(), {}
     for start, end, kind, path in stmts:
         if kind is None:
             continue
@@ -539,6 +541,7 @@ def merge_codex_config(text, trust, old_hook_keys):
                     moved.append((start + 1, '.'.join(path)))
                 removed.update(range(start, end))
                 owner[start] = name
+                moved_paths.setdefault(name, []).append(path)
                 first_removed.setdefault(name, start)
                 break
     # Move blank lines between two adopted statements, such as the gaps between adopted tables, along with
@@ -555,8 +558,9 @@ def merge_codex_config(text, trust, old_hook_keys):
         if start in owner:
             adopted[owner[start]] = adopted.get(owner[start], '') + ''.join(base[start:end])
     # An adopted key's original value is restored on uninstall; it cannot also sit in a block, or the
-    # original would not have parsed.
-    previous = {m: get_path(original, m)[0] for name in adopted for m in managed[name] if get_path(original, m)[1]}
+    # original would not have parsed. A managed key already in the block was not adopted and has no original.
+    previous = {m: get_path(original, m)[0] for name in adopted for m in managed[name]
+                if get_path(original, m)[1] and any(overlaps(path, m) for path in moved_paths[name])}
     headers = {path: start for start, _, kind, path in stmts if kind == 'table'}
     inserts = {}  # base index -> [(block lines, foreign lines)]
     for name in BLOCKS:

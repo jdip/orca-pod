@@ -107,7 +107,8 @@ or disappearing questions.
 After approval, complete Wayfinder's resolution/handoff bookkeeping if its map is
 still open with all decisions settled, reusing this draft rather than replanning.
 Hand the approved draft and sources to `to-tickets` after the map closes (or under
-the explicit map waiver). It creates
+the explicit map waiver); it can publish the parent body earlier as the map's
+follow-up. It creates
 the parent and children, records separate native membership and dependency
 edges, and reads them back. That publication does not select the parent as
 active or authorize execution; use `set-backlog` and `next-issue` or

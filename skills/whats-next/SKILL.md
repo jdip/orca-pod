@@ -56,7 +56,9 @@ takeover through the selection handoff owner; verify source quiescence, included
 claims and recipient binding before assuming ownership. An assignee, inactivity, or a finished turn
 alone is not permission. If Orca inventory is unavailable or `orca worktree ps`
 reports a host as not covered, preserve uncertain claims and continue work whose
-ownership is established.
+ownership is established. A worktree listed by `git worktree list` but absent from
+`orca worktree ps`, such as one created by an agent outside Orca, is an uncertain
+claim; record its branch, any open PR for that branch and its dirty state as evidence.
 
 When starting selected work in a new Orca worktree, attach its issue at creation
 with `orca worktree create --reference <issue-url>`, or afterwards with

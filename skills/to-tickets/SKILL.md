@@ -26,7 +26,10 @@ instructions, the approved specification, its comments, and linked design and
 decision sources. Require a covering resolved Wayfinder map unless the operator
 explicitly waived that requirement; missing coverage returns to Wayfinder and
 `to-spec`. Confirm the whole map is closed and resolved before publishing
-executable children. Use issue bodies for the current approved scope and
+executable children. While the resolved map is still open, publish only the
+approved parent body when it is the map's implementation follow-up under
+[Wayfinder's handoff](../wayfinder/SKILL.md#implementation-handoff); return for
+the children after closure. Use issue bodies for the current approved scope and
 acceptance criteria; comments supply decision history and evidence. Update a
 body to incorporate an approved amendment before it becomes the published
 contract.

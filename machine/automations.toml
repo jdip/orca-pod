@@ -16,8 +16,9 @@ trigger = "30 6 * * *"
 prompt = """
 $cleanup-task-artifacts Run the installed daily sweep exactly as this skill defines it. \
 This automation grants exactly the skill's conservative sweep removal: remove a worktree only when its inventory \
-disposition is `candidate`, its delivery is positively verified, it has been idle more than 7 days, no live Orca agent \
-or terminal is attached, and only with `orca worktree rm --worktree <selector>` after rechecking it. \
+disposition is `candidate`, its repository identity matches a repository that passed this run's discovery, its delivery \
+is shown by hosted evidence, it has been idle more than 7 days, no live Orca agent or terminal is attached, and only \
+with `orca worktree rm --worktree id:<worktreeId>` after rechecking it. \
 Everything else is report-only: stop, release or remove nothing else. \
 Report only this run's cleanup actions and what changed since the previous sweep, as the skill's `sweep_state.py` reports it.
 """

@@ -3,62 +3,102 @@
 
 The input is a JSON object mapping each finding's stable key (for example `worktree:<id>` or
 `discovery:<root>`) to its concise disposition. The previous sweep's findings live in one small file
-under the Git common directory; an unreadable file is reported, never silently replaced.
+under the Git common directory; an unreadable file is reported, never silently replaced. One run at a
+time holds the directory's lock from reading the previous findings until the new ones replace them.
 """
 import argparse
+import fcntl
 import json
 import os
 from pathlib import Path
+import secrets
+import stat
 import subprocess
 import sys
-import tempfile
 
 STATE_DIRECTORY = 'orca-pod-cleanup-sweep'
 STATE_FILE = 'last-sweep.json'
+LOCK_FILE = '.lock'
+DIRECTORY = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
 
 
-def state_path():
+def enter_state_directory():
+    """Make the real state directory the working directory, so a later path swap cannot redirect a write."""
     result = subprocess.run(['git', 'rev-parse', '--path-format=absolute', '--git-common-dir'],
                             check=True, capture_output=True, text=True, timeout=60)
-    common = Path(result.stdout.strip())
-    if common.is_symlink() or not common.is_dir():
-        raise ValueError('Git common directory is not a real directory')
-    directory = common / STATE_DIRECTORY
-    if directory.is_symlink() or (directory.exists() and not directory.is_dir()):
-        raise ValueError('sweep state path is not a real directory')
-    return directory / STATE_FILE
+    common = os.open(result.stdout.strip(), DIRECTORY)
+    try:
+        try:
+            os.mkdir(STATE_DIRECTORY, 0o700, dir_fd=common)
+        except FileExistsError:
+            pass
+        directory = os.open(STATE_DIRECTORY, DIRECTORY, dir_fd=common)
+    finally:
+        os.close(common)
+    try:
+        details = os.fstat(directory)
+        if not stat.S_ISDIR(details.st_mode) or details.st_uid != os.getuid():
+            raise ValueError('sweep state path is not a directory this user owns')
+        os.fchdir(directory)
+    finally:
+        os.close(directory)
+
+
+def regular(descriptor, label):
+    if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+        os.close(descriptor)
+        raise ValueError(f'{label} is not a regular file')
+    return descriptor
 
 
 def findings(text, label):
-    value = json.loads(text)
+    def unique(pairs):
+        if len({key for key, _ in pairs}) != len(pairs):
+            raise ValueError(f'{label} repeats a key')
+        return dict(pairs)
+    value = json.loads(text, object_pairs_hook=unique)
     if not isinstance(value, dict) or not all(isinstance(k, str) and isinstance(v, str) for k, v in value.items()):
         raise ValueError(f'{label} must be a JSON object of string keys and string dispositions')
     return value
 
 
 def update(current):
-    path = state_path()
-    if path.is_symlink() or (path.exists() and not path.is_file()):
-        raise ValueError('sweep state file is not a regular file')
-    previous = findings(path.read_text(encoding='utf-8'), 'previous sweep state') if path.exists() else None
-    before = previous or {}
-    changes = {
-        'first_sweep': previous is None,
-        'new': {key: value for key, value in current.items() if key not in before},
-        'changed': {key: {'before': before[key], 'now': value}
-                    for key, value in current.items() if key in before and before[key] != value},
-        'gone': {key: value for key, value in before.items() if key not in current},
-    }
-    path.parent.mkdir(exist_ok=True, mode=0o700)
-    descriptor, temporary = tempfile.mkstemp(prefix='.pending-', dir=path.parent)
+    enter_state_directory()
+    lock = regular(os.open(LOCK_FILE, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600), 'sweep state lock')
+    fcntl.flock(lock, fcntl.LOCK_EX)
     try:
-        with os.fdopen(descriptor, 'w', encoding='utf-8') as handle:
-            json.dump(current, handle, indent=2, sort_keys=True)
-            handle.write('\n')
-        os.replace(temporary, path)
+        try:
+            descriptor = os.open(STATE_FILE, os.O_RDONLY | os.O_NOFOLLOW)
+        except FileNotFoundError:
+            previous = None
+        else:
+            with os.fdopen(regular(descriptor, 'sweep state file'), encoding='utf-8') as handle:
+                previous = findings(handle.read(), 'previous sweep state')
+        before = previous or {}
+        changes = {
+            'first_sweep': previous is None,
+            'new': {key: value for key, value in current.items() if key not in before},
+            'changed': {key: {'before': before[key], 'now': value}
+                        for key, value in current.items() if key in before and before[key] != value},
+            'gone': {key: value for key, value in before.items() if key not in current},
+        }
+        temporary = f'.pending-{secrets.token_hex(8)}'
+        descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+        try:
+            with os.fdopen(descriptor, 'w', encoding='utf-8') as handle:
+                json.dump(current, handle, indent=2, sort_keys=True)
+                handle.write('\n')
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temporary, STATE_FILE)
+        finally:
+            try:
+                os.unlink(temporary)
+            except FileNotFoundError:
+                pass
+        return changes
     finally:
-        Path(temporary).unlink(missing_ok=True)
-    return changes
+        os.close(lock)
 
 
 if __name__ == '__main__':

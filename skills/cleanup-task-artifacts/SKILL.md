@@ -47,8 +47,12 @@ For a daily sweep, obtain exact known project roots from Orca's project inventor
 supervising agent. Pass those roots to this package's
 `scripts/discover.py` with Python 3.9+ (resolve the script relative to this skill)
 and keep its output for the inventory's `--discovery`. It parses only the root AGENTS.md Repository Standard section and verifies the exact
-Orca Pod source and adopted commit through gh. It checks each distinct revision
-once and reports eligible roots or skip reasons. Never replace this discovery procedure
+Orca Pod source and adopted commit through gh. One explicit exception: the
+Standard's own source repository adopts no Standard, so a checkout top level whose
+`origin` remote is jdip/orca-pod is admitted with basis `source repository`, its
+HEAD verified through gh the same way. Its worktrees still face every inventory and
+delivery-evidence check below. It checks each distinct revision once and reports
+eligible roots or skip reasons. Never replace this discovery procedure
 with a grep for arbitrary hashes, a filesystem sweep, internal app-storage scraping,
 or a new registry. Unavailable inventory/source evidence means skip, not inferred
 participation. Direct delivery cleanup may use the already verified current

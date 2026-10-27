@@ -82,7 +82,7 @@ def context(archive, mode, now):
     previous_end = timestamp(previous["coverage_end"]) if previous else None
     start = max(cutoff, previous_end) if mode == "brief" and previous else cutoff
     return {
-        "archive": str(archive), "drafts": str(archive / "drafts"), "mode": mode,
+        "archive": str(archive), "drafts": str(archive / "drafts"), "work": str(archive / ".work"), "mode": mode,
         "coverage_start": iso(start), "coverage_end": iso(now),
         "discovery_start": iso(cutoff),
         "previous_report": previous,

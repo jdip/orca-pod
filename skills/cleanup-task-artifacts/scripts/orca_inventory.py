@@ -21,7 +21,7 @@ TIMEOUT_SECONDS = 60
 LIVE_TERMINAL_STATES = {'active', 'retained', 'release_pending', 'release_unknown'}
 IDLE_TERMINAL_STATES = {'reclaimable', 'released'}  # Orca 1.4.241's other terminal states; any other is a gap.
 SETTLED_WORKER_STATES = {'succeeded', 'failed'}
-# Every discovered repository adopts the Repository Standard, which delivers through PR-to-test.
+# Every discovered repository adopts, or is the source of, the Repository Standard, which delivers through PR-to-test.
 DELIVERY_BRANCH = 'test'
 # Orca activity timestamps are epoch milliseconds; one before 2020 or more than a day ahead is not real.
 EARLIEST_ACTIVITY_MS = 1577836800000

@@ -1,7 +1,6 @@
 ---
 name: cleanup-task-artifacts
 description: Establish ownership before launching temporary compute; release task-owned resources at major work boundaries or during an authorized daily sweep.
-disable-model-invocation: true
 ---
 
 # Cleanup Task Artifacts

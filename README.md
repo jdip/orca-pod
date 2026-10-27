@@ -128,15 +128,17 @@ Ask the agent to use a skill by name, with the target and the outcome you want,
 for example **"Use dependency-review for this repository's TOML parser."** Use
 whats-next for coordination and a specialist when you know the step you want;
 direct calls follow the same planning rule. Each skill's `SKILL.md` owns its
-behavior. Skills marked † are name-only: the agent doesn't pick them on its own,
-so invoke them yourself or let the authorized workflow that owns them hand off.
+behavior. Skills marked † are name-only: no agent or workflow invokes them, so
+call them yourself. Skills marked ‡ are explicit-only in Codex, which doesn't pick
+them on its own; Claude can, and the authorized workflow that owns them hands off
+to them in either host.
 Every skill is installed for both Claude and Codex.
 
 | Area | Skills |
 | --- | --- |
-| Repository setup | `prepare-repository`, `greenfield-init` †, `brownfield-adoption` †, `standards-upgrade` †, `repository-verification` (optional verification instructions), `define-project-goal` (agree the README purpose) |
+| Repository setup | `prepare-repository`, `greenfield-init` ‡, `brownfield-adoption` ‡, `standards-upgrade` ‡, `repository-verification` (optional verification instructions), `define-project-goal` (agree the README purpose) |
 | Choosing and planning | `whats-next`, `wayfinder`, `grilling`, `set-map`, `next-waypoint`, `next-waypoint-loop`, `research`, `prototype`, `to-spec`, `to-tickets`, `wait-what` † (re-explain the last answer) |
-| Implementing and delivering | `triage`, `set-backlog`, `next-issue`, `next-issue-loop`, `tdd`, `diagnosing-bugs`, `resolving-merge-conflicts`, `code-review`, `pr-to-test` †, `promote-to-main` †, `cleanup-task-artifacts` † |
+| Implementing and delivering | `triage`, `set-backlog`, `next-issue`, `next-issue-loop`, `tdd`, `diagnosing-bugs`, `resolving-merge-conflicts`, `code-review`, `pr-to-test` ‡, `promote-to-main` ‡, `cleanup-task-artifacts` ‡ |
 | Delegation | `roster` (role, model and effort for each delegated task); Orca's own `orchestration` and `orca-cli` |
 | Maintenance | `codebase-hygiene`, `dependency-review`, `dependabot-upkeep`, `code-simplification`, `reflect` (turn a lesson into an issue), `audit-agent-instructions` |
 | Design and writing | `codebase-design`, `domain-modeling`, `improve-codebase-architecture` †, `writing-for-agents`, `wizard` (a guided script for human-only steps), `setup-matt-pocock-skills` † |

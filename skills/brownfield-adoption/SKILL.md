@@ -1,7 +1,6 @@
 ---
 name: brownfield-adoption
 description: Adopt the Repository Standard in an existing repository while preserving product behavior and useful compatible workflows.
-disable-model-invocation: true
 ---
 
 # Brownfield Adoption

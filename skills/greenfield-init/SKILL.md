@@ -1,7 +1,6 @@
 ---
 name: greenfield-init
 description: Adopt the Repository Standard in a repository without established product behavior or development workflows.
-disable-model-invocation: true
 ---
 
 # Greenfield Initialization

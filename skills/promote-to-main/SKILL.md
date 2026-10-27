@@ -1,7 +1,6 @@
 ---
 name: promote-to-main
-description: Promote verified test work through the repository’s canonical main promotion and synchronization workflow when explicitly requested.
-disable-model-invocation: true
+description: Promote verified test work through the repository’s canonical main promotion and synchronization workflow, only on the operator’s own explicit request.
 ---
 
 # Promote to Main
@@ -10,9 +9,12 @@ Before any GitHub write, follow the target repository's applicable publication
 policy for outgoing source, metadata and evidence. Inspect approved commit identity
 and verify platform-created merge metadata after delivery; report any mismatch.
 
-Require the human's separate promotion request. Implementation, adoption, upgrade,
-or successful test delivery alone does not authorize promotion. Preserve the
-request's repository, environment, and intended test revision.
+Run only when the operator's own words in the current conversation request
+promotion of the named repository from `test` to `main`. Implementation, adoption
+or upgrade approval, test delivery, earlier approvals and requests chained from
+another skill never count; without that request, report that promotion awaits it.
+Preserve the request's repository and environment. Before running the script,
+state the exact `test` revision you will promote.
 
 Read AGENTS.md, `docs/workflows/promote-to-main.md`, and relevant test-delivery and
 review evidence. Use `scripts/promote-to-main.sh` with that runbook's arguments.

@@ -1,0 +1,26 @@
+name: Validate
+# Full source checks for delivery PRs only; other PR bases run rollup.yml's targeted checks.
+# Records the tested synthetic integration; scripts/delivery.py reads it back.
+run-name: Validate integration ${{ github.sha }}
+on:
+  pull_request:
+    branches: [test, main]
+permissions:
+  actions: read
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Record source-check runtime
+        id: runtime
+        run: echo "context=${ImageOS:?}/${ImageVersion:?}/$(python3 --version)" >> "$GITHUB_OUTPUT"
+      - name: Validate integration (${{ steps.runtime.outputs.context }})
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VALIDATION_CONTEXT: ${{ steps.runtime.outputs.context }}
+        run: python3 scripts/delivery.py validate

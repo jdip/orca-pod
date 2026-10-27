@@ -1,0 +1,6 @@
+interface:
+  display_name: "Promote to Main"
+  short_description: "Promote verified test work and synchronize"
+  default_prompt: "Use promote-to-main for this repository."
+policy:
+  allow_implicit_invocation: false

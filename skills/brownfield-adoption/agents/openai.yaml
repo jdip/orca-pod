@@ -1,0 +1,6 @@
+interface:
+  display_name: "Brownfield Adoption"
+  short_description: "Adopt standards around existing behavior"
+  default_prompt: "Use brownfield-adoption to assess this repository, resolve its Wayfinder plan, and complete the approved workflow."
+policy:
+  allow_implicit_invocation: false

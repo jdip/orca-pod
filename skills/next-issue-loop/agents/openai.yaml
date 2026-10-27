@@ -1,0 +1,4 @@
+interface:
+  display_name: "Implementation Issue Loop"
+  short_description: "Work the saved implementation backlog through test delivery"
+  default_prompt: "Use next-issue-loop to work through this repository's saved implementation backlog. Use this task’s explicit effort scope and owner binding."

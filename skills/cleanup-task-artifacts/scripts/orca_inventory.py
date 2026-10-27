@@ -22,6 +22,7 @@ TIMEOUT_SECONDS = 60
 LIVE_TERMINAL_STATES = {'active', 'retained', 'release_pending', 'release_unknown'}
 IDLE_TERMINAL_STATES = {'reclaimable', 'released'}  # Orca 1.4.241's other terminal states; any other is a gap.
 SETTLED_WORKER_STATES = {'succeeded', 'failed'}
+SETTLED_DISPATCH_STATUSES = {'completed', 'failed'}
 # Every discovered repository adopts, or is the source of, the Repository Standard, which delivers through PR-to-test.
 DELIVERY_BRANCH = 'test'
 SOURCE_KEY = 'github.com/jdip/orca-pod'  # discover.py's only repository for its source-repository basis
@@ -118,8 +119,15 @@ def workers():
             field(worker, name, str, 'worker')
         if worker['terminalState'] not in LIVE_TERMINAL_STATES | IDLE_TERMINAL_STATES:
             raise Gap(f'worker terminalState {worker["terminalState"]!r} is unknown')
-        field(field(worker, 'resource', dict, 'worker'), 'worktreeId', str, 'worker resource')
-    return runs, rows
+        if 'resource' in worker and worker['resource'] is None:
+            # A settled dispatch Orca itself reports resource-absent holds no worktree or terminal resource.
+            projection = field(field(worker, 'projection', dict, 'worker'), 'resource', dict, 'worker projection')
+            if (field(projection, 'state', str, 'worker projection resource') != 'absent'
+                    or field(worker, 'dispatchStatus', str, 'worker') not in SETTLED_DISPATCH_STATUSES):
+                raise Gap(f'worker {worker["dispatchId"]} has no resource but is not a settled resource-absent dispatch')
+        else:
+            field(field(worker, 'resource', dict, 'worker'), 'worktreeId', str, 'worker resource')
+    return runs, [worker for worker in rows if worker['resource'] is not None]
 
 
 def git(path, *arguments):

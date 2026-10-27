@@ -19,7 +19,8 @@ from typing import Any
 
 STATE_VERSION = 1
 STATE_DIRECTORY = "orca-pod-selection-scopes"
-# Agent Team-era pointers keep their codex-* names; both are read-only migration inputs.
+# Agent Team-era scoped records and pointers keep their codex-* names; all are read-only migration inputs.
+LEGACY_STATE_DIRECTORY = "codex-selection-scopes"
 LEGACY_PATHS = {
     "map": ("orca-pod-wayfinder-map", "codex-wayfinder-map"),
     "backlog": ("orca-pod-implementation-backlog", "codex-implementation-backlog"),
@@ -151,11 +152,22 @@ def validate_state(value: Any, scope: str) -> dict[str, Any]:
     }
 
 
+def load_state(path: Path, scope: str, label: str) -> dict[str, Any]:
+    regular_file(path, label)
+    try:
+        raw = path.read_text(encoding="utf-8")
+        state = json.loads(raw, object_pairs_hook=unique_object)
+    except (OSError, UnicodeDecodeError, ValueError):
+        fail(f"{label} is malformed")
+    return validate_state(state, scope)
+
+
 class StateStore:
-    def __init__(self, scope: str) -> None:
+    def __init__(self, scope: str, directory: str = STATE_DIRECTORY, label: str = "selection state") -> None:
         self.scope = safe_scope(scope)
+        self.label = label
         self.common_dir = common_git_directory()
-        self.directory = self.common_dir / STATE_DIRECTORY
+        self.directory = self.common_dir / directory
         self.path = self.directory / f"{self.scope}.json"
         self.lock_path = self.directory / f"{self.scope}.lock"
 
@@ -168,9 +180,9 @@ class StateStore:
         try:
             info = self.directory.lstat()
         except FileNotFoundError:
-            fail(f"scope '{self.scope}' has no selection state")
+            fail(f"scope '{self.scope}' has no {self.label}")
         if stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode):
-            fail("selection state directory is not a real directory")
+            fail(f"{self.label} directory is not a real directory")
 
     def acquire_lock(self) -> None:
         self.prepare_directory(create=True)
@@ -200,15 +212,9 @@ class StateStore:
         self.prepare_directory(create=False)
         if not self.path.exists() and not self.path.is_symlink():
             if required:
-                fail(f"scope '{self.scope}' has no selection state")
+                fail(f"scope '{self.scope}' has no {self.label}")
             return None
-        regular_file(self.path, "selection state")
-        try:
-            raw = self.path.read_text(encoding="utf-8")
-            state = json.loads(raw, object_pairs_hook=unique_object)
-        except (OSError, UnicodeDecodeError, ValueError):
-            fail("selection state is malformed")
-        return validate_state(state, self.scope)
+        return load_state(self.path, self.scope, self.label)
 
     def write(self, state: dict[str, Any]) -> None:
         state = validate_state(state, self.scope)
@@ -294,6 +300,24 @@ def legacy_issue(store: StateStore, kind: str) -> dict[str, str]:
     if len(urls) != 1:
         fail(f"legacy {kind} pointers disagree: {', '.join(path.name for path in present)}")
     return tracker_issue(urls.pop(), kind, allow_closed=True)
+
+
+def agent_team_entry(scope: str, kind: str, required: bool) -> dict[str, Any] | None:
+    store = StateStore(scope, LEGACY_STATE_DIRECTORY, "Agent Team selection state")
+    if not required and not store.directory.exists() and not store.directory.is_symlink():
+        return None
+    state = store.read(required=required)
+    return None if state is None else state[kind]
+
+
+def agent_team_issue(scope: str, kind: str) -> dict[str, str]:
+    entry = agent_team_entry(scope, kind, required=True)
+    if entry is None:
+        fail(f"Agent Team scope '{scope}' has no {kind} selection")
+    target = tracker_issue(entry["url"], kind, allow_closed=True)
+    if target["issue_id"] != entry["issue_id"]:
+        fail(f"Agent Team {kind} selection in scope '{scope}' no longer resolves to its recorded issue identity")
+    return target
 
 
 def orca_result(*command: str) -> dict[str, Any]:
@@ -406,10 +430,65 @@ def command_check(arguments: argparse.Namespace) -> None:
     selection_output(store.scope, arguments.kind, entry)
 
 
+def scope_inventory(common_dir: Path, name: str, label: str) -> list[dict[str, Any]]:
+    directory = common_dir / name
+    try:
+        info = directory.lstat()
+    except FileNotFoundError:
+        return []
+    if stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode):
+        fail(f"{label} directory is not a real directory")
+    records = []
+    try:  # Unlike glob, scandir reports an unreadable directory instead of listing nothing.
+        names = sorted(entry.name for entry in os.scandir(directory))
+    except OSError as error:
+        fail(f"{label} directory could not be read: {error}")
+    for name in names:
+        if name.startswith(".") or not name.endswith(".json"):
+            continue
+        path = directory / name
+        scope = name.removesuffix(".json")
+        try:
+            state = load_state(path, safe_scope(scope), label)
+        except SelectionError as error:
+            records.append({"scope": scope, "error": str(error)})
+            continue
+        records.append({"scope": scope, "map": state["map"], "backlog": state["backlog"]})
+    return records
+
+
+def command_list(arguments: argparse.Namespace) -> None:
+    common_dir = common_git_directory()
+    pointers: dict[str, list[dict[str, str]]] = {}
+    for kind, names in LEGACY_PATHS.items():
+        pointers[kind] = []
+        for name in names:
+            path = common_dir / name
+            if not path.exists() and not path.is_symlink():
+                continue
+            try:
+                pointers[kind].append({"file": name, "url": legacy_url(path)})
+            except SelectionError as error:
+                pointers[kind].append({"file": name, "error": str(error)})
+    print(json.dumps({
+        "scopes": scope_inventory(common_dir, STATE_DIRECTORY, "selection state"),
+        "agent_team_scopes": scope_inventory(common_dir, LEGACY_STATE_DIRECTORY, "Agent Team selection state"),
+        "legacy_pointers": pointers,
+    }, sort_keys=True))
+
+
 def command_import_legacy(arguments: argparse.Namespace) -> None:
     owner = safe_owner(arguments.owner, "owner")
     store = StateStore(arguments.scope)
-    target = legacy_issue(store, arguments.kind)
+    if arguments.agent_team_scope is not None:
+        target = agent_team_issue(safe_scope(arguments.agent_team_scope), arguments.kind)
+    elif agent_team_entry(store.scope, arguments.kind, required=False) is not None:
+        fail(
+            f"Agent Team scope '{store.scope}' holds a {arguments.kind} selection; "
+            f"import it with --agent-team-scope {store.scope} instead of the root pointers"
+        )
+    else:
+        target = legacy_issue(store, arguments.kind)
 
     def mutation(state: dict[str, Any]) -> dict[str, Any]:
         expected_entry(state, arguments.kind, owner, None, absent=True)
@@ -512,9 +591,19 @@ def parser() -> argparse.ArgumentParser:
     owner.add_argument("--dispatch", help="this task's dispatch ID when it runs inside an Orca Run")
     owner.set_defaults(handler=command_owner)
 
-    legacy = commands.add_parser("import-legacy", help="copy a validated legacy pointer into an empty scoped selection")
+    inventory = commands.add_parser(
+        "list", help="read-only inventory of scoped selections and legacy state; establishes no binding"
+    )
+    inventory.set_defaults(handler=command_list)
+
+    legacy = commands.add_parser(
+        "import-legacy", help="copy a validated legacy pointer or Agent Team scoped entry into an empty scoped selection"
+    )
     scope_owner(legacy)
     legacy.add_argument("--expect-absent", action="store_true", required=True)
+    legacy.add_argument(
+        "--agent-team-scope", help="import this Agent Team scope's entry instead of the root pointers"
+    )
     legacy.set_defaults(handler=command_import_legacy)
 
     refresh = commands.add_parser("refresh", help="refresh an owned map after a repository rename")

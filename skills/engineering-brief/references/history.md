@@ -50,6 +50,21 @@ directory only when needed. Drafts have no completed-report header and are never
 used to advance coverage. Preserve incomplete work if interrupted. Do not put
 generated reports in the tracked checkout.
 
+Before the first scratch file, allocate this run's own scratch directory:
+
+```sh
+python3.13 <skill-directory>/scripts/history.py work
+```
+
+It creates an owner-only (0700) directory `.work/<run_id>` under the archive,
+validates the path below the archive as real directories without symlinks, and
+returns it as `work`. It refuses a symlinked or non-directory `.work`; preserve
+that and report it. Put quote-check copies, downloaded pages and every other
+scratch file there, never in a session scratch, system temporary or checkout
+directory, another run's directory or `.work` itself. Point any tool that
+defaults elsewhere at `work`. Once its checks are done, remove exactly that
+allocation with `history.py clean-work '<work>'`, never by deleting it yourself.
+
 After research and citation/repo-impact checks, save using the exact interval
 captured at run start:
 
@@ -82,6 +97,6 @@ file is needed. Report saving is not evidence that every possible source was rea
 
 Linked worktrees share the Git common directory and therefore this archive;
 separate clones/machines do not synchronize it. Preserve the archive as durable
-local state during task cleanup. Clean only proven-owned, no-longer-needed drafts;
-do not automatically delete reports. Private history stays local unless the
+local state during task cleanup. Clean only proven-owned, no-longer-needed drafts
+and scratch; do not automatically delete reports. Private history stays local unless the
 operator explicitly authorizes a particular sanitized publication.

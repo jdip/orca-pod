@@ -116,7 +116,9 @@ Route by actual state:
 
 - No declaration and no established product behavior/workflows: `greenfield-init`.
 - No declaration with established product behavior/workflows: `brownfield-adoption`.
-- Valid declaration: `standards-upgrade` for relevant alignment changes.
+- Valid declaration: `standards-upgrade` for relevant alignment changes,
+  including its source-switch comparison when the operator is moving the
+  declaration from another standard repository.
 
 Use the selected owner first for read-only target assessment and resolve one exact
 source baseline under its rules.

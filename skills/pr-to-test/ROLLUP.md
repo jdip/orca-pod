@@ -29,6 +29,18 @@ with equivalent full evidence reusable under the target's verification policy.
 Keep targeted and full results distinguishable; targeted evidence cannot satisfy
 full delivery acceptance.
 
+The hosted split is language-neutral; implement it in the target's approved
+Tooling language:
+
+- Trigger bases: the full workflow runs on pull requests into `test` and `main`;
+  the targeted workflow runs on pull requests into every other base.
+- Distinct job names per scope, so required checks and delivery lookup select
+  full or targeted results without ambiguity.
+- The targeted job checks only files changed since the PR base, plus the
+  mandatory privacy check.
+- Heavy jobs, such as services, matrices or deployment, run only in the full
+  workflow, or in the targeted one when the change touches their inputs.
+
 Confirm rollup pushes and child PRs cannot deploy to test or launch full CI before
 publishing them. Align conflicting CI triggers, required-check configuration and
 runbook obligations within authorized scope, or report the concrete blocker.

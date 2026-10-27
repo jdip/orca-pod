@@ -50,10 +50,20 @@ directory only when needed. Drafts have no completed-report header and are never
 used to advance coverage. Preserve incomplete work if interrupted. Do not put
 generated reports in the tracked checkout.
 
-Put quote-check copies, downloaded pages and every other scratch file under the
-returned `work` directory, creating it only when needed, never in a session scratch,
-system temporary or checkout directory. Point any tool that defaults elsewhere at
-`work`. Remove the run's own scratch there once its checks are done.
+Before the first scratch file, allocate this run's own scratch directory:
+
+```sh
+python3.13 <skill-directory>/scripts/history.py work
+```
+
+It creates an owner-only (0700) directory `.work/<run_id>` under the archive,
+validates the path below the archive as real directories without symlinks, and
+returns it as `work`. It refuses a symlinked or non-directory `.work`; preserve
+that and report it. Put quote-check copies, downloaded pages and every other
+scratch file there, never in a session scratch, system temporary or checkout
+directory, another run's directory or `.work` itself. Point any tool that
+defaults elsewhere at `work`. Once its checks are done, remove exactly that
+allocation with `history.py clean-work '<work>'`, never by deleting it yourself.
 
 After research and citation/repo-impact checks, save using the exact interval
 captured at run start:

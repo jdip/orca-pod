@@ -4,8 +4,9 @@
 This is always a dry run. It never stops, releases or removes anything; it reports what
 is retained and why, and which exact resources are candidates for the supervisor's
 recheck and removal under explicit cleanup authority. A worktree is a candidate only when
-its repository passed this run's discovery, every Orca field its disposition reads is
-present with its exact type, and a hosted compare shows its HEAD on the delivery branch.
+its repository passed this run's discovery, Orca's remote identity for it is exactly the
+repository discovery recorded, every Orca field its disposition reads is present with its
+exact type, and a hosted compare against that repository shows its HEAD on the delivery branch.
 """
 import argparse
 import json
@@ -23,6 +24,8 @@ IDLE_TERMINAL_STATES = {'reclaimable', 'released'}  # Orca 1.4.241's other termi
 SETTLED_WORKER_STATES = {'succeeded', 'failed'}
 # Every discovered repository adopts, or is the source of, the Repository Standard, which delivers through PR-to-test.
 DELIVERY_BRANCH = 'test'
+SOURCE_KEY = 'github.com/jdip/orca-pod'  # discover.py's only repository for its source-repository basis
+REPOSITORY_KEY = re.compile(r'github\.com/[\w.-]+/[\w.-]+')
 # Orca activity timestamps are epoch milliseconds; one before 2020 or more than a day ahead is not real.
 EARLIEST_ACTIVITY_MS = 1577836800000
 CLOCK_SKEW_MS = 86400000
@@ -166,23 +169,34 @@ def delivery(slug, path):
 
 
 def eligible_roots(source):
-    """Roots this run's discover.py output reports eligible."""
+    """Roots this run's discover.py output reports eligible, each with the repository key it recorded, or None."""
     if source is None:
-        return set()
+        return {}
     text = sys.stdin.read() if source == '-' else Path(source).read_text(encoding='utf-8')
-    roots = set()
+    roots = {}
     for line in filter(str.strip, text.splitlines()):
         result = strict_json(line)
         root, eligible = field(result, 'root', str, 'discovery'), field(result, 'eligible', bool, 'discovery')
         if eligible:
             if not re.fullmatch(r'[0-9a-f]{40}', field(result, 'revision', str, 'discovery')):
                 raise Gap('discovery revision is malformed')
-            roots.add(os.path.realpath(root))
+            basis, key = field(result, 'basis', str, 'discovery'), result.get('repository')
+            if basis == 'source repository' and key != SOURCE_KEY:
+                raise Gap(f'discovery source repository is not {SOURCE_KEY}')
+            if basis not in ('source repository', 'adoption') or 'repository' not in result or not (
+                    key is None or type(key) is str and REPOSITORY_KEY.fullmatch(key)):
+                raise Gap('discovery basis or repository is malformed')
+            real = os.path.realpath(root)
+            if roots.get(real, key) != key:
+                raise Gap('discovery records one root with two repositories')
+            roots[real] = key
     return roots
 
 
 def repositories(roots):
-    """Orca's repositories by id, each bound to this run's discovery only when its root passed it."""
+    """Orca's repositories by id, each bound to this run's discovery only when its root passed it.
+
+    Orca's remote identity is recorded as reported; only an exact match with discovery's key earns a hosted compare."""
     repos = {}
     for repo in field(orca('repo', 'list'), 'repos', list, 'repo list'):
         repo_id, path = field(repo, 'id', str, 'repo'), field(repo, 'path', str, 'repo')
@@ -190,10 +204,9 @@ def repositories(roots):
             raise Gap('repo list repeats a repository id')
         identity = repo.get('gitRemoteIdentity')
         key = identity.get('canonicalKey') if isinstance(identity, dict) else None
-        slug = re.fullmatch(r'github\.com/([\w.-]+/[\w.-]+)', key) if type(key) is str else None
         bound = os.path.realpath(path) in roots
-        repos[repo_id] = {'root': path, 'bound': bound, 'slug': slug and slug[1],
-                          'common_dir': common_dir(path) if bound else None}
+        repos[repo_id] = {'root': path, 'bound': bound, 'expected': roots.get(os.path.realpath(path)),
+                          'identity': key, 'common_dir': common_dir(path) if bound else None}
     return repos
 
 
@@ -223,6 +236,10 @@ def disposition(row, repos, current, terminals, live_workers, gaps):
         reasons.append('unknown repository identity')
     elif not repo['bound']:
         reasons.append("repository did not pass this run's discovery")
+    elif repo['expected'] is None:
+        reasons.append("this run's discovery recorded no hosted GitHub repository for it")
+    elif repo['identity'] != repo['expected']:
+        reasons.append(f"Orca remote identity {repo['identity']!r} is not discovery's {repo['expected']}")
     if values['isMainWorktree']:
         reasons.append('main checkout')
     if worktree_id == current:
@@ -247,12 +264,10 @@ def disposition(row, repos, current, terminals, live_workers, gaps):
         reasons += git_state(values['path'])
     evidence = None
     if not reasons:
-        if not repo['slug']:
-            reasons.append('repository has no hosted GitHub identity')
-        else:
-            evidence = delivery(repo['slug'], values['path'])
-            if not evidence:
-                reasons.append(f"delivery to {repo['slug']} {DELIVERY_BRANCH} not shown by a hosted compare")
+        slug = repo['expected'].removeprefix('github.com/')
+        evidence = delivery(slug, values['path'])
+        if not evidence:
+            reasons.append(f"delivery to {slug} {DELIVERY_BRANCH} not shown by a hosted compare")
     branch = row.get('branch')
     entry = {'worktree': worktree_id, 'repo_id': values['repoId'], 'repo_root': repo and repo['root'],
              'branch': branch if type(branch) is str else None, 'archived': values['isArchived'],

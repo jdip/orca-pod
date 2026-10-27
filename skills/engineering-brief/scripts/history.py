@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
-"""Resolve brief coverage and atomically archive completed local reports."""
+"""Resolve brief coverage, allocate per-run scratch and atomically archive completed local reports."""
 
 import argparse
 import json
 import os
 from pathlib import Path
+import re
+import shutil
+import stat
 import subprocess
 import tempfile
 from datetime import datetime, timedelta, timezone
@@ -14,6 +17,8 @@ from uuid import uuid4
 PREFIX = "<!-- engineering-brief "
 SUFFIX = " -->"
 DAYS = {"brief": 14, "audit": 30}
+WORK = ".work"
+RUN_ID = re.compile(r"\d{8}T\d{6}Z-[0-9a-f]{32}")
 
 
 def timestamp(value):
@@ -82,7 +87,7 @@ def context(archive, mode, now):
     previous_end = timestamp(previous["coverage_end"]) if previous else None
     start = max(cutoff, previous_end) if mode == "brief" and previous else cutoff
     return {
-        "archive": str(archive), "drafts": str(archive / "drafts"), "work": str(archive / ".work"), "mode": mode,
+        "archive": str(archive), "drafts": str(archive / "drafts"), "mode": mode,
         "coverage_start": iso(start), "coverage_end": iso(now),
         "discovery_start": iso(cutoff),
         "previous_report": previous,
@@ -96,6 +101,65 @@ def context(archive, mode, now):
             for kind, rows in history.items()
         },
     }
+
+
+def real_directory(info, name):
+    if stat.S_ISLNK(info.st_mode):
+        raise ValueError(f"preserve symlinked {name}; resolve its ownership first")
+    if not stat.S_ISDIR(info.st_mode):
+        raise ValueError(f"{name} is not a directory")
+    if info.st_uid != os.getuid():
+        raise ValueError(f"{name} is not owned by this user")
+    return info
+
+
+def allocation(archive, run_id):
+    """Check, without following links, that archive/.work/<run_id> is a real owner-only directory chain."""
+    if not RUN_ID.fullmatch(run_id):
+        raise ValueError("malformed scratch run id")
+    path, chain = archive, []
+    for name in (None, WORK, run_id):
+        path = path / name if name else path
+        chain.append(real_directory(os.lstat(path), path.name))
+    if stat.S_IMODE(chain[-1].st_mode) != 0o700:
+        raise ValueError("scratch directory is not owner-only")
+    return path, chain
+
+
+def provision(archive, now):
+    """Create this run's own scratch directory and return it once its path is validated."""
+    run_id = now.strftime("%Y%m%dT%H%M%SZ") + "-" + uuid4().hex
+    descriptors, created = [os.open(archive.parent, os.O_RDONLY | os.O_DIRECTORY)], []
+    try:
+        for name in (archive.name, WORK, run_id):
+            try:
+                os.mkdir(name, 0o700, dir_fd=descriptors[-1])
+            except FileExistsError:
+                if name == run_id:
+                    raise
+            real_directory(os.stat(name, dir_fd=descriptors[-1], follow_symlinks=False), name)
+            descriptors.append(os.open(name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=descriptors[-1]))
+            os.fchmod(descriptors[-1], 0o700)
+            info = os.fstat(descriptors[-1])
+            created.append((info.st_dev, info.st_ino))
+    finally:
+        for descriptor in descriptors:
+            os.close(descriptor)
+    path, chain = allocation(archive, run_id)
+    if [(info.st_dev, info.st_ino) for info in chain] != created:
+        raise ValueError("scratch path changed while it was created; preserve it and inspect")
+    return {"archive": str(archive), "work": str(path), "run_id": run_id}
+
+
+def release(archive, work):
+    """Delete exactly one scratch directory this helper allocated, never its parent or siblings."""
+    if work.parent != archive / WORK:
+        raise ValueError(f"not a scratch allocation under {archive / WORK}")
+    path, _ = allocation(archive, work.name)
+    if not shutil.rmtree.avoids_symlink_attacks:
+        raise ValueError("this platform cannot remove scratch without following symlinks")
+    shutil.rmtree(path)
+    return {"removed": str(path)}
 
 
 def save(archive, mode, start, end, draft, now):
@@ -142,11 +206,18 @@ def main():
     write.add_argument("--start", required=True)
     write.add_argument("--end", required=True)
     write.add_argument("draft", type=Path)
+    commands.add_parser("work", help="create this run's owner-only scratch directory under the archive")
+    clean = commands.add_parser("clean-work", help="remove one scratch directory that `work` returned")
+    clean.add_argument("work", type=Path)
     args = parser.parse_args()
     try:
         archive, now = archive_root(), datetime.now(timezone.utc)
         if args.command == "context":
             result = context(archive, args.mode, now)
+        elif args.command == "work":
+            result = provision(archive, now)
+        elif args.command == "clean-work":
+            result = release(archive, args.work)
         else:
             result = save(archive, args.mode, args.start, args.end, args.draft, now)
     except (OSError, ValueError, KeyError, TypeError, subprocess.CalledProcessError) as error:

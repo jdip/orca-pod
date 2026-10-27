@@ -33,7 +33,8 @@ Use the engineering-brief skill to write this scheduled edition of the brief, in
 when the skill says it is due. Save and render it as the skill defines, then finish with its short summary and links. \
 Write every draft, note, report and render output of this run only inside the archive that the skill's \
 `history.py context` returns, with drafts in its `drafts` directory and quote checks, downloaded pages and other \
-scratch files in its `work` directory, and write nothing anywhere else. \
+scratch files only in the run's own scratch directory that `history.py work` creates there, removed only with \
+`history.py clean-work`, and write nothing anywhere else. \
 This run authorizes no topic workspaces, repository changes, commits, pushes, publication, tracker writes or \
 schedule changes, and no installing or repairing prerequisites outside that archive: if one is missing or broken, \
 stop and report it.

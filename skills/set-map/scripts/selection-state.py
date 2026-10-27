@@ -439,8 +439,15 @@ def scope_inventory(common_dir: Path, name: str, label: str) -> list[dict[str, A
     if stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode):
         fail(f"{label} directory is not a real directory")
     records = []
-    for path in sorted(directory.glob("[!.]*.json")):
-        scope = path.name.removesuffix(".json")
+    try:  # Unlike glob, scandir reports an unreadable directory instead of listing nothing.
+        names = sorted(entry.name for entry in os.scandir(directory))
+    except OSError as error:
+        fail(f"{label} directory could not be read: {error}")
+    for name in names:
+        if name.startswith(".") or not name.endswith(".json"):
+            continue
+        path = directory / name
+        scope = name.removesuffix(".json")
         try:
             state = load_state(path, safe_scope(scope), label)
         except SelectionError as error:

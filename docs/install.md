@@ -123,13 +123,20 @@ can put them back.
 Codex asks for review of any hook in `~/.codex/hooks.json` whose
 `[hooks.state."<hooks.json path>:<event>:<group>:<handler>"]` entry has no matching
 `trusted_hash`, and that prompt stalls unattended launches. The installer seeds
-`enabled = true` and the hash only for a hook that exactly matches one the
-installed Orca version writes: `install.py` pins, per verified Orca version, the
-complete command, event and timeout of each Codex hook, taken from that version's
-hook generator (Orca 1.4.240 today). The handler must equal the pinned one field
-for field, in a group with no matcher. Any other hook, including one whose command
-merely starts with Orca's marker, gets no trust and is listed in a note; on an
-Orca version with no pinned hooks, nothing is seeded.
+`enabled = true` and the hash only for a hook that exactly matches a known Orca
+hook: `install.py` pins known sets of Orca's Codex hooks, each giving the
+complete command, event and timeout of every handler, taken from Orca's hook
+generator (Orca 1.4.240; 1.4.241 writes the same set). Trust follows content,
+not the Orca version, so an Orca update that leaves its hooks unchanged needs no
+repository change. The handler must equal its event's pinned handler field for
+field, in a group with no matcher. Any other hook, including one whose command
+merely starts with Orca's marker, gets no new trust and is listed in a note.
+
+When an Orca update changes a hook, the installer does not silently untrust it.
+A trust entry the installer already owns whose hook no longer matches keeps its
+recorded hash and is listed in a note; that hash does not match the changed
+hook, so Codex asks for review of it until a new pinned set is added for the
+changed handlers. Uninstall removes kept entries with the rest.
 
 The hash is derived exactly as Codex 0.164 computes it (`hook_hash` in
 `codex-rs/hooks/src/engine/discovery.rs`): SHA-256 over the compact JSON, with
@@ -139,17 +146,25 @@ is `type`, `command`, `async` and `timeout`, plus `statusMessage` and a
 non-default `additionalContextLimit` when set. The timeout defaults to 600 s, or
 for `session_end` and `interrupt` to 1 s, clamped to 1–3 s. The key uses the canonical
 (symlink-resolved) path of `hooks.json`. The hash depends only on content, so it
-works on a brand-new host. If Orca has not written `hooks.json` yet, nothing is
-seeded; run `--apply` again after Orca installs its hooks. A future Codex release
+works on a brand-new host. If Orca has not written `hooks.json` yet, nothing new
+is seeded; run `--apply` again after Orca installs its hooks. A future Codex release
 that changes the algorithm shows up as the review prompt returning.
 
 ### Orca app settings
 
 Orca has no settings CLI, so the installer launches `machine/orca_settings.py`
 detached and waits on its result file under `~/.local/state/orca-pod/`. The
-helper is gated on Orca and settings-document versions verified in
-[#6](https://github.com/jdip/orca-pod/issues/6). The installer first records the
-previous values in the manifest. The helper quits Orca gracefully (never
+helper is gated on the settings schema verified in
+[#6](https://github.com/jdip/orca-pod/issues/6) and
+[#38](https://github.com/jdip/orca-pod/issues/38), not on the Orca version: it
+requires a supported settings `domain_version` (1 today) and a read-only check
+that each target key exists with the expected type and, for `branchPrefix` and
+`agentPermissionDefault`, one of the values Orca accepts, for both the current
+and the new value. It repeats the check after quitting Orca, before the backup and
+write. The Orca version is informational: the helper's result file records it, and an
+owned manifest record keeps the app and settings versions it was last seen on,
+even when the settings already match. The installer first records the previous values in the
+manifest. The helper quits Orca gracefully (never
 force-killing it), saves the previous `settings` document (its payload, hash,
 revision and timestamp, nothing else from the profile store) to an owner-only
 file under `backups/<timestamp>/`, patches the document, relaunches Orca and
@@ -158,7 +173,7 @@ restores the saved document before Orca starts again, quitting Orca first when
 the failure shows up after the relaunch. The installer keeps the restoration
 record in the manifest until the change is verified as applied or as restored.
 Agent sessions survive the restart. When the values already match, nothing is
-restarted. On an unverified Orca version it refuses and changes nothing; set
+restarted. When the schema check fails it refuses and changes nothing; set
 **Branch prefix** to custom `orca` and the default agent permission to full
 access by hand in Orca's settings and rerun with `--skip-orca-settings`.
 

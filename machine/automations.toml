@@ -5,6 +5,7 @@
 #   role     a roster/roles.toml role id; its default provider, model and effort run the automation
 #   trigger  a 5-field cron expression in the host's local time
 #   prompt   the prompt each scheduled run starts with
+#            (the installer appends a sentence naming its install-time Python interpreter)
 #
 # Every automation runs in the repository's primary checkout (an existing Orca workspace, resolved
 # from Orca at install time) with a fresh session per run.

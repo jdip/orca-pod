@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 import re
 import secrets
+import shlex
 import shutil
 import stat
 import subprocess
@@ -59,6 +60,7 @@ AUTOMATION_PREFIX = 'Orca Pod: '
 AUTOMATION_ID = re.compile(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')  # Orca's UUIDs.
 CRON = re.compile(r'[0-9*,/-]+(?: [0-9*,/-]+){4}')
 PLAIN_TOKEN = re.compile(r'[A-Za-z0-9][A-Za-z0-9._-]*')
+PROMPT_SAFE_PATH = re.compile(r'/[A-Za-z0-9._+/-]+')  # An interpreter path that is safe in a prompt.
 ORCA_MISSED_RUN_GRACE = 720  # Orca's default missed-run grace window in minutes (1.4.240 and 1.4.241).
 
 # The known sets of command hooks Orca writes to ~/.codex/hooks.json, by event. Trust follows content, not the
@@ -1016,8 +1018,27 @@ def plan_claude(plan):
 
 # ---------- Orca automations ----------
 
+def automation_python():
+    """The absolute path of the install-time interpreter, which each automation run uses for its Python helpers."""
+    found = shutil.which(PYTHON)
+    real = os.path.realpath(found) if found else None  # The link target, so a later repointed link is not used.
+    if not real or not os.path.isfile(real) or not os.access(real, os.X_OK):
+        raise Refusal(f'the Python interpreter {PYTHON!r} (ORCA_POD_PYTHON, else the installer\'s own) is not an '
+                      'executable; an automation run could not use it')
+    if not PROMPT_SAFE_PATH.fullmatch(real):  # It is written into unattended prompts, so no newlines or markup.
+        raise Refusal(f'the Python interpreter path {real!r} has characters outside letters, digits and ._+-/; '
+                      'install it at a plain path or set ORCA_POD_PYTHON to one')
+    return real
+
+
 def automation_definitions():
-    """The automations in machine/automations.toml, each run by its roster role's default model and effort."""
+    """The automations in machine/automations.toml, each run by its roster role's default model and effort. Each
+    prompt ends with the install-time interpreter, so a run does not depend on the host's default python3."""
+    path = automation_python()
+    python = shlex.quote(path)
+    python_line = (f'Run this run\'s Python helpers with ORCA_POD_PYTHON={python}, the interpreter the installer '
+                   f'resolved: invoke each `.py` script as `{python} <script>` and give each shell script the same '
+                   f'setting, as `ORCA_POD_PYTHON={python} <script>`.')
     table = tomllib.loads(AUTOMATIONS.read_text(encoding='utf-8'))
     if set(table) - {'automation'} or not isinstance(table.get('automation', []), list):
         raise Refusal('machine/automations.toml must hold only [[automation]] tables')
@@ -1036,8 +1057,8 @@ def automation_definitions():
         if model['provider'] not in AGENT_ARGS or not all(PLAIN_TOKEN.fullmatch(model[k]) for k in ('model', 'effort')):
             raise Refusal(f'roles.toml: the {entry["role"]} default model cannot run an Orca automation')
         definitions.append({'name': name, 'role': entry['role'], 'trigger': entry['trigger'],
-                            'prompt': entry['prompt'].strip(), 'provider': model['provider'],
-                            'extra_args': AGENT_ARGS[model['provider']].format(**model)})
+                            'prompt': f'{entry["prompt"].strip()} {python_line}', 'provider': model['provider'],
+                            'extra_args': AGENT_ARGS[model['provider']].format(**model), 'python': path})
     return definitions
 
 
@@ -1357,7 +1378,8 @@ def print_automations(plan):
         if definition and op['action'] != 'unchanged':
             workspace = definition.get('workspace_path', 'the primary checkout (not resolved on this run)')
             print(f'      {definition["provider"]} {definition["extra_args"]} (roster {definition["role"]}); '
-                  f'cron "{definition["trigger"]}"; workspace {workspace} (existing); fresh session per run')
+                  f'cron "{definition["trigger"]}"; workspace {workspace} (existing); fresh session per run; '
+                  f'Python helpers {definition["python"]}')
         if op.get('changes'):
             print(f'      changes: {", ".join(op["changes"])}')
 

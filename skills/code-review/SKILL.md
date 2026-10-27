@@ -10,7 +10,7 @@ Two-axis review of the requested committed or working-tree changes:
 
 A third, triggered axis applies when the change crosses a trust boundary:
 
-- **Security**: can the change be reached and abused across a trust boundary, and do existing controls hold? Owned by SEC-REV.
+- **Security**: can the change be reached and abused across a trust boundary, and do existing controls hold? Owned by SEC-REV. When a provider content filter hides SEC-REV's result, follow the roster's [filter-blocked SEC](../roster/SKILL.md#filter-blocked-sec) rule.
 
 The primary agent selects reviewers per the `roster` skill (skills/roster/SKILL.md) after preparing the review packet below. This applies to explicit reviews and delivery reviews. An already assigned reviewer performs its axes directly and returns findings to the primary; it does not reroute or spawn reviewers. A single reviewer checks Standards and Spec unless assigned only one. Review is read-only: report fixes for the implementation owner.
 

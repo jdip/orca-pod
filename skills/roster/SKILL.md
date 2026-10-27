@@ -304,6 +304,24 @@ orca orchestration worker-start --terminal <handle> --worktree <sel> \
   returns `retained` for an adopted terminal, so then run
   `orca terminal close --terminal <handle>`.
 
+## Filter-blocked SEC
+
+The provider's content filter can hide SEC's output: the SEC terminal shows a
+notice such as "This content can't be shown" where the result belongs, and no
+`worker_done` arrives. It can persist after a nudge, so act once you see it:
+
+1. Salvage the evidence still visible with
+   `orca orchestration worker-read --dispatch <dispatch_id> --source terminal --json`,
+   and hand any defect it shows to the implementation owner.
+2. Stop the dispatch with `orca orchestration worker-stop --dispatch <dispatch_id> --json`,
+   then `orca terminal close --terminal <handle>`.
+3. Route the targeted security re-review to REV2 (Claude Opus 5.5 xhigh) with
+   the salvaged evidence, and report it as an exception.
+
+Every SEC brief asks for findings in defect-and-fix terms: the flaw, its
+location and the fix. That wording trips the filter less than attack
+narratives.
+
 ## DSP dual opinion
 
 DSP is two independent specialists on one question: Codex `gpt-6-astra` max and

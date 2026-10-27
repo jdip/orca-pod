@@ -204,6 +204,16 @@ role, and map #1 found Opus 5.5 leads document work. OPS's
 `workspace-write` sandbox is not passed, since Orca accepts only model and effort
 as extra arguments. Each run gets Orca's default Codex permission instead.
 
+The installer ends each prompt with one sentence naming the interpreter it runs
+its own helpers with (`ORCA_POD_PYTHON`, else its own), as an absolute path
+resolved at install time: the run invokes each Python helper with it and passes
+it to each shell helper as `ORCA_POD_PYTHON`. Orca gives an automation no
+environment of its own and accepts only model and effort as extra arguments, so
+the prompt carries it. A run therefore does not depend on the host's default
+`python3`, which can be older than the 3.11 the skills need. Run the installer
+with the interpreter the automations should use; after that interpreter moves,
+rerun `--apply` with the new one, which edits both prompts in place.
+
 Both run in the repository's primary checkout as an existing workspace
 (`--workspace-mode existing`, a fresh session per run). The installer resolves
 that checkout from the Git common directory of the checkout it runs from, then

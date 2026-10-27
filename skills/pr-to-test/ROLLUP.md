@@ -36,7 +36,9 @@ Tooling language:
   the targeted workflow runs on pull requests into every other base.
 - Distinct job names per scope, so required checks and delivery lookup select
   full or targeted results without ambiguity.
-- The targeted job checks only files changed since the PR base, plus the
+- The targeted job runs focused source checks on files changed since the PR
+  base, tests and validation for the changed behavior and its affected
+  integration paths (including existing tests the change didn't edit), and the
   mandatory privacy check.
 - Heavy jobs, such as services, matrices or deployment, run only in the full
   workflow, or in the targeted one when the change touches their inputs.

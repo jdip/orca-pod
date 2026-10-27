@@ -1,0 +1,3 @@
+interface:
+  display_name: "Codebase Hygiene"
+  short_description: "Assess and reduce codebase maintenance burden"

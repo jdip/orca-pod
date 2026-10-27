@@ -1,0 +1,4 @@
+interface:
+  display_name: "Set Wayfinder Map"
+  short_description: "Save this repository’s active Wayfinder map"
+  default_prompt: "Use set-map to save this Wayfinder map URL for the current repository using this task’s explicit effort scope and owner binding."

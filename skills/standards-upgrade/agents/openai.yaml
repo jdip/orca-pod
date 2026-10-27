@@ -1,0 +1,6 @@
+interface:
+  display_name: "Standards Upgrade"
+  short_description: "Apply the relevant Repository Standard delta"
+  default_prompt: "Use standards-upgrade to assess this repository, resolve its Wayfinder plan, and complete the approved workflow."
+policy:
+  allow_implicit_invocation: false

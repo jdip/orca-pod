@@ -1,0 +1,25 @@
+name: Targeted checks
+# Changed-file checks for PRs into rollups and other non-delivery bases. These runs are
+# never Validate evidence: delivery lookup reads only validate.yml runs.
+run-name: Targeted checks integration ${{ github.sha }}
+on:
+  pull_request:
+    branches-ignore: [test, main]
+permissions:
+  contents: read
+jobs:
+  targeted:
+    runs-on: ubuntu-latest
+    steps:
+      # Depth 2 fetches the synthetic merge and both of its parents.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Targeted checks of the integration's changes
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          FEATURE_SHA: ${{ github.event.pull_request.head.sha }}
+        run: bash scripts/check.sh --base "$BASE_SHA" --feature "$FEATURE_SHA"

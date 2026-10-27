@@ -6,9 +6,10 @@ gracefully, saves the previous `settings` document (payload, content_hash, revis
 new private --backup file, patches that document, relaunches Orca, waits for the runtime, verifies the
 patch survived and writes a JSON result. On any failure after the write it restores the saved document
 before Orca starts, quitting Orca again first when the failure is found after the relaunch, and reports
-whether the restore was verified. Orca is never force-killed, and an unverified Orca or settings-document
-version is refused with nothing changed. Agent sessions run under Orca's terminal host, so they survive
-the restart.
+whether the restore was verified. Orca is never force-killed. The gate is the settings schema, not the
+app version: an unsupported settings domain_version, or a target key that is missing or has an unexpected
+type or value, is refused with nothing changed; the app version is only recorded. Agent sessions run under
+Orca's terminal host, so they survive the restart.
 """
 import argparse
 import hashlib
@@ -25,7 +26,12 @@ APP = '/Applications/Orca.app'
 APP_BIN = APP + '/Contents/MacOS/Orca'
 ORCA_CLI = APP + '/Contents/Resources/bin/orca'
 DB = Path('~/Library/Application Support/orca/profiles/local-default/profile-state.db').expanduser()
-SUPPORTED = {('1.4.240', 1)}  # (app version, settings domain_version) verified in jdip/orca-pod#6
+SUPPORTED_DOMAIN_VERSIONS = {1}  # Settings document versions verified in jdip/orca-pod#6 and #38.
+# The settings keys the helper may set, with the type and, where Orca defines a closed set, the values Orca accepts
+# (verified against Orca 1.4.240 and 1.4.241). The current and new values must both fit.
+SETTINGS_SHAPE = {'branchPrefix': (str, {'git-username', 'custom', 'none'}),
+                  'branchPrefixCustom': (str, None),
+                  'agentPermissionDefault': (str, {'own', 'ask', 'accept-edits', 'auto', 'full-access'})}
 MANUAL = 'set them by hand in Orca Settings instead'
 FIELDS = ('domain_version', 'revision', 'payload', 'content_hash', 'updated_at')
 
@@ -48,6 +54,21 @@ def read_settings(conn):
     return dict(zip(FIELDS, row))
 
 
+def schema_error(domain_version, current, patch):
+    """Why the settings document does not have the verified shape for patch, or None when it does."""
+    if domain_version not in SUPPORTED_DOMAIN_VERSIONS:
+        return f'unsupported settings domain_version {domain_version}'
+    unknown = [k for k in patch if k not in SETTINGS_SHAPE or k not in current]
+    if unknown:
+        return f'refusing unknown settings keys {unknown}'
+    for key, value in patch.items():
+        kind, allowed = SETTINGS_SHAPE[key]
+        for label, v in (('current', current[key]), ('new', value)):
+            if type(v) is not kind or (allowed is not None and v not in allowed):
+                return f'unexpected {label} value {json.dumps(v)} for settings key {key!r}'
+    return None
+
+
 def preflight(patch):
     """Read-only gate: return {ok, error?, app_version, domain_version, revision, before, changes}."""
     info = {'ok': False, 'app_version': app_version() if Path(APP).exists() else None}
@@ -63,11 +84,9 @@ def preflight(patch):
     cur = json.loads(doc['payload'])
     dv = doc['domain_version']
     info.update(domain_version=dv, revision=doc['revision'], before={k: cur.get(k) for k in patch})
-    if (info['app_version'], dv) not in SUPPORTED:
-        return {**info, 'error': f'unverified Orca {info["app_version"]} / settings domain_version {dv}; {MANUAL}'}
-    unknown = [k for k in patch if k not in cur]
-    if unknown:
-        return {**info, 'error': f'refusing unknown settings keys {unknown}; {MANUAL}'}
+    error = schema_error(dv, cur, patch)
+    if error:
+        return {**info, 'error': f'{error} (Orca {info["app_version"]}); {MANUAL}'}
     info['changes'] = {k: v for k, v in patch.items() if cur.get(k) != v}
     return {**info, 'ok': True}
 
@@ -169,11 +188,12 @@ def main():
         conn = sqlite3.connect(DB)
         try:
             saved = read_settings(conn)
-            if (pre['app_version'], saved['domain_version']) not in SUPPORTED:
-                raise RuntimeError(f'settings domain_version changed to {saved["domain_version"]}')
+            cur = json.loads(saved['payload'])
+            error = schema_error(saved['domain_version'], cur, patch)
+            if error:
+                raise RuntimeError(f'the settings document no longer fits the verified shape: {error}')
             write_private(a.backup, json.dumps(saved) + '\n')
             step('backup', path=str(a.backup))
-            cur = json.loads(saved['payload'])
             cur.update(patch)
             payload = json.dumps(cur, separators=(',', ':'), ensure_ascii=False)
             with conn:

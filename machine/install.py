@@ -47,7 +47,7 @@ ORCA_PATCH = {'branchPrefix': 'custom', 'branchPrefixCustom': 'orca', 'agentPerm
 CODEX_ROOT = {'model': 'gpt-6.1-sol', 'model_reasoning_effort': 'high'}
 CODEX_TABLE_KEYS = {'agents': ('enabled', True), 'features': ('hooks', True)}
 BLOCKS = ('root', 'agents', 'features', 'hooks.state')
-# Each provider's --extra-agent-args for a roster model and effort; Orca 1.4.240 accepts only these options.
+# Each provider's --extra-agent-args for a roster model and effort; Orca 1.4.240 and 1.4.241 accept only these options.
 AGENT_ARGS = {'claude': '--model {model} --effort {effort}',
               'codex': '--model {model} -c model_reasoning_effort={effort}'}
 AUTOMATION_KEYS = {'name', 'role', 'trigger', 'prompt'}
@@ -57,10 +57,10 @@ AUTOMATION_PREFIX = 'Orca Pod: '
 AUTOMATION_ID = re.compile(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')  # Orca's UUIDs.
 CRON = re.compile(r'[0-9*,/-]+(?: [0-9*,/-]+){4}')
 PLAIN_TOKEN = re.compile(r'[A-Za-z0-9][A-Za-z0-9._-]*')
-ORCA_MISSED_RUN_GRACE = 720  # Orca 1.4.240's default missed-run grace window, in minutes.
+ORCA_MISSED_RUN_GRACE = 720  # Orca's default missed-run grace window in minutes (1.4.240 and 1.4.241).
 
-# The exact command hooks each verified Orca version writes to ~/.codex/hooks.json, taken from Orca 1.4.240's
-# agent-hook generator (its Codex command builder and event table). Only an exact match is ever trusted.
+# The known sets of command hooks Orca writes to ~/.codex/hooks.json, by event. Trust follows content, not the
+# Orca version: a handler is trusted only when it exactly equals its event's handler in one of these sets.
 ORCA_HOOK_COMMAND_1 = (
     ': orca-agent-hook-form=1; '
     'if [ -n "${ORCA_PANE_KEY-}" ] && [ -n "${ORCA_AGENT_HOOK_ROOT-}" ] && '
@@ -70,11 +70,13 @@ ORCA_HOOK_COMMAND_1 = (
     '[ -f "${HOME-}/.orca/agent-hooks/codex-hook.sh" ]; '
     'then /bin/sh "${HOME-}/.orca/agent-hooks/codex-hook.sh" || :; '
     'else { command -p cat 2>/dev/null || cat; } >/dev/null 2>&1 || :; fi')
-ORCA_CODEX_HOOKS = {
-    '1.4.240': {event: {'type': 'command', 'command': ORCA_HOOK_COMMAND_1, 'timeout': 3 if event == 'Interrupt' else 10}
-                for event in ('SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PermissionRequest', 'PostToolUse',
-                              'SubagentStart', 'SubagentStop', 'Stop', 'Interrupt')},
-}
+ORCA_CODEX_HOOK_SETS = (
+    # Taken from Orca 1.4.240's agent-hook generator (its Codex command builder and event table); 1.4.241 writes
+    # the same handlers.
+    {event: {'type': 'command', 'command': ORCA_HOOK_COMMAND_1, 'timeout': 3 if event == 'Interrupt' else 10}
+     for event in ('SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PermissionRequest', 'PostToolUse',
+                   'SubagentStart', 'SubagentStop', 'Stop', 'Interrupt')},
+)
 MATCHER_EVENTS = {'pre_tool_use', 'permission_request', 'post_tool_use', 'session_start', 'session_end',
                   'subagent_start', 'subagent_stop', 'pre_compact', 'post_compact'}
 CONTEXT_LIMIT_EVENTS = {'pre_tool_use', 'post_tool_use', 'session_start', 'user_prompt_submit', 'subagent_start'}
@@ -275,20 +277,16 @@ def hook_hash(event, matcher, handler):
     return 'sha256:' + sha(text.encode('utf-8'))
 
 
-def orca_hook_trust(home, notes, orca_version):
-    """Return {state key: trusted_hash} for each hook in <home>/.codex/hooks.json that exactly matches one
-    the installed Orca version is pinned to write; any other hook is reported and left untrusted."""
+def orca_hook_trust(home, notes):
+    """Return {state key: trusted_hash} for each hook in <home>/.codex/hooks.json that exactly matches its
+    event's handler in a pinned Orca hook set, whatever the Orca version; any other hook is reported and
+    left untrusted."""
     path = home / '.codex' / 'hooks.json'
     check_path(home, path)
     data = current_bytes(path, links_ok=True)  # Only hashed, never copied or replaced.
     if data is None:
         notes.append('~/.codex/hooks.json is absent, so no Codex hook trust is seeded; '
                      'rerun --apply after Orca installs its hooks')
-        return {}
-    pinned = ORCA_CODEX_HOOKS.get(orca_version)
-    if pinned is None:
-        notes.append(f'Orca {orca_version or "(not installed)"} has no pinned Codex hook commands, '
-                     'so no Codex hook trust is seeded')
         return {}
     raw = read_regular(path.resolve(), links_ok=True) if data.startswith(b'symlink:') else data
     events = json.loads(raw).get('hooks', {})
@@ -298,13 +296,13 @@ def orca_hook_trust(home, notes, orca_version):
         for gi, group in enumerate(groups if isinstance(groups, list) else []):
             handlers = group.get('hooks', []) if isinstance(group, dict) else []
             for hi, handler in enumerate(handlers if isinstance(handlers, list) else []):
-                if pinned.get(name) == handler and set(group) == {'hooks'}:
+                if set(group) == {'hooks'} and any(pinned.get(name) == handler for pinned in ORCA_CODEX_HOOK_SETS):
                     trust[f'{source}:{snake(name)}:{gi}:{hi}'] = hook_hash(snake(name), None, handler)
                 else:
                     skipped.append(f'{name}[{gi}][{hi}]')
     if skipped:
-        notes.append(f'~/.codex/hooks.json: {len(skipped)} hook(s) are not ones Orca {orca_version} writes, '
-                     'so they get no trust: ' + ', '.join(skipped))
+        notes.append(f'~/.codex/hooks.json: {len(skipped)} hook(s) match no pinned Orca hook set, '
+                     'so they get no new trust: ' + ', '.join(skipped))
     return trust
 
 
@@ -672,7 +670,6 @@ class Plan:
         self.notes = []
         self.refusals = []
         self.automations = []
-        self.orca_version = None
 
     def show(self, path):
         try:
@@ -916,10 +913,23 @@ def plan_codex_config(plan, adopt):
     cur = read_key_file(plan, path)
     if cur is False:
         return
-    trust = orca_hook_trust(plan.home, plan.notes, plan.orca_version)
+    matched = orca_hook_trust(plan.home, plan.notes)
     old_keys = entry.get('hook_keys', []) if entry else []
     text = cur.decode('utf-8') if cur else ''
     try:
+        # An owned trust entry whose hook no longer matches a pinned set keeps its recorded hash, so an Orca
+        # hook change is reported instead of silently untrusting the hook; the changed hook gains no trust.
+        kept, doc = {}, tomllib.loads(text)
+        for key in old_keys:
+            value, found = get_path(doc, ('hooks', 'state', key))
+            if key not in matched and found and isinstance(value, dict) and isinstance(value.get('trusted_hash'), str):
+                kept[key] = value['trusted_hash']
+        if kept:
+            plan.notes.append(f'{plan.show(path)}: kept {len(kept)} existing Orca hook trust entr'
+                              f'{"y" if len(kept) == 1 else "ies"} whose hook no longer matches a pinned Orca hook '
+                              'set; check the Orca hooks and update the pinned set: '
+                              + ', '.join(':'.join(key.rsplit(':', 3)[1:]) for key in kept))
+        trust = {key: matched.get(key, kept.get(key)) for key in [*old_keys, *matched] if key in matched or key in kept}
         new, moved, adopted, previous = merge_codex_config(text, trust, old_keys)
         domain = codex_managed(list(trust) + old_keys)
         diff = managed_diff(text, new, domain)
@@ -1252,14 +1262,8 @@ def uninstall_automations(old, args):
     return [], failures
 
 
-def orca_app_version():
-    module = orca_settings_module()
-    return module.app_version() if Path(module.APP).exists() else None
-
-
 def build_plan(home, old, args):
     plan = Plan(home, old)
-    plan.orca_version = orca_app_version()
     for path, leaf_dir in ((home / STATE, True), (home / STATE / 'backups', True), (home / STATE / 'manifest.json', False)):
         plan.check(path, leaf_dir)
     for step in (plan_skills, plan_roles, plan_rules, lambda p: plan_codex_config(p, args.adopt_config),
@@ -1615,7 +1619,8 @@ def record_orca_patch(writer, manifest, pre, patch):
     earlier = copy.deepcopy(manifest.get('orca_settings'))
     record = copy.deepcopy(earlier) if earlier else {}
     record['previous'] = {**pre['before'], **record.get('previous', {})}  # Keep the first original values.
-    record.update(set=dict(patch), status='pending',
+    record.update(set=dict(patch), status='pending', app_version=pre['app_version'],  # The version is informational.
+                  domain_version=pre['domain_version'],
                   backup=(writer.backup_root / 'orca-settings.json').relative_to(writer.state).as_posix())
     manifest['orca_settings'] = record
     write_manifest(writer, manifest)

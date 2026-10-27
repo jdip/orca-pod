@@ -117,7 +117,9 @@ def inventory():
         else:
             reasons += git_state(row['path'])
         activity = row.get('lastActivityAt')
-        idle_days = round((time.time() * 1000 - activity) / 86400000, 1) if isinstance(activity, (int, float)) else None
+        # Orca reports 0 for a worktree with no recorded activity; that is no timestamp, not an epoch-old one.
+        recorded = isinstance(activity, (int, float)) and activity > 0
+        idle_days = round((time.time() * 1000 - activity) / 86400000, 1) if recorded else None
         entry = {'worktree': worktree_id, 'branch': row.get('branch'), 'archived': row.get('isArchived', False),
                  'idle_days': idle_days, 'disposition': 'retain' if reasons else 'candidate', 'reasons': reasons}
         if not reasons:

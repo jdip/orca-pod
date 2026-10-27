@@ -115,11 +115,18 @@ checkout. Report actual cleanup separately from delivery completion.
 A daily sweep is a dry run by default: it reports the inventory and dispositions.
 Removing a worktree the sweep did not create needs explicit removal authority from
 the installed sweep or the operator, an inventory `candidate` disposition,
-positively verified delivery of its work, no pending input/approval or unresolved
-work, and MORE THAN SEVEN DAYS since its Orca `lastActivityAt` (the inventory's
-`idle_days`). No timestamp or unclear completion means skip. Do not use file
-modification time, worktree name, creation date, or an invented timestamp as a
+positively verified delivery of its work (for example a merged PR, or its HEAD
+reachable from the repository's remote delivery branch), no pending input/approval
+or unresolved work, and MORE THAN SEVEN DAYS since its Orca `lastActivityAt` (the
+inventory's `idle_days`). No timestamp or unclear completion means skip. Do not use
+file modification time, worktree name, creation date, or an invented timestamp as a
 substitute. Do not relax the threshold.
+
+The installed sweep's authority covers exactly that removal: a worktree meeting every
+condition above, with no live Orca agent or terminal attached, removed only with
+`orca worktree rm --worktree <selector>` and no other flag. Everything else it finds
+stays report-only, including settled worker terminals, branches, containers,
+networks, processes and any worktree failing one condition.
 
 Rerun the inventory immediately before each removal and recheck the exact
 worktree. Observe and report the actual result of `orca worktree rm`, including a
@@ -143,8 +150,14 @@ cleanup and any retained live resources, failed teardown or missing evidence tha
 needs action. Do not describe unresolved teardown as completed cleanup or close an
 issue whose acceptance requires it.
 
-Scheduled runs retain a concise disposition in their existing run output/memory,
-including coverage limits and discovery failures. Notify on meaningful cleanup,
-new or materially changed failures, or required action; remain quiet on unchanged
-non-actionable skips and genuine no-ops. An unchanged known failure remains
-unresolved in the run evidence even when it needs no repeat notification.
+Scheduled runs retain a concise disposition, including coverage limits and
+discovery failures, in this package's `scripts/sweep_state.py` (Python 3.9+). Once
+the run's actions are done, pass it a JSON object mapping each finding's stable key
+(such as `worktree:<id>` or `discovery:<root>`) to its concise disposition from the
+final inventory, leaving out values that change every run, such as `idle_days`
+itself rather than whether it exceeds seven days. It reports what is new, changed or gone since the previous sweep
+and keeps these findings for the next one in one file under the Git common
+directory. Report the run's own cleanup actions and those changes only; when
+nothing changed, say so in one line. An unchanged known failure stays recorded as
+unresolved even though it is not repeated. If the state cannot be read or kept,
+report that and every finding.

@@ -47,8 +47,14 @@ For a daily sweep, obtain exact known project roots from Orca's project inventor
 supervising agent. Pass those roots to this package's
 `scripts/discover.py` with Python 3.9+ (resolve the script relative to this skill)
 and keep its output for the inventory's `--discovery`. It parses only the root AGENTS.md Repository Standard section and verifies the exact
-Orca Pod source and adopted commit through gh. It checks each distinct revision
-once and reports eligible roots or skip reasons. Never replace this discovery procedure
+Orca Pod source and adopted commit through gh. One explicit exception: the
+Standard's own source repository adopts no Standard, so a checkout top level whose
+`origin` remote is jdip/orca-pod is admitted with basis `source repository`, its
+HEAD verified through gh the same way. Its worktrees still face every inventory and
+delivery-evidence check below. It checks each distinct revision once and reports
+eligible roots, each with its basis and expected `repository` key
+(`github.com/jdip/orca-pod` for the source repository, else the root's GitHub
+`origin`, or none), or skip reasons. Never replace this discovery procedure
 with a grep for arbitrary hashes, a filesystem sweep, internal app-storage scraping,
 or a new registry. Unavailable inventory/source evidence means skip, not inferred
 participation. Direct delivery cleanup may use the already verified current
@@ -82,9 +88,11 @@ and a hosted `gh` compare, and changes nothing. It marks each Orca worktree
 `retain`, with its reasons, or `candidate`, with its `repo_id` and `repo_root`, and
 lists settled workers whose terminals are reclaimable.
 
-A candidate's repository passed this run's discovery, and its checkout shares that
-repository's Git common directory. A worktree in any other repository, or with
-unknown repository identity, is retained; without `--discovery` nothing is a
+A candidate's repository passed this run's discovery, Orca's `gitRemoteIdentity`
+`canonicalKey` for it is exactly that discovery's `repository` key, and its checkout
+shares that repository's Git common directory. A worktree in any other repository,
+with unknown, mismatched or stale remote identity, or whose discovery recorded no
+repository, is retained before any hosted compare; without `--discovery` nothing is a
 candidate. The inventory validates every Orca response strictly: required fields
 present with exact types, complete pagination and untruncated listings covering
 every host, booleans as booleans and timestamps as plausible epoch milliseconds,
@@ -93,8 +101,8 @@ that worktree; a gap in a listing that covers all worktrees (`inventory_gaps`)
 retains every worktree. Both report the gap. A live Orca terminal or agent, an
 unsettled or unreleased worker, the main checkout, the sweep's own worktree, local
 changes or unpublished commits also retain the worktree. A candidate also needs
-hosted delivery evidence (`delivery`): a `gh` compare showing its HEAD already on
-the repository's `test` delivery branch. Local remote-tracking refs never count. A
+hosted delivery evidence (`delivery`): a `gh` compare against discovery's repository
+showing its HEAD already on its `test` delivery branch. Local remote-tracking refs never count. A
 failed inventory preserves every resource. A candidate is only a proposal for the
 checks below.
 

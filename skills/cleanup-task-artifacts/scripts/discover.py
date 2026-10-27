@@ -7,6 +7,9 @@ import re
 import subprocess
 
 SOURCE = 'https://github.com/jdip/orca-pod'
+# The Standard's own source repository adopts no Standard; its origin remote identifies it instead.
+SOURCE_KEY = 'github.com/jdip/orca-pod'
+GITHUB_REMOTE = re.compile(r'(?:https://|ssh://git@|git@)github\.com[:/]([\w.-]+/[\w.-]+?)(?:\.git)?/?')
 
 
 def declaration(text):
@@ -42,6 +45,29 @@ def declaration(text):
     return revisions[0]
 
 
+def git(root, *arguments):
+    result = subprocess.run(['git', '-C', str(root), *arguments], capture_output=True, text=True)
+    return result.stdout.strip() if result.returncode == 0 else ''
+
+
+def repository(root):
+    """The canonical github.com/<owner>/<name> key of the root's origin remote, else None."""
+    match = GITHUB_REMOTE.fullmatch(git(root, 'remote', 'get-url', 'origin'))
+    return f'github.com/{match[1]}' if match else None
+
+
+def source_revision(root, key):
+    """The checkout's HEAD when root is a top-level clone of the source repository, else None."""
+    if key != SOURCE_KEY:
+        return None
+    if git(root, 'rev-parse', '--path-format=absolute', '--show-toplevel') != str(root.resolve()):
+        raise ValueError('source repository root is not its checkout top level')
+    revision = git(root, 'rev-parse', '--verify', 'HEAD^{commit}')
+    if not re.fullmatch(r'[0-9a-f]{40}', revision):
+        raise ValueError('source repository HEAD is unreadable')
+    return revision
+
+
 def discover(roots):
     verified = {}
     for supplied in dict.fromkeys(roots):
@@ -50,17 +76,21 @@ def discover(roots):
         try:
             if root.is_symlink() or not root.is_dir():
                 raise ValueError('root is missing or indirect')
-            instructions = root / 'AGENTS.md'
-            if instructions.is_symlink() or not instructions.is_file():
-                raise ValueError('root AGENTS.md is missing or indirect')
-            revision = declaration(instructions.read_text(encoding='utf-8'))
+            # The inventory accepts hosted delivery only from the repository this key names.
+            key = repository(root)
+            revision, basis = source_revision(root, key), 'source repository'
+            if revision is None:
+                instructions = root / 'AGENTS.md'
+                if instructions.is_symlink() or not instructions.is_file():
+                    raise ValueError('root AGENTS.md is missing or indirect')
+                revision, basis = declaration(instructions.read_text(encoding='utf-8')), 'adoption'
             if revision not in verified:
                 response = subprocess.run(['gh', 'api', f'repos/jdip/orca-pod/commits/{revision}', '--jq', '.sha'],
                                           capture_output=True, text=True)
                 verified[revision] = response.returncode == 0 and response.stdout.strip() == revision
             if not verified[revision]:
                 raise ValueError('revision could not be verified in the trusted source repository')
-            result.update(eligible=True, revision=revision)
+            result.update(eligible=True, revision=revision, basis=basis, repository=key)
         except (OSError, UnicodeError, ValueError) as error:
             result['reason'] = str(error)
         print(json.dumps(result), flush=True)

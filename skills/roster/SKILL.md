@@ -203,8 +203,23 @@ orca orchestration worker-retain --dispatch <dispatch_id> --json
 ```
 
 After each accepted `worker_done`, validate it against the expected Dispatch,
-then do exactly one: reuse the terminal for an immediate follow-up, retain it on
-the operator's request, or release it. `worker-read` still works after release.
+then do exactly one:
+
+- **Follow up in the same session** where Orca accepts the handle, such as the
+  terminal-backed SEC Daybreak worker: `worker-show`, then
+  `worker-start --task <next_task_id> --terminal <agent_terminal_handle>`. The
+  new Dispatch takes over cleanup.
+- **Retain** the worker on the operator's request.
+- **Release** it. `worker-read` still works after release.
+
+Current Orca refuses the handle for agent-session workers with
+`terminal_unsupported_for_agent_session` (fix pending upstream,
+stablyai/orca#34043). For their follow-up, release, then start a fresh
+`worker-start` whose brief carries the needed context: prior findings, files and
+revision.
+
+`send --to dispatch:<id>` is guidance for a live, unsettled Dispatch only; never
+send work outside a Dispatch.
 
 ## Verify the model
 

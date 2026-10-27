@@ -470,9 +470,16 @@ def render_body(name, trust, header):
         return ([f'[{name}]\n'] if header else []) + [f'{key} = {str(value).lower()}\n']
     body = []
     for key, value in trust.items():
+        state = trust_state(value)
         body += ['\n'] if body else []
-        body += [f'[hooks.state.{toml_str(key)}]\n', 'enabled = true\n', f'trusted_hash = {toml_str(value)}\n']
+        body += [f'[hooks.state.{toml_str(key)}]\n', f'enabled = {str(state["enabled"]).lower()}\n',
+                 f'trusted_hash = {toml_str(state["trusted_hash"])}\n']
     return body
+
+
+def trust_state(value):
+    """A trust value is a pinned hook's hash, seeded enabled, or a kept entry's recorded hash and enabled state."""
+    return value if isinstance(value, dict) else {'enabled': True, 'trusted_hash': value}
 
 
 def set_path(doc, path, value):
@@ -584,7 +591,7 @@ def merge_codex_config(text, trust, old_hook_keys):
     for name, (key, value) in CODEX_TABLE_KEYS.items():
         set_path(expected, (name, key), value)
     for path in managed['hooks.state']:
-        set_path(expected, path, {'enabled': True, 'trusted_hash': trust[path[2]]})
+        set_path(expected, path, trust_state(trust[path[2]]))
     try:
         ok = pruned(tomllib.loads(new)) == pruned(expected)
     except tomllib.TOMLDecodeError:
@@ -923,7 +930,7 @@ def plan_codex_config(plan, adopt):
         for key in old_keys:
             value, found = get_path(doc, ('hooks', 'state', key))
             if key not in matched and found and isinstance(value, dict) and isinstance(value.get('trusted_hash'), str):
-                kept[key] = value['trusted_hash']
+                kept[key] = {'enabled': value.get('enabled') is not False, 'trusted_hash': value['trusted_hash']}
         if kept:
             plan.notes.append(f'{plan.show(path)}: kept {len(kept)} existing Orca hook trust entr'
                               f'{"y" if len(kept) == 1 else "ies"} whose hook no longer matches a pinned Orca hook '
@@ -1664,6 +1671,11 @@ def orca_steps(plan, args, writer, manifest, stamp):
         return False
     if not pre['changes']:
         print('Orca app settings already match.')
+        record = manifest.get('orca_settings')
+        seen = {'app_version': pre['app_version'], 'domain_version': pre['domain_version']}
+        if record and any(record.get(k) != v for k, v in seen.items()):  # Note the versions it was last seen on.
+            record.update(seen)
+            write_manifest(writer, manifest)
         return ok
     earlier = record_orca_patch(writer, manifest, pre, ORCA_PATCH)
     result = patch_orca(writer, ORCA_PATCH, stamp)

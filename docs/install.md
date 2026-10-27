@@ -161,8 +161,9 @@ requires a supported settings `domain_version` (1 today) and a read-only check
 that each target key exists with the expected type and, for `branchPrefix` and
 `agentPermissionDefault`, one of the values Orca accepts, for both the current
 and the new value. It repeats the check after quitting Orca, before the backup and
-write. The Orca version is informational: the helper's result file and the
-manifest record it. The installer first records the previous values in the
+write. The Orca version is informational: the helper's result file records it, and an
+owned manifest record keeps the app and settings versions it was last seen on,
+even when the settings already match. The installer first records the previous values in the
 manifest. The helper quits Orca gracefully (never
 force-killing it), saves the previous `settings` document (its payload, hash,
 revision and timestamp, nothing else from the profile store) to an owner-only

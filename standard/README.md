@@ -60,6 +60,12 @@ need Repository Adoption; ordinary upgrades use the recorded source's default
 branch unless the user requests a revision. Select one concrete revision and apply
 its relevant delta, preserving unrelated work.
 
+The default branch carries this standard from `v0.1.0`, so ordinary adoption and
+upgrades use its HEAD. A target explicitly pinned to a pre-default revision, such
+as a rollup or `test` commit, depends on that commit staying reachable: verify it
+is reachable from a source branch before selecting it, and keep source delivery to
+merge commits only so later integration retains it.
+
 ## Target assessment and planning
 
 Preparation, Greenfield Initialization, Brownfield Adoption and Standards Upgrade
@@ -248,8 +254,12 @@ from active service. Record coverage, justified exceptions and exact blocked
 capabilities in the existing alignment evidence. Missing permissions or unavailable
 hosting features leave protection explicitly incomplete; continue independent
 alignment work. Configuration awaiting separately authorized default-branch
-delivery can finish verified test delivery with activation reported as pending. Do
-not claim active coverage or require promotion merely to complete source delivery.
+delivery can finish verified test delivery with activation reported as pending.
+Dependabot alerts cover only the default branch, so a target that delivers to
+`test` and promotes rarely has no alert coverage of code delivered since its last
+promotion. Record that gap, with the default-branch revision alerts cover, in the
+alignment evidence. Do not claim active coverage or require promotion merely to
+complete source delivery or close the gap.
 Additional credentials, paid features, visibility changes and separately required
 main promotion retain their own approval boundaries. Do not widen permissions,
 change hosting or invent a new updater to claim completion.
@@ -387,6 +397,13 @@ or data includes them rather than keying reuse to the source tree alone.
 Exact head/base/parent pins, review, branch protection and real deployment or
 processing acceptance remain separate gates. Reused build or test evidence never
 satisfies deployment acceptance.
+
+Under non-admin access, GitHub returns 404 for branch protection and the
+[Dependabot settings](../skills/dependabot-upkeep/SKILL.md#establish-alert-only-protection),
+so 404 does not separate disabled from forbidden. Report such a setting as
+unreadable, not disabled, and give the owner its readback or set step, such as
+`gh api repos/<owner>/<repo>/branches/<branch>/protection/required_status_checks`
+for required-check configuration.
 
 ## Checkouts and delivery
 

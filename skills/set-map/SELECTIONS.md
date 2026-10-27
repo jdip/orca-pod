@@ -41,6 +41,17 @@ a continuation succeed. A confirmed absent entry is different from unreadable,
 invalid, inaccessible, foreign or transferred state. Only explicit absence in a
 known scope permits initial `select --expect-absent`.
 
+## Assess selections
+
+To learn which efforts hold selections, run either selector's `list` instead of
+reading state files. It reads local state only, without locks or tracker lookups,
+and reports every scope's map and backlog issue, owner and generation, Agent Team
+scoped records and legacy root pointers; an unreadable record appears as that
+scope's `error`. The inventory is assessment evidence, never a binding: a task
+still establishes its own scope and owner from explicit context and binds through
+`show`. Agent Team records or pointers mean legacy state awaiting import, not an
+empty repository.
+
 Before repository/tracker mutations, on resume after interruption or human input,
 and between loop tickets, check the retained binding and current tracker/design
 state. Failure stops dependent work with existing state preserved. Changes made
@@ -124,18 +135,25 @@ cannot cancel an already-running command; verified source quiescence is essentia
 
 ## Legacy import and rename
 
-The root pointer files in Git's common directory are historical inputs, never
-fallback selections: `orca-pod-wayfinder-map` and `orca-pod-implementation-backlog`,
-or their Agent Team-era names `codex-wayfinder-map` and
-`codex-implementation-backlog`. Import reads whichever exist and refuses
-pointers that disagree. With explicit
-migration authority, run the relevant selector's `import-legacy --scope <scope>
---owner <task> --expect-absent`. It validates that one legacy URL belongs to the
-current repository and has the required issue role; closed historical issues are
-allowed. It creates only the absent scoped entry and leaves both legacy files and
-the other scoped entry unchanged. Import each kind separately and verify each
-result. Existing destination state, malformed input or a failed lookup preserves
-all state; investigate rather than choosing a different scope silently.
+Legacy state in Git's common directory is a historical input, never a fallback
+selection. Root pointer files are `orca-pod-wayfinder-map` and
+`orca-pod-implementation-backlog`, or their Agent Team-era names
+`codex-wayfinder-map` and `codex-implementation-backlog`; import reads whichever
+exist and refuses pointers that disagree. Agent Team scoped records live in
+`codex-selection-scopes/<scope>.json` with the current record format.
+
+With explicit migration authority, run the relevant selector's `import-legacy
+--scope <scope> --owner <task> --expect-absent`, adding `--agent-team-scope
+<scope>` to import that Agent Team scope's entry. Normally keep the scope name.
+Without that option, import refuses root pointers when the same-named Agent Team
+scope holds that kind. Import validates that the legacy URL belongs to the current
+repository and has the required issue role, and that an Agent Team entry still
+resolves to its recorded issue identity; closed historical issues are allowed. It
+creates only the absent scoped entry, owned by the importing task at generation 1,
+and leaves every legacy file and the other scoped entry unchanged. The Agent Team
+owner is not carried over. Import each kind separately and verify each result.
+Existing destination state, malformed input or a failed lookup preserves all
+state; investigate rather than choosing a different scope silently.
 
 For an authorized repository rename, capture the map's immutable issue node ID
 before the rename. After updating the remote, use map `refresh` with its scope,

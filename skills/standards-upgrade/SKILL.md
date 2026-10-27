@@ -24,13 +24,20 @@ Source/Revision declaration. If absent, use Repository Adoption. Investigate a
 malformed, ambiguous, inaccessible, or wrong-source declaration rather than guessing
 an adopted SHA. Preserve unrelated work and existing product behavior.
 
+For an operator-confirmed source switch, where the adopted SHA belongs to another
+standard repository, compare that source's standard at its recorded revision with
+the target standard, and record both repositories and revisions in the upgrade
+evidence; the switch replaces the declaration's Source and Revision together.
+
 Resolve the recorded source repository and the full adopted commit. For an ordinary
 upgrade, resolve that source's default-branch HEAD; honor an explicitly requested
 revision instead. Select and report one concrete target commit. Do not silently
 use the current source branch (host installation through `machine/install.py`
 has a different selection rule; see `docs/install.md`), stale content, or another
 repository. Verify both revisions are from the
-recorded source before comparing them.
+recorded source, or from their respective repositories for a source switch, before
+comparing them. An explicitly pinned revision follows the target standard's
+reachability rule for pre-default pins.
 
 Read the target standard and compare the relevant adopted-to-target source changes.
 Apply its Target assessment and planning and Guidance retirement outcomes to the

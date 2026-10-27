@@ -219,9 +219,11 @@ both ways. Reuse an existing follow-up for the same effort; one shared follow-up
 may cover several decisions. Record its intended outcome and references to the
 approved decisions. Once every decision is settled, use `to-spec` to draft one
 specification/backlog parent and its executable breakdown. For a settled compact
-map, record its agreed direction in the map's resolution comment. Record
-resolution and close the map once its open follow-up is verified; `to-tickets`
-publishes the approved batch after the map closes. While design remains
+map, record its agreed direction in the map's resolution comment. The follow-up
+can be the approved specification parent: `to-tickets` publishes its body, with no
+children, before closure. Record resolution and close the map once its open
+follow-up is verified; `to-tickets` publishes the approved children after the map
+closes. While design remains
 unsettled, keep the follow-up explicitly awaiting planning rather than inventing
 executable scope.
 

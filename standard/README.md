@@ -42,6 +42,8 @@ copying an entire scaffolding tree.
   safeguards under [visibility and public work](#visibility-and-public-work).
 - Executable scripts/pr-to-test.sh and scripts/promote-to-main.sh, paired with
   docs/workflows/pr-to-test.md and docs/workflows/promote-to-main.md.
+- Owner-confirmed branch protection on `test` and `main`, with catch-up delivery,
+  under [checkouts and delivery](#checkouts-and-delivery).
 - One source/revision declaration in root AGENTS.md, delivered in the adoption or
   upgrade PR, using the exact fields below.
 
@@ -402,8 +404,7 @@ Under non-admin access, GitHub returns 404 for branch protection and the
 [Dependabot settings](../skills/dependabot-upkeep/SKILL.md#establish-alert-only-protection),
 so 404 does not separate disabled from forbidden. Report such a setting as
 unreadable, not disabled, and give the owner its readback or set step, such as
-`gh api repos/<owner>/<repo>/branches/<branch>/protection/required_status_checks`
-for required-check configuration.
+the [branch protection](#checkouts-and-delivery) readback.
 
 ## Checkouts and delivery
 
@@ -435,6 +436,23 @@ protection bypasses are not delivery alternatives. Separately requested promotio
 uses the global `promote-to-main` skill, `docs/workflows/promote-to-main.md`, and
 `scripts/promote-to-main.sh` from the clean primary `test` checkout, completing
 verification and main-to-test synchronization.
+
+Protect `test` and `main`: require a pull request, the target's full CI check or
+checks and up-to-date branches; disable force pushes and deletions; and turn on
+"Do not allow bypassing the above settings". Approvals follow the target's review
+policy, defaulting to none. Drastic recovery is a deliberate, one-time disable of
+the no-bypass setting, re-enabled afterwards. Agents usually lack admin, so
+adoption gives the owner these exact settings and a readback of
+`gh api repos/<owner>/<repo>/branches/<branch>/protection` for each branch:
+`required_pull_request_reviews` present, `required_status_checks.strict` true with
+the full CI contexts, `allow_force_pushes` and `allow_deletions` disabled, and
+`enforce_admins` enabled. The outcome is complete only after the owner confirms it.
+Already-adopted targets adopt it at their next Standards Upgrade.
+
+The PR-to-test script catches up by merging the latest `test` into the task branch
+before the first push and whenever `test` moves during its wait. It bounds
+catch-ups and waits, with limits chosen and recorded in the target runbook, stops
+on conflict with the branch unchanged, and never bypasses protection.
 
 Root guidance must direct agents to `cleanup-task-artifacts` before launching
 temporary compute to establish ownership and teardown, and before reporting at

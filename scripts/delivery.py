@@ -98,6 +98,11 @@ def sha(ref):
 RUN_NAME = re.compile(r'Validate integration ([0-9a-f]{40})')
 CONTEXT_STEP = re.compile(r'Validate integration \((.+)\)')
 API_TIMEOUT = 60
+CATCH_UPS = 3  # Per PR-to-test run; each catch-up during the wait restarts its fifteen-minute limit.
+
+
+class BaseMoved(ValueError):
+    """The PR base moved or GitHub reports the head behind it. PR-to-test catches up; other flows stop."""
 
 
 def commit(repository, revision):
@@ -208,12 +213,12 @@ def pr(base, head, title, body_file, semver):
     return number
 
 
-def merge(repository, number, expected_head, expected_base):
+def merge(repository, number, expected_head, expected_base, pushed_over=None):
     run.enter('check/readiness', f'check PR {number} at expected head/base')
     account = github('api', 'user')
     author_email = f'{account["id"]}+{account["login"]}@users.noreply.github.com'
     info = github('pr', 'view', number, '--json', 'headRefOid,state,url')
-    if info['state'] != 'OPEN' or info['headRefOid'] != expected_head:
+    if info['state'] != 'OPEN' or info['headRefOid'] not in (expected_head, pushed_over):
         raise ValueError(f'PR revision/state changed: {info["url"]}')
     print(f'Waiting for checks: {info["url"]}', flush=True)
     deadline = time.monotonic() + 900
@@ -223,10 +228,14 @@ def merge(repository, number, expected_head, expected_base):
             raise ValueError(f'PR {number} did not become ready within 15 minutes; inspect required checks and branch policy')
         registered = github('pr', 'view', number, '--json', 'state,headRefOid,baseRefOid,statusCheckRollup',
                             timeout=min(API_TIMEOUT, remaining))
-        if (registered['state'] != 'OPEN' or registered['headRefOid'] != expected_head
-                or registered['baseRefOid'] != expected_base):
-            raise ValueError(f'PR {number} state/head/base changed while waiting for checks to register')
-        if not registered['statusCheckRollup']:
+        head = registered['headRefOid']
+        if registered['state'] != 'OPEN' or head not in (expected_head, pushed_over):
+            raise ValueError(f'PR {number} state/head changed while waiting for checks to register')
+        if head == expected_head and registered['baseRefOid'] != expected_base:
+            raise BaseMoved(f'PR {number} base moved from {expected_base} to {registered["baseRefOid"]} '
+                            'while waiting for checks to register')
+        # A just-pushed head can reach the PR after the push returns; only the head it replaced is tolerated.
+        if head != expected_head or not registered['statusCheckRollup']:
             time.sleep(min(10, max(0, deadline - time.monotonic())))
             continue
         remaining = deadline - time.monotonic()
@@ -236,10 +245,13 @@ def merge(repository, number, expected_head, expected_base):
                        check=True, timeout=remaining)
         fresh = github('pr', 'view', number, '--json',
                        'state,headRefOid,baseRefOid,mergeStateStatus,reviewDecision,isDraft')
-        if (fresh['state'] != 'OPEN' or fresh['headRefOid'] != expected_head
-                or fresh['baseRefOid'] != expected_base):
-            raise ValueError(f'PR {number} state/head/base changed while waiting; reassess scope before merging')
+        if fresh['state'] != 'OPEN' or fresh['headRefOid'] != expected_head:
+            raise ValueError(f'PR {number} state/head changed while waiting; reassess scope before merging')
+        if fresh['baseRefOid'] != expected_base:
+            raise BaseMoved(f'PR {number} base moved from {expected_base} to {fresh["baseRefOid"]} while waiting')
         readiness = fresh['mergeStateStatus']
+        if readiness == 'BEHIND':
+            raise BaseMoved(f'PR {number} head {expected_head} is behind its base')
         if fresh['isDraft'] or fresh['reviewDecision'] in ('REVIEW_REQUIRED', 'CHANGES_REQUESTED'):
             raise ValueError(f'PR {number} needs draft/review policy resolution before merging')
         if readiness == 'CLEAN':
@@ -286,6 +298,59 @@ def merge(repository, number, expected_head, expected_base):
     print(f'Verified {revision} tree matches Validate-tested integration {validated["integration"]}; '
           'no deployed application exists in this repository.', flush=True)
     return revision
+
+
+def catch_up(branch):
+    """Merge fetched origin/test into the task branch with a merge commit; abort, never resolve, a conflict."""
+    git = str(command_path('git'))
+    before, base = sha('HEAD'), sha('origin/test')
+    status = subprocess.run([git, 'merge-base', '--is-ancestor', base, before]).returncode
+    if status == 0:
+        return False
+    if status != 1:
+        raise ValueError(f'cannot establish whether {branch} contains origin/test {base}')
+    run.enter('catch-up', f'merge origin/test {base} into {branch} at {before}')
+    # The configured repository-local identity authors the commit; refuse anything but a no-reply email.
+    for role in ('AUTHOR', 'COMMITTER'):
+        if not re.search(r'@users\.noreply\.github\.com>', call('git', 'var', f'GIT_{role}_IDENT')):
+            raise ValueError('catch-up commit identity is not a GitHub no-reply address; '
+                             'configure the repository-local identity under the public-work policy')
+    effect = f'merge origin/test {base} into {before}'
+    run.attempt(effect)
+    if subprocess.run([git, 'merge', '--no-ff', '--no-edit', '-m', f'Merge origin/test into {branch}', base]).returncode:
+        conflicted = call('git', 'diff', '--name-only', '--diff-filter=U')
+        subprocess.run([git, 'merge', '--abort'])
+        residual = subprocess.run([git, 'rev-parse', '-q', '--verify', 'MERGE_HEAD'],
+                                  stdout=subprocess.DEVNULL).returncode == 0
+        if sha('HEAD') != before or residual or call('git', 'status', '--porcelain'):
+            raise ValueError(f'aborted catch-up did not restore {branch} at {before} with a clean tree; '
+                             'preserve the checkout and investigate')
+        run.uncertain.remove(effect)
+        run.confirm(f'aborted catch-up; {branch} unchanged at {before}')
+        if conflicted:
+            raise ValueError(f'catch-up merge of origin/test {base} conflicts; resolve it with '
+                             'resolving-merge-conflicts, have the resolution reviewed, then re-run')
+        raise ValueError(f'catch-up merge of origin/test {base} failed before conflicts; native stderr remains above')
+    run.confirm(effect)
+    run.revision = sha('HEAD')
+    print(f'Caught up {branch} with origin/test {base} as {run.revision}', flush=True)
+    run.enter('source gate', f'run Git index privacy checks on catch-up {run.revision}')
+    call(sys.executable, 'scripts/check_secrets.py', capture=False)
+    run.confirm(f'privacy gate passed on {run.revision}')
+    return True
+
+
+def push(branch):
+    """Push HEAD; return it with the remote branch head it replaces, if any."""
+    previous = subprocess.run([str(command_path('git')), 'rev-parse', '-q', '--verify', f'refs/remotes/origin/{branch}'],
+                              stdout=subprocess.PIPE, text=True).stdout.strip() or None
+    intended = run.revision = sha('HEAD')
+    run.enter('push/PR', f'push intended revision {intended}')
+    effect = f'push intended revision {intended}'
+    run.attempt(effect)
+    call('git', 'push', 'origin', f'HEAD:refs/heads/{branch}', capture=False)
+    run.confirm(effect)
+    return intended, previous
 
 
 def version_for_promotion(repository, old_main, intended_test):
@@ -373,14 +438,23 @@ def main():
         branch = call('git', 'branch', '--show-current')
         if not branch or branch in ('main', 'test'):
             raise ValueError('PR-to-test requires a named task branch')
-        intended = sha('HEAD')
-        run.enter('push/PR', f'push intended revision {intended}')
-        effect = f'push intended revision {intended}'
-        run.attempt(effect)
-        call('git', 'push', 'origin', f'HEAD:refs/heads/{branch}', capture=False)
-        run.confirm(effect)
+        catch_ups = int(catch_up(branch))  # An up-to-date branch spends none of the budget.
+        intended, pushed_over = push(branch)
         number = pr('test', branch, args.title or f'Deliver {branch}', args.body_file, args.semver)
-        merge(repository, number, intended, sha('origin/test'))
+        while True:
+            try:
+                merge(repository, number, intended, sha('origin/test'), pushed_over)
+                break
+            except BaseMoved as moved:
+                if catch_ups == CATCH_UPS:
+                    raise ValueError(f'{moved}; stopped after {CATCH_UPS} catch-ups because test is still '
+                                     'moving. Re-run when test settles.') from moved
+                catch_ups += 1  # Every drift signal counts, so a lagging BEHIND report cannot loop.
+                print(f'{moved}; catch-up {catch_ups} of {CATCH_UPS}.', flush=True)
+                run.enter('catch-up', 'fetch the moved test branch')
+                call('git', 'fetch', '--no-tags', 'origin', capture=False)
+                catch_up(branch)
+                intended, pushed_over = push(branch)
     else:
         old_main, intended = sha('origin/main'), sha('origin/test')
         if sha('HEAD') != intended:

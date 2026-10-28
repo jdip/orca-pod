@@ -16,7 +16,7 @@ body instead of treating a triage brief or comment as the contract.
 ## Establish backlog state
 
 Resolve the current repository with `gh repo view` and read its tracker guidance.
-Read [selection scope and handoff](../set-map/SELECTIONS.md) and inspect the
+Read [selection scope and handoff](../select/SELECTIONS.md) and inspect the
 explicit scope through the backlog selector. Retain and check the task's binding.
 
 - Only an explicit absent result for the established scope means there is no
@@ -85,7 +85,7 @@ Backlog parent and obtain authorization to activate it. Recheck this scope's
 selection, owner/generation and parent state immediately before selection; if
 another parent has become active in this scope, preserve it and stop activation.
 Then invoke
-the `set-backlog` owner with this scope, owner and expected generation (or
+the `select backlog` owner with this scope, owner and expected generation (or
 confirmed absence), and report its readback. This shared operation is the only
 selection mechanism; do not duplicate its validation or offer to replace an active
 parent during routine triage.

@@ -1,6 +1,0 @@
-interface:
-  display_name: "Greenfield Initialization"
-  short_description: "Establish minimal repository foundations"
-  default_prompt: "Use greenfield-init to assess this repository, resolve its Wayfinder plan, and complete the approved workflow."
-policy:
-  allow_implicit_invocation: false

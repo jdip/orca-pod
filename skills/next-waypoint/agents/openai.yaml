@@ -1,4 +1,4 @@
 interface:
   display_name: "Next Waypoint"
-  short_description: "Continue this repository’s saved Wayfinder map"
-  default_prompt: "Use next-waypoint to continue the saved Wayfinder map. Use this task’s explicit effort scope and owner binding."
+  short_description: "Work the saved Wayfinder map, one ticket or continuously"
+  default_prompt: "Use next-waypoint to work the next frontier ticket on the saved Wayfinder map, or continue mode to work successive tickets until human input or approval is needed. Use this task’s explicit effort scope and owner binding."

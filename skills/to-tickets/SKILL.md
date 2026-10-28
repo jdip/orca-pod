@@ -14,7 +14,7 @@ relationships. This skill prepares work only; it neither selects an active
 backlog nor authorizes implementation.
 
 When resolving or changing a saved selection, read
-[selection scope and handoff](../set-map/SELECTIONS.md). Carry the explicit
+[selection scope and handoff](../select/SELECTIONS.md). Carry the explicit
 scope, task owner and generation through handoffs to selection/execution owners.
 Keep map and backlog bindings independent. Publication and closed design do not
 change another effort's selections or grant takeover authority.
@@ -87,7 +87,7 @@ concrete blast radius requires temporary coexistence.
 
 Create children without assignees. Publication alone supplies no execution
 authorization. Carry an existing implementation request through selection and
-`next-issue` or `next-issue-loop` when it covers this approved scope; those
+`next-issue` or its continue mode when it covers this approved scope; those
 owners select and claim work.
 
 For GitHub, use native sub-issues for membership. Before attaching an existing
@@ -129,5 +129,4 @@ Send the human a short spec-link report without waiting for a reply: the parent
 link and its approval basis, child URLs, verified membership and dependencies, and
 the source links. Publication alone leaves a newly created parent prepared; an
 existing parent's active or executing state is preserved. An explicitly authorized
-backlog selection and `next-issue` or `next-issue-loop` request controls future
-execution.
+backlog selection and `next-issue` request controls future execution.

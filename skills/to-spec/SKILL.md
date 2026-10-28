@@ -15,7 +15,7 @@ implementation backlog; do not create a parallel planning or queue issue.
 the draft passes independent review against the map.
 
 When resolving or changing a saved selection, read
-[selection scope and handoff](../set-map/SELECTIONS.md). Carry the explicit
+[selection scope and handoff](../select/SELECTIONS.md). Carry the explicit
 scope, task owner and generation through handoffs to selection/execution owners.
 Keep map and backlog bindings independent. Publication and closed design do not
 change another effort's selections or grant takeover authority.
@@ -41,7 +41,7 @@ evidence. Read the complete map, its comments, every
 child and material linked decisions. Draft once all decisions are settled; a map
 awaiting only its resolution/handoff bookkeeping can receive this draft before
 closure. A substantive unresolved decision returns to Wayfinder and pauses the
-associated effort; routine implementation choices stay with the implementer.
+associated effort.
 
 Keep planning proportionate. Reuse an existing resolved map and approved spec
 only when they cover this change. Otherwise draft a brief spec even for small
@@ -178,8 +178,8 @@ without waiting for a reply.
 Publication does not select the parent or authorize execution. Under `whats-next`
 or an implementation request, the Chart-the-map confirmation, or the operator's
 approval under a map waiver, carries on with no further prompt: `triage` admits
-the parent to `implementation:ready`, `set-backlog` activates it when no parent is
-active in that scope, and `next-issue` or `next-issue-loop` carries it to
+the parent to `implementation:ready`, `select backlog` activates it when no parent is
+active in that scope, and `next-issue` or its continue mode carries it to
 verified test delivery. Keep an active parent from
 another effort in that scope; report it and stop, leaving any switch to the human.
 A planning-only request ends at the approved, published spec.

@@ -4,8 +4,9 @@ Act on the user's authorized outcome and carry it through verification. Read the
 repository's root AGENTS.md and instructions covering each changed path; reload
 when changing repository or branch. Use its domain vocabulary and local workflows.
 Make routine decisions independently. Before asking for human judgment, finish
-independent work and batch every ready decision with concrete recommendations.
-Preserve supplied answers and existing authorization across turns.
+independent work and batch every ready decision with concrete recommendations in
+ordinary text, then wait for the actual answers. Preserve supplied answers and
+existing authorization across turns.
 
 ## Host capabilities and skills
 

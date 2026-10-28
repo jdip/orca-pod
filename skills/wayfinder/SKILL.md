@@ -13,7 +13,7 @@ for routine implementation choices.
 The destination varies per effort, and naming it is the first act of charting: it shapes every ticket. It might be a spec to hand off and iterate on, a decision to lock before planning starts, or a change made in place like a data-structure migration. The map is domain-agnostic: engineering work, course content, whatever fits the shape.
 
 When resolving or changing a saved selection, read
-[selection scope and handoff](../set-map/SELECTIONS.md). Carry the explicit
+[selection scope and handoff](../select/SELECTIONS.md). Carry the explicit
 scope, task owner and generation through handoffs to selection/execution owners.
 Keep map and backlog bindings independent. Publication and closed design do not
 change another effort's selections or grant takeover authority.
@@ -149,10 +149,8 @@ spec review, publication, backlog selection, execution and verified test
 delivery; a planning-only request ends at the reviewed, published spec. Record
 the confirmed direction and a concise summary of the actual dialogue in the
 map's existing Notes/Decisions so far; use available conversation evidence
-without publishing private transcripts.
-Reuse supported prior answers on approved continuations and reopen dialogue when
-scope, assumptions, or outcome materially changes. Preserve the global Planning
-before implementation rule and its explicit-waiver boundary.
+without publishing private transcripts. Preserve the global Planning before
+implementation rule and its explicit-waiver boundary.
 
 1. **Name the destination.** Complete the `grilling` entry above with the user.
    Use `domain-modeling` when terminology or domain relationships need resolution.
@@ -165,8 +163,8 @@ before implementation rule and its explicit-waiver boundary.
 4. **Create the tickets you can specify now** as child issues of the map, then wire blocking edges in a **second pass** (issues need ids before they can reference each other). Wiring sorts them into the frontier and the blocked; everything you can't yet specify stays in the fog: the **Not yet specified** section.
 5. **Research actual open questions.** When research tickets exist, use the `research` skill to assign independent research with bounded questions and evidence requirements. Dispatch delegated work per the `roster` skill (skills/roster/SKILL.md). Prepare artifacts in a separate worktree on a `orca/research-<name>` branch from fresh `origin/test`, following the target repository's checkout and delivery rules. Each assigned researcher investigates directly and returns cited findings; the primary owns any repository artifact and tracker resolution. Link the retained findings from the ticket. The primary serializes shared Git mutations and resolves the research tickets from the returned evidence.
 6. For a chart-only request, return the map. When the request includes continuation
-   or implementation, select the open map through `set-map` before closure, then
-   use `next-waypoint-loop` under that authority. Reusing an already resolved map
+   or implementation, select the open map through `select map` before closure, then
+   use `next-waypoint` in continue mode under that authority. Reusing an already resolved map
    needs no new selection; retain its source links and existing pointer.
    A compact map with confirmed direction proceeds directly to the Implementation handoff:
    draft its specification and executable breakdown, then record resolution and
@@ -217,7 +215,7 @@ The **Chart the map** entry retains its explicit confirmation gate.
 
 ## Implementation handoff
 
-Resolve the entire map before its associated implementation proceeds. If implementation exposes a substantive missing decision, reopen the map and pause the whole associated backlog until it is resolved again. Routine implementation choices remain with the implementing agent. Ask ready human questions together in ordinary text and wait for answers.
+Resolve the entire map before its associated implementation proceeds. If implementation exposes a substantive missing decision, reopen the map and pause the whole associated backlog until it is resolved again.
 
 Before closing a resolved design ticket or completed map that leaves
 implementation work, find or create an open implementation follow-up and link it

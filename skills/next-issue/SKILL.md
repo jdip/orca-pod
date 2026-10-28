@@ -17,8 +17,8 @@ or planning.
 
 ## Load the backlog and select work
 
-Read [selection scope and handoff](../set-map/SELECTIONS.md). Resolve the
-explicit backlog scope and task owner through `set-backlog`'s selector. Establish
+Read [selection scope and handoff](../select/SELECTIONS.md). Resolve the
+explicit backlog scope and task owner through `select backlog`. Establish
 a new authorized binding with `show`, retain scope, owner, generation and parent
 URL, and use `check` with that binding for continuation and before mutations.
 Missing, invalid or transferred state returns to the selection owner with existing

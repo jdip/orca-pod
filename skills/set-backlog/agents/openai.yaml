@@ -1,4 +1,0 @@
-interface:
-  display_name: "Set Implementation Backlog"
-  short_description: "Select an existing implementation backlog"
-  default_prompt: "Use set-backlog to select an existing implementation backlog for this repository using this task’s explicit effort scope and owner binding."

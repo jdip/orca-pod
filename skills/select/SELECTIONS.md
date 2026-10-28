@@ -1,8 +1,8 @@
 # Selection scope and handoff
 
 Read this contract when a workflow selects, reads, resumes, forks, moves or hands
-off a saved map or implementation backlog. The set-map package owns the shared
-resolver; set-backlog uses that installed sibling. Use their scripts, never direct
+off a saved map or implementation backlog. The select package owns the shared
+resolver and its `map|backlog` entry script. Use that script, never direct
 state-file edits. Run `--help` for exact arguments. The existing Python 3.11+
 runtime is selected with `ORCA_POD_PYTHON` when needed.
 
@@ -43,7 +43,7 @@ known scope permits initial `select --expect-absent`.
 
 ## Assess selections
 
-To learn which efforts hold selections, run either selector's `list` instead of
+To learn which efforts hold selections, run `list` under either kind instead of
 reading state files. It reads local state only, without locks or tracker lookups,
 and reports every scope's map and backlog issue, owner and generation, Agent Team
 scoped records and legacy root pointers; an unreadable record appears as that
@@ -114,7 +114,7 @@ unrelated real transfer.
    records. Use existing tracker owners to transfer included claims explicitly;
    do not reparent issues or change dependencies. Verify their readback. Leave
    source and recipient stopped if a partial failure needs investigation.
-4. Invoke `transfer` on either selector with `--scope`, `--from-owner`,
+4. Invoke `transfer` under either kind with `--scope`, `--from-owner`,
    `--to-owner`, `--kinds map|backlog|both`, each selected kind's expected
    `--map-generation` / `--backlog-generation`, `--approval-ref`, and
    `--source-stopped-ref`. The references point to the actual evidence above.

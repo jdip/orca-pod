@@ -105,7 +105,7 @@ promotion, host installation and background scheduling are separate requests.
   children; `to-tickets` publishes them as an `implementation:backlog` parent
   with native sub-issues and dependencies.
 - **Select, then execute.** `triage` admits prepared parents to the Ready Backlog
-  (`implementation:ready`); `set-backlog` selects one for your effort.
+  (`implementation:ready`); `select backlog` selects one for your effort.
   Publication, admission and selection do not by themselves authorize
   execution. `next-issue` claims and delivers one eligible child, and its
   continue mode works through the parent. A reopened map pauses its
@@ -122,7 +122,7 @@ promotion, host installation and background scheduling are separate requests.
   boundaries and keeps anything active or uncertain.
 
 [Tracker guidance](docs/agents/issue-tracker.md) and
-[selection scope and handoff](skills/set-map/SELECTIONS.md) cover labels, claims
+[selection scope and handoff](skills/select/SELECTIONS.md) cover labels, claims
 and moving an effort between tasks.
 
 ## Skill guide
@@ -140,8 +140,8 @@ Every skill is installed for both Claude and Codex.
 | Area | Skills |
 | --- | --- |
 | Repository setup | `prepare-repository`, `adopt-standard` ‡, `repository-verification` (optional verification instructions), `define-project-goal` (agree the README purpose) |
-| Choosing and planning | `whats-next`, `wayfinder`, `grilling`, `set-map`, `next-waypoint`, `research`, `prototype`, `to-spec`, `to-tickets`, `wait-what` † (re-explain the last answer) |
-| Implementing and delivering | `triage`, `set-backlog`, `next-issue`, `tdd`, `diagnosing-bugs`, `resolving-merge-conflicts`, `code-review`, `pr-to-test` ‡, `promote-to-main` ‡, `cleanup-task-artifacts` ‡ |
+| Choosing and planning | `whats-next`, `wayfinder`, `grilling`, `select map`, `next-waypoint`, `research`, `prototype`, `to-spec`, `to-tickets`, `wait-what` † (re-explain the last answer) |
+| Implementing and delivering | `triage`, `select backlog`, `next-issue`, `tdd`, `diagnosing-bugs`, `resolving-merge-conflicts`, `code-review`, `pr-to-test` ‡, `promote-to-main` ‡, `cleanup-task-artifacts` ‡ |
 | Delegation | `roster` (role, model and effort for each delegated task); Orca's own `orchestration` and `orca-cli` |
 | Maintenance | `codebase-hygiene`, `dependency-review`, `dependabot-upkeep`, `code-simplification`, `reflect` (turn a lesson into an issue), `audit-agent-instructions` |
 | Design and writing | `codebase-design`, `domain-modeling`, `improve-codebase-architecture` †, `writing-for-agents`, `wizard` (a guided script for human-only steps), `setup-matt-pocock-skills` † |

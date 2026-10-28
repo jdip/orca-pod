@@ -18,11 +18,11 @@ bypassing approvals.
 
 ## Load the saved map
 
-Read [selection scope and handoff](../set-map/SELECTIONS.md) before resolving
+Read [selection scope and handoff](../select/SELECTIONS.md) before resolving
 state. Use the map selector's `show` only to establish a new explicitly authorized
 binding, then retain its scope, owner, generation and issue URL. Use `check` with
 that binding on continuation and before tracker mutations; transfer or selection
-changes stop this run. Missing or invalid context returns to `set-map` with existing
+changes stop this run. Missing or invalid context returns to `select map` with existing
 authority; never infer a replacement scope or map.
 
 Read the `wayfinder` skill completely and the repository's issue-tracker

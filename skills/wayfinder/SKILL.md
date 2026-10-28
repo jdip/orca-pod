@@ -166,7 +166,7 @@ before implementation rule and its explicit-waiver boundary.
 5. **Research actual open questions.** When research tickets exist, use the `research` skill to assign independent research with bounded questions and evidence requirements. Dispatch delegated work per the `roster` skill (skills/roster/SKILL.md). Prepare artifacts in a separate worktree on a `orca/research-<name>` branch from fresh `origin/test`, following the target repository's checkout and delivery rules. Each assigned researcher investigates directly and returns cited findings; the primary owns any repository artifact and tracker resolution. Link the retained findings from the ticket. The primary serializes shared Git mutations and resolves the research tickets from the returned evidence.
 6. For a chart-only request, return the map. When the request includes continuation
    or implementation, select the open map through `set-map` before closure, then
-   use `next-waypoint-loop` under that authority. Reusing an already resolved map
+   use `next-waypoint` in continue mode under that authority. Reusing an already resolved map
    needs no new selection; retain its source links and existing pointer.
    A compact map with confirmed direction proceeds directly to the Implementation handoff:
    draft its specification and executable breakdown, then record resolution and

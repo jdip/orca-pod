@@ -141,7 +141,7 @@ Every skill is installed for both Claude and Codex.
 | Area | Skills |
 | --- | --- |
 | Repository setup | `prepare-repository`, `greenfield-init` ‡, `brownfield-adoption` ‡, `standards-upgrade` ‡, `repository-verification` (optional verification instructions), `define-project-goal` (agree the README purpose) |
-| Choosing and planning | `whats-next`, `wayfinder`, `grilling`, `set-map`, `next-waypoint`, `next-waypoint-loop`, `research`, `prototype`, `to-spec`, `to-tickets`, `wait-what` † (re-explain the last answer) |
+| Choosing and planning | `whats-next`, `wayfinder`, `grilling`, `set-map`, `next-waypoint`, `research`, `prototype`, `to-spec`, `to-tickets`, `wait-what` † (re-explain the last answer) |
 | Implementing and delivering | `triage`, `set-backlog`, `next-issue`, `next-issue-loop`, `tdd`, `diagnosing-bugs`, `resolving-merge-conflicts`, `code-review`, `pr-to-test` ‡, `promote-to-main` ‡, `cleanup-task-artifacts` ‡ |
 | Delegation | `roster` (role, model and effort for each delegated task); Orca's own `orchestration` and `orca-cli` |
 | Maintenance | `codebase-hygiene`, `dependency-review`, `dependabot-upkeep`, `code-simplification`, `reflect` (turn a lesson into an issue), `audit-agent-instructions` |

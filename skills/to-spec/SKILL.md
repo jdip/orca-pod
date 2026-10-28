@@ -41,7 +41,7 @@ evidence. Read the complete map, its comments, every
 child and material linked decisions. Draft once all decisions are settled; a map
 awaiting only its resolution/handoff bookkeeping can receive this draft before
 closure. A substantive unresolved decision returns to Wayfinder and pauses the
-associated effort; routine implementation choices stay with the implementer.
+associated effort.
 
 Keep planning proportionate. Reuse an existing resolved map and approved spec
 only when they cover this change. Otherwise draft a brief spec even for small

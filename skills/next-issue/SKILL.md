@@ -110,8 +110,7 @@ choices stay with the implementing agent and do not reopen a map.
 Read the entire selected issue and relevant comments, repository instructions,
 domain docs, and linked acceptance criteria. Inspect actual code before choosing
 the approach. Use the issue's required skills and delegate bounded independent
-work when authorized. Make routine implementation choices within the approved
-design; do not turn every detail into a user decision.
+work when authorized.
 
 Use a suitable branch/worktree while preserving unrelated work. For a rollup,
 start the child branch from its current verified remote rollup, following the
@@ -204,10 +203,8 @@ At coherent recovery or closeout, use
 
 Before pausing after a substantial phase, a failed/blocked operation, or for user
 input, complete independent work within the issue, then use `cleanup-task-artifacts`
-with local guidance and ask ALL ready questions together in ordinary text, with
-concrete recommendations, and wait for the actual answers. Phase cleanup does not
-complete this issue or detach its checkout. Do not use timed or disappearing
-question widgets.
+with local guidance before asking. Phase cleanup does not complete this issue or
+detach its checkout. Do not use timed or disappearing question widgets.
 Do not guess dependent answers, add confirmation for settled points, or treat a partial reply as approval
 of unanswered decisions. Wait only on genuine prerequisites, and keep a round to
 its full ready set rather than one question by habit. Apply supplied answers and

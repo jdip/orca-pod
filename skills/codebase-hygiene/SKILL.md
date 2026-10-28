@@ -74,8 +74,7 @@ Use the repository's tracker guidance for deduplication and actionable
 remediation findings. Recommendations and issue filing do not change the Active
 Backlog or authorize implementation. Before cleanup edits, reuse covering
 resolved map/spec work or use Wayfinder, `to-spec` and `to-tickets` under the
-global planning rule. Keep small plans brief; batch only unresolved decisions
-with concrete recommendations.
+global planning rule.
 
 ## Execute and finish
 

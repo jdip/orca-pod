@@ -74,9 +74,8 @@ rule. Reuse a resolved map and approved spec covering the actual change. If cove
 is missing, begin or resume Wayfinder from the inspected target and desired
 outcome. Hand control to Wayfinder's **Chart the map** entry and stay in its
 grilling dialogue until its completion gate is satisfied. A concrete destination
-is the result of that dialogue, not an alternative gate. Smallness or a delivery
-request does not supply a planning waiver.
-Read-only assessment may continue while planning remains open.
+is the result of that dialogue, not an alternative gate. A delivery request does
+not supply a planning waiver.
 
 After Wayfinder's entry dialogue and user confirmation, carry the request's
 planning authority through
@@ -102,10 +101,8 @@ step unresolved, with a concrete limitation reported to the human.
 
 Reuse explicit consent only when it covers the same repository, target, scope, and
 action and has not been superseded. Labels, assignment, publication, or an open PR
-alone do not establish permission. Before asking, finish independent investigation
-and present the actual missing decision or approval with a recommendation. Batch
-ready questions; the human supplies the answers. Execute only the approved portion
-of a combined proposal and carry it forward across ordinary skill boundaries.
+alone do not establish permission. Execute only the approved portion of a
+combined proposal and carry it forward across ordinary skill boundaries.
 
 | Selected work | Owning handoff |
 | --- | --- |

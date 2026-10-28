@@ -78,12 +78,14 @@ calls them:
    missing, it offers options with rough effort and a recommendation; reply with
    your choice and the scope you authorize.
 3. **Plan.** New work starts with a `wayfinder` grilling dialogue; confirm the
-   shared understanding before it records a map. That confirmation is your one
-   planning approval: a reviewer on the other provider checks the spec and its
-   tickets against the map, and you get a short report with the spec link. You
-   are asked again only when findings remain after three review rounds, a finding
-   changes a map decision, or the scope changes. If you waive the map, you
-   approve the spec and tickets directly instead.
+   shared understanding before it records a map. For a full map or a new
+   mechanism, a reviewer on the other provider first checks the draft, and its
+   findings come to you as questions before you confirm. That confirmation is
+   your one planning approval: a reviewer on the other provider then checks the
+   spec and its tickets against the map, and you get a short report with the
+   spec link. You are asked again only when findings remain after three review
+   rounds, a finding changes a map decision, or the scope changes. If you waive
+   the map, you approve the spec and tickets directly instead.
 4. **Run.** Approved tickets are claimed, implemented in their own Orca
    worktrees, reviewed on the other provider and delivered. Your approval carries
    across these handoffs; you don't repeat it per ticket.

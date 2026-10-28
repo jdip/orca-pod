@@ -22,7 +22,7 @@ Standing instructions for each role are in [roles.md](roles.md).
 | **🐋 ORC** `orc` | Coordinate: own the human dialogue, decisions, approvals, tracker writes, Git integration and final acceptance. | Claude · `claude-opus-5-5` · high | pane | named-git-action | Claude · `claude-opus-5-5` · xhigh: map, spec or design synthesis; DSP synthesis; a contested review finding (never max) |
 | **🗺️ PLN** `pln` | Draft substantive maps and specifications; plan complex execution within approved scope. | Claude · `claude-opus-5-5` · high | native | read-only | — |
 | **🛠️ WRK** `wrk` | Implement a bounded component or fix against explicit acceptance criteria. | Claude · `claude-opus-5-5` · high | orca | write-owned-files | Codex · `gpt-6.1-sol` · high: long-horizon batch run on Codex; REV and TST-proof then flip to Claude |
-| **🔍 REV** `rev` | Review correctness, regressions, security, and fidelity to the approved outcome, read-only. | Codex · `gpt-6.1-sol` · xhigh | orca | read-only | Claude · `claude-opus-5-5` · xhigh: the implementer ran on Codex (WRK on Codex, or SEC-WRK), or the spec drafter ran on Codex |
+| **🔍 REV** `rev` | Review correctness, regressions, security, and fidelity to the approved outcome, read-only. | Codex · `gpt-6.1-sol` · xhigh | orca | read-only | Claude · `claude-opus-5-5` · xhigh: the implementer ran on Codex (WRK on Codex, or SEC-WRK), or the spec drafter ran on Codex, or the map drafter ran on Codex |
 | **🔍 REV2** `rev2` | Independent second review in a fresh context, for high-risk changes only. | Claude · `claude-opus-5-5` · xhigh | orca | read-only | — |
 | **🧠 DSP** `dsp` | Resolve difficult technical ambiguity, root causes, and architectural tradeoffs, as two independent opinions. | Codex · `gpt-6-astra` · max **and** Claude · `claude-opus-5-5` · max | orca | read-only | — |
 | **🛡️ SEC** `sec` | Perform scoped, authorized defensive security analysis; security reviewer, proof owner or worker on the security path. | Codex · `gpt-5.6-sol` · xhigh, Daybreak Blue via `codex --profile orca-pod-sec` | orca (terminal) | read-only | — |
@@ -58,9 +58,9 @@ Standing instructions for each role are in [roles.md](roles.md).
 1. **Only ORC selects models**, from the roster. Workers never reroute.
 2. **Cross-provider review and proof.** REV and the independent bug proof
    (TST-proof, SEC-PROOF) run on the other provider from the implementer; a spec
-   review runs REV on the other provider from the spec drafter. When
-   WRK runs on Codex, REV flips to Claude Opus 5.5 xhigh and TST-proof to Claude
-   Opus 5.5 medium. TST and BRW stay on Codex.
+   review or a map pass runs REV on the other provider from that record's
+   drafter. When WRK runs on Codex, REV flips to Claude Opus 5.5 xhigh and
+   TST-proof to Claude Opus 5.5 medium. TST and BRW stay on Codex.
 3. **Read the receipt; never trust self-report.** On every `worker-start`
    receipt, `launch.effective` must equal `launch.requested`. Report a mismatch or
    a failed launch to the operator. Never substitute a model or provider; there
@@ -90,11 +90,11 @@ Standing instructions for each role are in [roles.md](roles.md).
    implementation specification or material revision, delegate drafting to PLN
    with the operator's actual answers and the relevant repository evidence, and
    reuse that PLN for later revisions. ORC keeps the live dialogue, reconciles
-   PLN's proposed text and publishes through the owning workflow. It routes spec
-   review through `to-spec` and asks the human only for map decisions, the
-   Chart-the-map confirmation and escalated review findings. ORC may draft a
-   compact, fully settled record itself and makes administrative updates without
-   PLN.
+   PLN's proposed text and publishes through the owning workflow. It routes the
+   map pass through `wayfinder` and spec review through `to-spec`, and asks the
+   human only for map decisions, the Chart-the-map confirmation and escalated
+   review findings. ORC may draft a compact, fully settled record itself and
+   makes administrative updates without PLN.
 
 Launch failures are reported, never rerouted. Delegation never expands
 authority: workers do not commit, push, merge or publish unless that action is

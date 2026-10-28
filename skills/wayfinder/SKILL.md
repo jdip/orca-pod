@@ -142,7 +142,8 @@ may become map tickets. Grilling owns the dialogue procedure; this entry owns
 the boundary between establishing the destination and mapping its remaining design.
 
 Before creating a map, summarize the shared understanding and obtain the user's
-explicit confirmation. A detailed request, agent proposal, or reading the skill
+explicit confirmation. Run the [Map pass](#map-pass) before asking for that
+confirmation when it applies. A detailed request, agent proposal, or reading the skill
 does not establish completed grilling. This confirmation is the single human
 planning gate. Under `whats-next` or an implementation request it carries through
 spec review, publication, backlog selection, execution and verified test
@@ -171,6 +172,64 @@ implementation rule and its explicit-waiver boundary.
    close the map once the spec is approved under `to-spec`, normally through a
    pass of its review, and no decision remains.
    No dummy frontier is needed.
+
+### Map pass
+
+One fresh reviewer on the other provider reads the drafted map before the
+shared-understanding confirmation, and its findings reach the user as grilling
+questions.
+
+**When it runs.** On a full map, one that will carry decision tickets or **Not
+yet specified** fog, and on any map that introduces a new mechanism: a new skill,
+script, role, workflow step, gate, tracker convention, or language, runtime or
+environment, as opposed to a change to the mechanism that already owns the
+behavior. A compact map for small, settled work that introduces no new mechanism
+skips it. A map waiver means no map pass.
+
+**Dispatch.** Per `roster`, dispatch one fresh REV on the other provider from the
+map drafter (PLN, or the primary when it drafted the summary). The pass is
+read-only and single, with no iterations. The brief carries:
+
+- the target repository and revision;
+- the drafted Destination, Notes constraints and Out of scope;
+- Decisions so far with the user's actual answers, sanitized; and
+- any decision tickets and Not-yet-specified fog drafted so far.
+
+Frontier mapping still follows the confirmation; do not manufacture frontier detail
+to dispatch the pass. Leave out the drafter's reasoning and the dialogue transcript. The reviewer reads
+the draft through four lenses:
+
+- **need and reuse:** whether this needs to exist, whether an existing mechanism
+  or code can already do it, and whether the draft is over-built;
+- **risks:** cost, quotas and bottlenecks;
+- **migration and rollback safety;** and
+- **ergonomics** for whoever uses the result.
+
+It returns each finding with repository evidence and a recommended answer, or
+states that it has no findings. It leaves findings unclassified, neither major
+nor minor.
+
+**Disposition.** Resolve factual findings under `grilling`'s existing procedure,
+building on the facts the reviewer already established rather than redoing them.
+Turn each finding that needs human judgment into a numbered grilling question
+with its recommendation, asked in a round before the confirmation request. Record
+a finding the user already answered in this dialogue with that answer instead of
+asking it again. Once those rounds are answered, ask for the confirmation as
+before; the pass adds no gate.
+
+**Reruns.** One pass per confirmation. When a material change to scope,
+assumptions or outcome reopens an existing map's dialogue, including through
+**Map-entry evidence**, **Work through the map** or the **Implementation
+handoff**, the reopened confirmation gets a fresh pass if the map qualifies. A
+compact map that later grows through frontier mapping gets no retroactive pass.
+
+**Record.** Once the map exists, post one comment on it, sanitized under the
+target's publication policy: `Map pass`, the reviewer role with its
+receipt-verified model and effort, and each finding with its disposition: asked
+as Q<n> with the gist of the answer, settled by fact, or already answered. A
+skipped pass records nothing. A missing map-pass record alone does not block
+**Map-entry evidence**; that entry's dialogue and confirmation requirements still
+apply.
 
 ### Map-entry evidence
 

@@ -93,7 +93,7 @@ authority = "read-only"
 standing_instructions = """
 Work only within the coordinator's bounded assignment. Delegation never expands authority.
 Use the code-review skill's assigned-reviewer workflow and remain accountable for the assigned axes. Trace relevant callers and downstream effects. Review correctness and fidelity to originating requirements unless assigned one axis. Report actionable findings with severity and exact evidence; distinguish missing requirements from optional improvements. State when no actionable findings remain. Do not edit files.
-For a spec-against-map review, follow the brief and checklist in the to-spec skill's "Review the draft against the map" section in place of code-review, classifying each finding major or minor.
+For a spec-against-map review, follow the brief and checklist in the to-spec skill's "Review the draft against the map" section in place of code-review, classifying each finding major or minor. For a map pass, follow the brief and lenses in the wayfinder skill's "Map pass" section in place of code-review, returning each finding as a question with a recommended answer and no major/minor classification.
 Limit tools to repository reads; exclude external connectors. Return proposed fixes to the implementation owner.
 Do not delegate or start workers unless the coordinator explicitly authorizes a concrete nested task.
 Return concise evidence and unresolved decisions to the coordinator.
@@ -106,7 +106,7 @@ effort = "xhigh"
 sandbox = "read-only"
 
 [[role.alternates]]
-when = "the implementer ran on Codex (WRK on Codex, or SEC-WRK), or the spec drafter ran on Codex"
+when = "the implementer ran on Codex (WRK on Codex, or SEC-WRK), or the spec drafter ran on Codex, or the map drafter ran on Codex"
 provider = "claude"
 model = "claude-opus-5-5"
 effort = "xhigh"

@@ -337,6 +337,33 @@ def orca_result(*command: str) -> dict[str, Any]:
     return payload["result"]
 
 
+def verified_session(worktree_id: str, instance_id: Any) -> str | None:
+    """Return ORCA_AGENT_SESSION_ID only when Orca lists that agent session in the current worktree."""
+    session_id = os.environ.get("ORCA_AGENT_SESSION_ID", "")
+    if not session_id:
+        return None
+    safe_owner(session_id, "ORCA_AGENT_SESSION_ID")
+    if not isinstance(instance_id, str):
+        fail("the current directory has no stable Orca worktree identity")
+    listing = orca_result("worktree", "ps")
+    rows = listing.get("worktrees")
+    if not isinstance(rows, list) or listing.get("truncated") is not False:
+        fail("orca worktree ps did not return a complete worktree listing")
+    pane_segment = f"structured-agent-session-{session_id}"
+    holders = set()
+    for row in rows:
+        agents = row.get("agents") if isinstance(row, dict) else None
+        for agent in agents if isinstance(agents, list) else []:
+            pane_key = agent.get("paneKey") if isinstance(agent, dict) else None
+            if isinstance(pane_key, str) and pane_segment in pane_key.split(":"):
+                holders.add((row.get("worktreeId"), row.get("worktreeInstanceId")))
+    if not holders:
+        return None
+    if holders != {(worktree_id, instance_id)}:
+        fail(f"Orca lists agent session '{session_id}' under a different worktree")
+    return session_id
+
+
 def command_owner(arguments: argparse.Namespace) -> None:
     worktree = orca_result("worktree", "current").get("worktree")
     identity = worktree.get("identity") if isinstance(worktree, dict) else None
@@ -345,7 +372,12 @@ def command_owner(arguments: argparse.Namespace) -> None:
     if not isinstance(key, str) or not isinstance(worktree_id, str):
         fail("the current directory has no stable Orca worktree identity")
     owner = key
-    if arguments.dispatch is not None:
+    session = None
+    if arguments.dispatch is None:
+        session = verified_session(worktree_id, identity.get("instanceId"))
+        if session is not None:
+            owner = f"{key}:session:{session}"
+    else:
         dispatch_id = safe_owner(arguments.dispatch, "dispatch ID")
         shown = orca_result("orchestration", "worker-show", "--dispatch", dispatch_id)
         dispatch = shown.get("dispatch")
@@ -359,6 +391,7 @@ def command_owner(arguments: argparse.Namespace) -> None:
         "owner": safe_owner(owner, "Orca owner"),
         "worktree_identity": key,
         "dispatch": arguments.dispatch,
+        "session": session,
     }, sort_keys=True))
 
 
@@ -587,7 +620,7 @@ def parser() -> argparse.ArgumentParser:
     check.add_argument("--generation", required=True, type=positive_generation)
     check.set_defaults(handler=command_check)
 
-    owner = commands.add_parser("owner", help="derive the task owner from the current Orca worktree and dispatch")
+    owner = commands.add_parser("owner", help="derive the task owner from the current Orca worktree and its verified agent session or dispatch")
     owner.add_argument("--dispatch", help="this task's dispatch ID when it runs inside an Orca Run")
     owner.set_defaults(handler=command_owner)
 

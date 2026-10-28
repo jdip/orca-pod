@@ -149,10 +149,8 @@ spec review, publication, backlog selection, execution and verified test
 delivery; a planning-only request ends at the reviewed, published spec. Record
 the confirmed direction and a concise summary of the actual dialogue in the
 map's existing Notes/Decisions so far; use available conversation evidence
-without publishing private transcripts.
-Reuse supported prior answers on approved continuations and reopen dialogue when
-scope, assumptions, or outcome materially changes. Preserve the global Planning
-before implementation rule and its explicit-waiver boundary.
+without publishing private transcripts. Preserve the global Planning before
+implementation rule and its explicit-waiver boundary.
 
 1. **Name the destination.** Complete the `grilling` entry above with the user.
    Use `domain-modeling` when terminology or domain relationships need resolution.
@@ -217,7 +215,7 @@ The **Chart the map** entry retains its explicit confirmation gate.
 
 ## Implementation handoff
 
-Resolve the entire map before its associated implementation proceeds. If implementation exposes a substantive missing decision, reopen the map and pause the whole associated backlog until it is resolved again. Routine implementation choices remain with the implementing agent. Ask ready human questions together in ordinary text and wait for answers.
+Resolve the entire map before its associated implementation proceeds. If implementation exposes a substantive missing decision, reopen the map and pause the whole associated backlog until it is resolved again.
 
 Before closing a resolved design ticket or completed map that leaves
 implementation work, find or create an open implementation follow-up and link it

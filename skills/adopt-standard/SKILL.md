@@ -138,10 +138,9 @@ issues without claiming unmet coverage is satisfied.
 ## Decide and deliver
 
 Make routine choices within the approved standard. Investigate substantive
-behavior changes, tradeoffs and conflicts. Finish independent work and batch all
-ready human decisions with concrete recommendations; preserve unanswered decisions
-rather than assuming intent. Reuse already-settled standards and routine
-implementation details instead of asking the human to restate them.
+behavior changes, tradeoffs and conflicts. Preserve unanswered decisions rather
+than assuming intent. Reuse already-settled standards and routine implementation
+details instead of asking the human to restate them.
 
 Write the one Repository Standard section in root AGENTS.md with Source set to the
 exact source repository URL and Revision set to the full selected commit SHA, as

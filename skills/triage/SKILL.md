@@ -52,12 +52,10 @@ preserving claims. Surface external blockers rather than absorbing them into an
 unrelated parent.
 
 Apply the global Planning before implementation rule. Reuse a resolved map and
-approved specification only when they cover the candidate, including small
-fixes. Otherwise begin or resume Wayfinder, then use `to-spec` and `to-tickets`
-for a proportionate parent and executable-child batch. Only an explicit scoped
-operator waiver changes that gate. Substantive unresolved design pauses
-associated execution; ordinary refinement within approved coverage does not
-reopen the map.
+approved specification only when they cover the candidate. Otherwise begin or
+resume Wayfinder, then use `to-spec` and `to-tickets` for a proportionate parent
+and executable-child batch. Substantive unresolved design pauses associated
+execution; ordinary refinement within approved coverage does not reopen the map.
 
 Scope expansion and moving an issue between efforts require the user's explicit
 decision. Do not reparent another effort's issue or modify an existing claim.
@@ -67,10 +65,9 @@ relationships back.
 
 ## Admit and activate deliberately
 
-Batch ready human decisions in ordinary text and wait for answers. Reuse explicit
-prior admission or activation authorization when it covers the same parent and
-scope. When no parent is active, admission and activation may be approved together;
-specification approval alone supplies neither.
+Reuse explicit prior admission or activation authorization when it covers the
+same parent and scope. When no parent is active, admission and activation may be
+approved together; specification approval alone supplies neither.
 
 For a prepared non-active parent, first show its objective, child scope,
 external blockers, and source links. Reuse a request that already authorizes

@@ -130,8 +130,23 @@ covers the map alone; every other gate still applies. Otherwise run this loop:
    - acceptance criteria and the completion boundary against the map;
    - ticket granularity: each child is an independently verifiable outcome;
    - dependency edges: only real blockers;
-   - the `Delivery` mode and, for `rollup`, its named branch; and
-   - source links to the map and material decisions.
+   - the `Delivery` mode and, for `rollup`, its named branch;
+   - source links to the map and material decisions;
+   - **paraphrase first:** before judging, the reviewer restates each parent
+     section and each child outcome in one line. A section it cannot restate, or
+     a term the spec, map and `docs/agents/domain.md` leave undefined, is a
+     finding;
+   - **implementation readiness:** each child can be built without the
+     implementer making a design choice. A substantive choice left open is major
+     under step 4; a routine choice within the approved scope is not a finding;
+     and
+   - **reuse and premature detail:** the reviewer searches the repository for an
+     existing mechanism or code the spec could reuse in place of new work, and
+     flags detail the map's outcome does not require that constrains the
+     implementer. A reuse that would change a map decision is major; otherwise
+     the finding is minor.
+
+   The reviewer returns its paraphrases with its findings.
 4. **Classify and dispose.** The reviewer flags each finding major or minor and the
    primary confirms. A finding is **major** when it shows a missing or
    contradicted map decision, a scope expansion or reduction, or a new decision the

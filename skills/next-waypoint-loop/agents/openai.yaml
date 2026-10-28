@@ -1,4 +1,0 @@
-interface:
-  display_name: "Next Waypoint Loop"
-  short_description: "Work saved-map tickets until human input is needed"
-  default_prompt: "Use next-waypoint-loop to work through the saved Wayfinder map until human input or approval is needed. Use this task’s explicit effort scope and owner binding."

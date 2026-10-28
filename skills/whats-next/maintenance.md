@@ -112,11 +112,11 @@ completion boundaries when evidence changes; do not create a background schedule
 Inspect the repository's actual guidance/workflow state and Repository Standard
 Source/Revision declaration. Distinguish absent from malformed, conflicting, or
 inaccessible evidence; investigate uncertainty rather than guessing adoption status.
-Route by actual state:
+Route by actual state to an `adopt-standard` branch:
 
-- No declaration and no established product behavior/workflows: `greenfield-init`.
-- No declaration with established product behavior/workflows: `brownfield-adoption`.
-- Valid declaration: `standards-upgrade` for relevant alignment changes,
+- No declaration and no established product behavior/workflows: `new`.
+- No declaration with established product behavior/workflows: `existing`.
+- Valid declaration: `upgrade` for relevant alignment changes,
   including its source-switch comparison when the operator is moving the
   declaration from another standard repository.
 

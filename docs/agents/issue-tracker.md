@@ -107,8 +107,8 @@ authorized selection replaces them.
 
 ## Implementation backlogs
 
-Used by `to-spec`, `to-tickets`, `triage`, `set-backlog`, `next-issue`, and
-`next-issue-loop`.
+Used by `to-spec`, `to-tickets`, `triage`, `set-backlog` and `next-issue`,
+including its continue mode.
 
 The Implementation Specification body owns current approved scope and acceptance;
 comments hold decisions, discussion, and evidence. `to-spec` reviews the drafted

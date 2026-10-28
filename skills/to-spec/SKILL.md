@@ -179,7 +179,7 @@ Publication does not select the parent or authorize execution. Under `whats-next
 or an implementation request, the Chart-the-map confirmation, or the operator's
 approval under a map waiver, carries on with no further prompt: `triage` admits
 the parent to `implementation:ready`, `set-backlog` activates it when no parent is
-active in that scope, and `next-issue` or `next-issue-loop` carries it to
+active in that scope, and `next-issue` or its continue mode carries it to
 verified test delivery. Keep an active parent from
 another effort in that scope; report it and stop, leaving any switch to the human.
 A planning-only request ends at the approved, published spec.

@@ -220,6 +220,12 @@ model = "gpt-6.1-sol"
 effort = "medium"
 sandbox = "workspace-write"
 
+[[role.alternates]]
+when = "routine verification trial; record the outcome on #88"
+provider = "codex"
+model = "gpt-6.1-terra"
+effort = "medium"
+
 [[role]]
 id = "tst-proof"
 tag = "TST-proof"
@@ -262,7 +268,7 @@ Return concise evidence and unresolved decisions to the coordinator.
 
 [[role.models]]
 provider = "codex"
-model = "gpt-6.1-sol"
+model = "gpt-6.1-terra"
 effort = "medium"
 sandbox = "workspace-write"
 

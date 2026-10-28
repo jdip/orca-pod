@@ -91,7 +91,7 @@ selection mechanism; do not duplicate its validation or offer to replace an acti
 parent during routine triage.
 
 Creating or admitting a Ready Backlog parent does not authorize implementation.
-Execution begins through `next-issue` or `next-issue-loop` after activation
+Execution begins through `next-issue` or its continue mode after activation
 under the implementation request's authority; no extra slash command is
 required.
 

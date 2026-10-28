@@ -107,8 +107,8 @@ promotion, host installation and background scheduling are separate requests.
 - **Select, then execute.** `triage` admits prepared parents to the Ready Backlog
   (`implementation:ready`); `set-backlog` selects one for your effort.
   Publication, admission and selection do not by themselves authorize
-  execution. `next-issue` claims and delivers one eligible child;
-  `next-issue-loop` continues through the parent. A reopened map pauses its
+  execution. `next-issue` claims and delivers one eligible child, and its
+  continue mode works through the parent. A reopened map pauses its
   whole backlog until the decision is settled.
 - **Deliver.** A one-child parent goes straight to a PR into `test`. A parent with
   several children uses one named `orca/` rollup branch cut from fresh
@@ -141,7 +141,7 @@ Every skill is installed for both Claude and Codex.
 | --- | --- |
 | Repository setup | `prepare-repository`, `adopt-standard` ‡, `repository-verification` (optional verification instructions), `define-project-goal` (agree the README purpose) |
 | Choosing and planning | `whats-next`, `wayfinder`, `grilling`, `set-map`, `next-waypoint`, `research`, `prototype`, `to-spec`, `to-tickets`, `wait-what` † (re-explain the last answer) |
-| Implementing and delivering | `triage`, `set-backlog`, `next-issue`, `next-issue-loop`, `tdd`, `diagnosing-bugs`, `resolving-merge-conflicts`, `code-review`, `pr-to-test` ‡, `promote-to-main` ‡, `cleanup-task-artifacts` ‡ |
+| Implementing and delivering | `triage`, `set-backlog`, `next-issue`, `tdd`, `diagnosing-bugs`, `resolving-merge-conflicts`, `code-review`, `pr-to-test` ‡, `promote-to-main` ‡, `cleanup-task-artifacts` ‡ |
 | Delegation | `roster` (role, model and effort for each delegated task); Orca's own `orchestration` and `orca-cli` |
 | Maintenance | `codebase-hygiene`, `dependency-review`, `dependabot-upkeep`, `code-simplification`, `reflect` (turn a lesson into an issue), `audit-agent-instructions` |
 | Design and writing | `codebase-design`, `domain-modeling`, `improve-codebase-architecture` †, `writing-for-agents`, `wizard` (a guided script for human-only steps), `setup-matt-pocock-skills` † |

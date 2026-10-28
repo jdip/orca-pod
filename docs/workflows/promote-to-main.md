@@ -5,9 +5,10 @@ for outgoing source, metadata and evidence, including approved commit identity.
 The script verifies the merge author; inspect that result and the remaining
 platform-created metadata against the policy after delivery.
 
-Run only on a separate explicit promotion request. Issue implementation and
-next-issue-loop do not request promotion. Use a clean checkout of the intended
-origin/test revision, preserving existing task checkouts and unrelated work.
+Run only on a separate explicit promotion request. Issue implementation,
+including next-issue's continue mode, does not request promotion. Use a clean
+checkout of the intended origin/test revision, preserving existing task
+checkouts and unrelated work.
 Requirements are the same Git/gh/Bash/Python 3.11+ tools as PR-to-test. Read actual
 review and test-delivery evidence; review any changes not covered by it.
 

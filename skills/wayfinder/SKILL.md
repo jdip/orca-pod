@@ -196,18 +196,17 @@ read-only and single, with no iterations. The brief carries:
 - any decision tickets and Not-yet-specified fog drafted so far.
 
 Frontier mapping still follows the confirmation; do not manufacture frontier detail
-to dispatch the pass. Leave out the drafter's reasoning and the dialogue transcript. The reviewer reads
-the draft through four lenses:
-
-- **need and reuse:** whether this needs to exist, whether an existing mechanism
-  or code can already do it, and whether the draft is over-built;
-- **risks:** cost, quotas and bottlenecks;
-- **migration and rollback safety;** and
-- **ergonomics** for whoever uses the result.
+to dispatch the pass. Leave out the drafter's reasoning and the dialogue transcript. The reviewer
+applies the `MAP PASS` mode instructions of all four review lenses, with the
+drafted map as the raw feature concept:
+[zoom out](../to-spec/review-lenses/zoom_out.md),
+[design critic](../to-spec/review-lenses/design_critic.md),
+[implementation readiness](../to-spec/review-lenses/implementation_readiness.md)
+and [comprehension](../to-spec/review-lenses/comprehension.md).
 
 It returns each finding with repository evidence and a recommended answer, or
 states that it has no findings. It leaves findings unclassified, neither major
-nor minor.
+nor minor; the lenses' own severities stay as reported.
 
 **Disposition.** Resolve factual findings under `grilling`'s existing procedure,
 building on the facts the reviewer already established rather than redoing them.

@@ -131,28 +131,23 @@ covers the map alone; every other gate still applies. Otherwise run this loop:
    - ticket granularity: each child is an independently verifiable outcome;
    - dependency edges: only real blockers;
    - the `Delivery` mode and, for `rollup`, its named branch;
-   - source links to the map and material decisions;
-   - **paraphrase first:** before judging, the reviewer restates each parent
-     section and each child outcome in one line. A section it cannot restate, or
-     a term the spec, map and `docs/agents/domain.md` leave undefined, is a
-     finding;
-   - **implementation readiness:** each child can be built without the
-     implementer making a design choice. A substantive choice left open is major
-     under step 4; a routine choice within the approved scope is not a finding;
-     and
-   - **reuse and premature detail:** the reviewer searches the repository for an
-     existing mechanism or code the spec could reuse in place of new work, and
-     flags detail the map's outcome does not require that constrains the
-     implementer. A reuse that would change a map decision is major; otherwise
-     the finding is minor.
-
-   The reviewer returns its paraphrases with its findings.
+   - source links to the map and material decisions; and
+   - the `SPEC REVIEW` mode instructions of all four review lenses:
+     [zoom out](review-lenses/zoom_out.md) with its adapted
+     [standard](review-lenses/zoom-out-standard.md),
+     [design critic](review-lenses/design_critic.md),
+     [implementation readiness](review-lenses/implementation_readiness.md) and
+     [comprehension](review-lenses/comprehension.md).
 4. **Classify and dispose.** The reviewer flags each finding major or minor and the
-   primary confirms. A finding is **major** when it shows a missing or
+   primary confirms; a lens severity informs but does not replace that
+   classification. A finding is **major** when it shows a missing or
    contradicted map decision, a scope expansion or reduction, or a new decision the
-   map does not record. A disagreement over major versus minor makes the finding
-   major. Return a major finding to the map under Wayfinder's Implementation
-   handoff; the spec never absorbs it. Once the map settles that decision,
+   map does not record. A substantive design choice left open for the implementer
+   is major; a routine choice within the approved scope is not a finding. A reuse
+   that would change a map decision is major; other reuse findings are minor.
+   A disagreement over major versus minor makes the finding major. Return a
+   major finding to the map under Wayfinder's Implementation handoff; the spec
+   never absorbs it. Once the map settles that decision,
    redraft and start a fresh loop of up to 3 iterations. Fix each minor finding
    or reject it with a recorded rationale, then run the next iteration; its
    reviewer receives that disposition.

@@ -16,8 +16,10 @@ orchestrator threads, including two in one checkout, each bind their own scope.
 
 Resolve scripts relative to this skill directory. `scripts/select.sh <kind>` passes
 `map` or `backlog` to the shared resolver; its `--help` owns the exact interface.
-Derive the owner, this task's Orca worktree identity (plus its dispatch ID inside a
-Run), with `scripts/select.sh <kind> owner [--dispatch <dispatch-id>]`. A missing
+Derive the owner with `scripts/select.sh <kind> owner [--dispatch <dispatch-id>]`:
+this task's Orca worktree identity plus its dispatch ID inside a Run, or its
+Orca-verified agent session outside one, so two threads in one checkout get
+distinct owners. The shared contract owns the owner forms and verification. A missing
 script or resolver is a concrete failure, never a reason to write state manually.
 
 For a new selection run `scripts/select.sh <kind> select --scope <scope> --owner

@@ -10,16 +10,31 @@ runtime is selected with `ORCA_POD_PYTHON` when needed.
 
 An **effort scope** is a stable identifier for independently selected work in one
 repository. It is not a branch, checkout path, issue number or permission to act.
-A **task owner** is the task's Orca worktree identity, plus its dispatch ID when
-the task runs as a worker inside an Orca Run. Derive it with the selector's
-`owner` command (add `--dispatch <dispatch-id>` from the task's own dispatch
-context); it reads `orca worktree current` and verifies the dispatch's worktree
-through `orca orchestration worker-show`. Outside Orca, record an explicit unique
-path-safe identity with this task instead. Establish both from the current task's
-explicit context; missing or conflicting context is an error. Do not discover
-ownership by enumerating scope files or inheriting a shell environment from
-another task; Orca's `ORCA_WORKTREE_ID` can name the launching coordinator's
-worktree rather than the worker's.
+A **task owner** is derived by the selector's `owner` command from the current
+worktree's identity key in `orca worktree current`, in one of three forms:
+
+- `<worktree key>:<dispatch-id>` for a worker inside an Orca Run. Pass `--dispatch
+  <dispatch-id>` from the task's own dispatch context; the command verifies the
+  dispatch's worktree through `orca orchestration worker-show`.
+- `<worktree key>:session:<session-id>` for an Orca agent session outside a Run.
+  The command reads `ORCA_AGENT_SESSION_ID` and accepts it only when `orca
+  worktree ps` lists that structured agent session under the current worktree, so
+  two coordinator threads in one checkout get distinct owners.
+- `<worktree key>` when the session is unset or Orca lists no such agent, such as
+  in a plain terminal.
+
+Its JSON reports `session` and `dispatch` beside `worktree_identity`. A session
+that Orca lists under a different worktree, an unsafe session ID or an incomplete
+Orca listing is conflicting context, and `owner` fails. Outside Orca, record an
+explicit unique path-safe identity with this task instead. Establish both scope
+and owner from the current task's explicit context; missing or conflicting context
+is an error. Derive ownership only through `owner` or that explicit context, never
+by enumerating scope files or trusting a shell environment inherited from another
+task; Orca's `ORCA_WORKTREE_ID` can name the launching coordinator's worktree
+rather than the worker's.
+A scope selected under the earlier worktree-only owner keeps that owner and stays
+valid. A task with a new session owner receives a still-live scope only through
+the approved handoff's `transfer`; nothing migrates silently.
 For a new effort, the agent may choose a unique scope and report it under existing
 selection authority. Reuse the established scope on continuation.
 

@@ -22,14 +22,14 @@ Standing instructions for each role are in [roles.md](roles.md).
 | **🐋 ORC** `orc` | Coordinate: own the human dialogue, decisions, approvals, tracker writes, Git integration and final acceptance. | Claude · `claude-opus-5-5` · high | pane | named-git-action | Claude · `claude-opus-5-5` · xhigh: map, spec or design synthesis; DSP synthesis; a contested review finding (never max) |
 | **🗺️ PLN** `pln` | Draft substantive maps and specifications; plan complex execution within approved scope. | Claude · `claude-opus-5-5` · high | native | read-only | — |
 | **🛠️ WRK** `wrk` | Implement a bounded component or fix against explicit acceptance criteria. | Claude · `claude-opus-5-5` · high | orca | write-owned-files | Codex · `gpt-6.1-sol` · high: long-horizon batch run on Codex; REV and TST-proof then flip to Claude |
-| **🔍 REV** `rev` | Review correctness, regressions, security, and fidelity to the approved outcome, read-only. | Codex · `gpt-6.1-sol` · xhigh | orca | read-only | Claude · `claude-opus-5-5` · xhigh: the implementer ran on Codex (WRK on Codex, or SEC-WRK) |
+| **🔍 REV** `rev` | Review correctness, regressions, security, and fidelity to the approved outcome, read-only. | Codex · `gpt-6.1-sol` · xhigh | orca | read-only | Claude · `claude-opus-5-5` · xhigh: the implementer ran on Codex (WRK on Codex, or SEC-WRK), or the spec drafter ran on Codex, or the map drafter ran on Codex |
 | **🔍 REV2** `rev2` | Independent second review in a fresh context, for high-risk changes only. | Claude · `claude-opus-5-5` · xhigh | orca | read-only | — |
 | **🧠 DSP** `dsp` | Resolve difficult technical ambiguity, root causes, and architectural tradeoffs, as two independent opinions. | Codex · `gpt-6-astra` · max **and** Claude · `claude-opus-5-5` · max | orca | read-only | — |
 | **🛡️ SEC** `sec` | Perform scoped, authorized defensive security analysis; security reviewer, proof owner or worker on the security path. | Codex · `gpt-5.6-sol` · xhigh, Daybreak Blue via `codex --profile orca-pod-sec` | orca (terminal) | read-only | — |
 | **🧰 OPS** `ops` | Diagnose systems and perform authorized operational changes. | Codex · `gpt-6.1-sol` · high | orca | write-owned-files | — |
-| **🧪 TST** `tst` | Reproduce behavior and verify changes with relevant checks and evidence. | Codex · `gpt-6.1-sol` · medium | orca | read-only | — |
+| **🧪 TST** `tst` | Reproduce behavior and verify changes with relevant checks and evidence. | Codex · `gpt-6.1-sol` · medium | orca | read-only | Codex · `gpt-6.1-terra` · medium: routine verification trial; record the outcome on #88 |
 | **🧪 TST-proof** `tst-proof` | Write the independent failing proof that a fix must satisfy (tdd proof owner). | Codex · `gpt-6.1-sol` · high | orca | write-owned-files | Claude · `claude-opus-5-5` · medium: WRK ran on Codex |
-| **🖥️ BRW** `brw` | Verify rendered interfaces, interactions, accessibility, responsive layouts, and exported artifacts. | Codex · `gpt-6.1-sol` · medium | orca | read-only | — |
+| **🖥️ BRW** `brw` | Verify rendered interfaces, interactions, accessibility, responsive layouts, and exported artifacts. | Codex · `gpt-6.1-terra` · medium | orca | read-only | — |
 | **🧭 EXP** `exp` | Map repositories, trace execution paths, and gather targeted evidence. | Codex · `gpt-6-luna` · high | native | read-only | Codex · `gpt-6-luna` · max: a tricky trace<br>Codex · `gpt-6.1-sol` · low: a tricky trace that Luna max does not resolve |
 | **🧭 EXP-lite** `exp-lite` | Answer a bounded few-file lookup for a Claude coordinator, in place of Claude Code's built-in Explore. | Claude · `claude-haiku-5-5` · low | native | read-only | — |
 | **⏳ MON** `mon` | Run or observe a bounded workflow where no deterministic wait will do, and return terminal evidence. | Codex · `gpt-6-luna` · medium | native | read-only | — |
@@ -57,9 +57,10 @@ Standing instructions for each role are in [roles.md](roles.md).
 
 1. **Only ORC selects models**, from the roster. Workers never reroute.
 2. **Cross-provider review and proof.** REV and the independent bug proof
-   (TST-proof, SEC-PROOF) run on the other provider from the implementer. When
-   WRK runs on Codex, REV flips to Claude Opus 5.5 xhigh and TST-proof to Claude
-   Opus 5.5 medium. TST and BRW stay on Codex.
+   (TST-proof, SEC-PROOF) run on the other provider from the implementer; a spec
+   review or a map pass runs REV on the other provider from that record's
+   drafter. When WRK runs on Codex, REV flips to Claude Opus 5.5 xhigh and
+   TST-proof to Claude Opus 5.5 medium. TST and BRW stay on Codex.
 3. **Read the receipt; never trust self-report.** On every `worker-start`
    receipt, `launch.effective` must equal `launch.requested`. Report a mismatch or
    a failed launch to the operator. Never substitute a model or provider; there
@@ -85,6 +86,15 @@ Standing instructions for each role are in [roles.md](roles.md).
 8. **Every managed agent is a `worker-start` dispatch.** Never use bare
    `orca agent launch` for work you manage: its sessions cannot be read or closed
    from the CLI.
+9. **PLN drafts maps and specifications.** For a substantive map,
+   implementation specification or material revision, delegate drafting to PLN
+   with the operator's actual answers and the relevant repository evidence, and
+   reuse that PLN for later revisions. ORC keeps the live dialogue, reconciles
+   PLN's proposed text and publishes through the owning workflow. It routes the
+   map pass through `wayfinder` and spec review through `to-spec`, and asks the
+   human only for map decisions, the Chart-the-map confirmation and escalated
+   review findings. ORC may draft a compact, fully settled record itself and
+   makes administrative updates without PLN.
 
 Launch failures are reported, never rerouted. Delegation never expands
 authority: workers do not commit, push, merge or publish unless that action is
@@ -196,8 +206,23 @@ orca orchestration worker-retain --dispatch <dispatch_id> --json
 ```
 
 After each accepted `worker_done`, validate it against the expected Dispatch,
-then do exactly one: reuse the terminal for an immediate follow-up, retain it on
-the operator's request, or release it. `worker-read` still works after release.
+then do exactly one:
+
+- **Follow up in the same session** where Orca accepts the handle, such as the
+  terminal-backed SEC Daybreak worker: `worker-show`, then
+  `worker-start --task <next_task_id> --terminal <agent_terminal_handle>`. The
+  new Dispatch takes over cleanup.
+- **Retain** the worker on the operator's request.
+- **Release** it. `worker-read` still works after release.
+
+Current Orca refuses the handle for agent-session workers with
+`terminal_unsupported_for_agent_session` (fix pending upstream,
+stablyai/orca#34043). For their follow-up, release, then start a fresh
+`worker-start` whose brief carries the needed context: prior findings, files and
+revision.
+
+`send --to dispatch:<id>` is guidance for a live, unsettled Dispatch only; never
+send work outside a Dispatch.
 
 ## Verify the model
 
@@ -296,6 +321,30 @@ orca orchestration worker-start --terminal <handle> --worktree <sel> \
 - **Tear down** after settlement: `worker-release --dispatch <dispatch_id>`
   returns `retained` for an adopted terminal, so then run
   `orca terminal close --terminal <handle>`.
+
+## Filter-blocked SEC
+
+The provider's content filter can hide SEC's output: the SEC terminal shows a
+notice such as "This content can't be shown" where the result belongs, and no
+`worker_done` arrives. It can persist after a nudge, so act once you see it:
+
+1. Salvage the evidence still visible with
+   `orca orchestration worker-read --dispatch <dispatch_id> --source terminal --json`,
+   and hand any defect it shows to the implementation owner.
+2. Confirm the turn has ended before teardown: the terminal is idle at the
+   Codex prompt (`orca terminal wait --terminal <handle> --for tui-idle --json`
+   succeeds and the last screen shows the input prompt, not a running turn).
+   Then stop the dispatch with
+   `orca orchestration worker-stop --dispatch <dispatch_id> --json` and run
+   `orca terminal close --terminal <handle>`. If the turn may still be running
+   or its state is unverifiable, keep the terminal and dispatch, and report
+   them as retained.
+3. Route the targeted security re-review to REV2 (Claude Opus 5.5 xhigh) with
+   the salvaged evidence, and report it as an exception.
+
+Every SEC brief asks for findings in defect-and-fix terms: the flaw, its
+location and the fix. That wording trips the filter less than attack
+narratives.
 
 ## DSP dual opinion
 

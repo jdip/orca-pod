@@ -1,0 +1,4 @@
+interface:
+  display_name: "Select Map or Backlog"
+  short_description: "Select a Wayfinder map or implementation backlog"
+  default_prompt: "Use select to select this repository’s Wayfinder map or an existing implementation backlog using this task’s explicit effort scope and owner binding."

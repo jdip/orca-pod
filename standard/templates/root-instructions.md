@@ -78,6 +78,8 @@ and report the delivery blocker instead of inventing an alternate flow.
 Retain only guidance justified by current needs after the selected standard's
 guidance-retirement assessment. Use the actual selected source revision and ship
 its declaration with the adoption/upgrade implementation. The source repository's
-scripts and runbooks are a small working example for its Tooling; adapt actual
+scripts and runbooks are a small working example in its own Python Tooling; build
+the [targeted/full split](../../skills/pr-to-test/ROLLUP.md#establish-the-delivery-boundary)
+and privacy check in the target's approved Tooling language, and adapt actual
 application gates, evidence equivalence and deployment effects locally rather than
 importing assumptions.

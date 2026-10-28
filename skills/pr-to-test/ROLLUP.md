@@ -29,6 +29,20 @@ with equivalent full evidence reusable under the target's verification policy.
 Keep targeted and full results distinguishable; targeted evidence cannot satisfy
 full delivery acceptance.
 
+The hosted split is language-neutral; implement it in the target's approved
+Tooling language:
+
+- Trigger bases: the full workflow runs on pull requests into `test` and `main`;
+  the targeted workflow runs on pull requests into every other base.
+- Distinct job names per scope, so required checks and delivery lookup select
+  full or targeted results without ambiguity.
+- The targeted job runs focused source checks on files changed since the PR
+  base, tests and validation for the changed behavior and its affected
+  integration paths (including existing tests the change didn't edit), and the
+  mandatory privacy check.
+- Heavy jobs, such as services, matrices or deployment, run only in the full
+  workflow, or in the targeted one when the change touches their inputs.
+
 Confirm rollup pushes and child PRs cannot deploy to test or launch full CI before
 publishing them. Align conflicting CI triggers, required-check configuration and
 runbook obligations within authorized scope, or report the concrete blocker.
@@ -89,10 +103,10 @@ commits remain in the rollup; closed issues alone are insufficient. An explicitl
 accepted workflow exception needs its own completion evidence. Preserve separate
 scope decisions rather than silently excluding unfinished work.
 
-Fetch current test. Merge any new test changes into the rollup using ordinary merge
-commits; investigate conflicts, review resolutions and repeat affected checks. Review
-aggregate behavior and the complete test-bound diff, reusing child reviews only
-where they cover the final result. Resolve target drift through the local runbook.
+Review aggregate behavior and the complete test-bound diff, reusing child reviews
+only where they cover the final result. The canonical script catches the rollup up
+with new test changes like any task branch, including its conflict path. Resolve
+other target drift through the local runbook.
 
 Classify the combined change once through `pr-to-test`'s Version classification.
 Invoke the canonical `scripts/pr-to-test.sh` from the completed named rollup branch

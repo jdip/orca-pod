@@ -4,8 +4,9 @@ Act on the user's authorized outcome and carry it through verification. Read the
 repository's root AGENTS.md and instructions covering each changed path; reload
 when changing repository or branch. Use its domain vocabulary and local workflows.
 Make routine decisions independently. Before asking for human judgment, finish
-independent work and batch every ready decision with concrete recommendations.
-Preserve supplied answers and existing authorization across turns.
+independent work and batch every ready decision with concrete recommendations in
+ordinary text, then wait for the actual answers. Preserve supplied answers and
+existing authorization across turns.
 
 ## Host capabilities and skills
 
@@ -35,13 +36,16 @@ complete while scaling discovery and discussion to what remains unresolved.
 For every new-work discussion, invoke `wayfinder` and its `grilling` entry before
 creating a map. Complete the actual dialogue and obtain the user's confirmation
 of shared understanding; reading the skills or drafting a proposal alone does not
-complete that entry. Approved continuations reuse settled answers; material
-changes to scope, assumptions, or outcome reopen the dialogue.
+complete that entry. That confirmation is the single human planning gate; under
+a map waiver, the operator approves the spec instead. Approved continuations
+reuse settled answers; material changes to scope, assumptions, or outcome reopen
+the dialogue.
 
 Implementation, including documentation, maintenance, dependency and
-alignment changes, requires a resolved map and approved specification covering
-the work. Reuse settled decisions and existing coverage. Keep small maps/specs
-brief, with no invented research or decision tickets; use the existing
+alignment changes, requires a resolved map and an approved specification, as
+`to-spec` defines approval, covering the work. Reuse settled decisions and
+existing coverage. Keep small maps/specs brief, with no invented research or
+decision tickets; use the existing
 specification parent and executable-child workflow through `to-spec`,
 `to-tickets` and `next-issue`. Direct workflow requests hand approved work to
 that executor before edits; an already claimed child runs its named skill
@@ -71,11 +75,11 @@ resolution before implementation, rather than a new fallback framework.
 An implementation request means carry the outcome through planning, approved
 publication/selection, execution, review and verified PR-to-test delivery under
 local rules. Reuse that authority across skill boundaries; ask only for
-unresolved human decisions or necessary approval of the concrete map/spec or
-changed scope. Do not require separate commands or repeat administrative
-approvals already covered. Substantive design gaps return to the associated map
-and pause its implementation; routine choices within approved scope stay with
-the implementer. Planning does not require a recursive map for its own records.
+unresolved human decisions, the map confirmation, escalated spec review findings,
+spec approval under a map waiver or changed scope. Do not require separate
+commands or repeat administrative approvals already covered. Substantive design
+gaps return to the associated map and pause its implementation; routine choices
+within approved scope stay with the implementer. Planning does not require a recursive map for its own records.
 Existing workflow-specific completion boundaries and the separate authority
 needed to install or change host configuration remain. Main promotion requires a
 separate explicit operator request; implementation approval and test delivery

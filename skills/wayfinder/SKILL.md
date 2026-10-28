@@ -13,14 +13,14 @@ for routine implementation choices.
 The destination varies per effort, and naming it is the first act of charting: it shapes every ticket. It might be a spec to hand off and iterate on, a decision to lock before planning starts, or a change made in place like a data-structure migration. The map is domain-agnostic: engineering work, course content, whatever fits the shape.
 
 When resolving or changing a saved selection, read
-[selection scope and handoff](../set-map/SELECTIONS.md). Carry the explicit
+[selection scope and handoff](../select/SELECTIONS.md). Carry the explicit
 scope, task owner and generation through handoffs to selection/execution owners.
 Keep map and backlog bindings independent. Publication and closed design do not
 change another effort's selections or grant takeover authority.
 
 ## Plan, don't do
 
-Wayfinder is **planning** by default: each ticket resolves a decision, and the map is done when the way is clear, with nothing left to decide before someone goes and does the thing. The pull to just do the work is usually the signal you've reached the edge of the map and it's time to hand off. Record standing preferences in **Notes**. Execute associated implementation through `next-issue` only after the entire map is resolved and the user authorizes execution. Decision-unblocking tasks remain part of planning.
+Wayfinder is **planning** by default: each ticket resolves a decision, and the map is done when the way is clear, with nothing left to decide before someone goes and does the thing. The pull to just do the work is usually the signal you've reached the edge of the map and it's time to hand off. Record standing preferences in **Notes**. Execute associated implementation through `next-issue` only after the entire map is resolved and its spec is an [approved specification](../to-spec/SKILL.md#review-the-draft-against-the-map), normally through a pass of `to-spec`'s review against the map, under the execution authority of **Chart the map**. Decision-unblocking tasks remain part of planning.
 
 ## Refer by name
 
@@ -142,13 +142,16 @@ may become map tickets. Grilling owns the dialogue procedure; this entry owns
 the boundary between establishing the destination and mapping its remaining design.
 
 Before creating a map, summarize the shared understanding and obtain the user's
-explicit confirmation. A detailed request, agent proposal, or reading the skill
-does not establish completed grilling. Record the confirmed direction and a concise
-summary of the actual dialogue in the map's existing Notes/Decisions so far;
-use available conversation evidence without publishing private transcripts.
-Reuse supported prior answers on approved continuations and reopen dialogue when
-scope, assumptions, or outcome materially changes. Preserve the global Planning
-before implementation rule and its explicit-waiver boundary.
+explicit confirmation. Run the [Map pass](#map-pass) before asking for that
+confirmation when it applies. A detailed request, agent proposal, or reading the skill
+does not establish completed grilling. This confirmation is the single human
+planning gate. Under `whats-next` or an implementation request it carries through
+spec review, publication, backlog selection, execution and verified test
+delivery; a planning-only request ends at the reviewed, published spec. Record
+the confirmed direction and a concise summary of the actual dialogue in the
+map's existing Notes/Decisions so far; use available conversation evidence
+without publishing private transcripts. Preserve the global Planning before
+implementation rule and its explicit-waiver boundary.
 
 1. **Name the destination.** Complete the `grilling` entry above with the user.
    Use `domain-modeling` when terminology or domain relationships need resolution.
@@ -161,12 +164,71 @@ before implementation rule and its explicit-waiver boundary.
 4. **Create the tickets you can specify now** as child issues of the map, then wire blocking edges in a **second pass** (issues need ids before they can reference each other). Wiring sorts them into the frontier and the blocked; everything you can't yet specify stays in the fog: the **Not yet specified** section.
 5. **Research actual open questions.** When research tickets exist, use the `research` skill to assign independent research with bounded questions and evidence requirements. Dispatch delegated work per the `roster` skill (skills/roster/SKILL.md). Prepare artifacts in a separate worktree on a `orca/research-<name>` branch from fresh `origin/test`, following the target repository's checkout and delivery rules. Each assigned researcher investigates directly and returns cited findings; the primary owns any repository artifact and tracker resolution. Link the retained findings from the ticket. The primary serializes shared Git mutations and resolves the research tickets from the returned evidence.
 6. For a chart-only request, return the map. When the request includes continuation
-   or implementation, select the open map through `set-map` before closure, then
-   use `next-waypoint-loop` under that authority. Reusing an already resolved map
+   or implementation, select the open map through `select map` before closure, then
+   use `next-waypoint` in continue mode under that authority. Reusing an already resolved map
    needs no new selection; retain its source links and existing pointer.
    A compact map with confirmed direction proceeds directly to the Implementation handoff:
-   prepare its specification and executable breakdown, record resolution and close
-   the map after verifying that no decision remains. No dummy frontier is needed.
+   draft its specification and executable breakdown, then record resolution and
+   close the map once the spec is approved under `to-spec`, normally through a
+   pass of its review, and no decision remains.
+   No dummy frontier is needed.
+
+### Map pass
+
+One fresh reviewer on the other provider reads the drafted map before the
+shared-understanding confirmation, and its findings reach the user as grilling
+questions.
+
+**When it runs.** On a full map, one that will carry decision tickets or **Not
+yet specified** fog, and on any map that introduces a new mechanism: a new skill,
+script, role, workflow step, gate, tracker convention, or language, runtime or
+environment, as opposed to a change to the mechanism that already owns the
+behavior. A compact map for small, settled work that introduces no new mechanism
+skips it. A map waiver means no map pass.
+
+**Dispatch.** Per `roster`, dispatch one fresh REV on the other provider from the
+map drafter (PLN, or the primary when it drafted the summary). The pass is
+read-only and single, with no iterations. The brief carries:
+
+- the target repository and revision;
+- the drafted Destination, Notes constraints and Out of scope;
+- Decisions so far with the user's actual answers, sanitized; and
+- any decision tickets and Not-yet-specified fog drafted so far.
+
+Frontier mapping still follows the confirmation; do not manufacture frontier detail
+to dispatch the pass. Leave out the drafter's reasoning and the dialogue transcript. The reviewer
+applies the `MAP PASS` mode instructions of all four review lenses, with the
+drafted map as the raw feature concept:
+[zoom out](../to-spec/review-lenses/zoom_out.md),
+[design critic](../to-spec/review-lenses/design_critic.md),
+[implementation readiness](../to-spec/review-lenses/implementation_readiness.md)
+and [comprehension](../to-spec/review-lenses/comprehension.md).
+
+It returns each finding with repository evidence and a recommended answer, or
+states that it has no findings. It leaves findings unclassified, neither major
+nor minor; the lenses' own severities stay as reported.
+
+**Disposition.** Resolve factual findings under `grilling`'s existing procedure,
+building on the facts the reviewer already established rather than redoing them.
+Turn each finding that needs human judgment into a numbered grilling question
+with its recommendation, asked in a round before the confirmation request. Record
+a finding the user already answered in this dialogue with that answer instead of
+asking it again. Once those rounds are answered, ask for the confirmation as
+before; the pass adds no gate.
+
+**Reruns.** One pass per confirmation. When a material change to scope,
+assumptions or outcome reopens an existing map's dialogue, including through
+**Map-entry evidence**, **Work through the map** or the **Implementation
+handoff**, the reopened confirmation gets a fresh pass if the map qualifies. A
+compact map that later grows through frontier mapping gets no retroactive pass.
+
+**Record.** Once the map exists, post one comment on it, sanitized under the
+target's publication policy: `Map pass`, the reviewer role with its
+receipt-verified model and effort, and each finding with its disposition: asked
+as Q<n> with the gist of the answer, settled by fact, or already answered. A
+skipped pass records nothing. A missing map-pass record alone does not block
+**Map-entry evidence**; that entry's dialogue and confirmation requirements still
+apply.
 
 ### Map-entry evidence
 
@@ -211,7 +273,7 @@ The **Chart the map** entry retains its explicit confirmation gate.
 
 ## Implementation handoff
 
-Resolve the entire map before its associated implementation proceeds. If implementation exposes a substantive missing decision, reopen the map and pause the whole associated backlog until it is resolved again. Routine implementation choices remain with the implementing agent. Ask ready human questions together in ordinary text and wait for answers.
+Resolve the entire map before its associated implementation proceeds. If implementation exposes a substantive missing decision, reopen the map and pause the whole associated backlog until it is resolved again.
 
 Before closing a resolved design ticket or completed map that leaves
 implementation work, find or create an open implementation follow-up and link it
@@ -219,9 +281,13 @@ both ways. Reuse an existing follow-up for the same effort; one shared follow-up
 may cover several decisions. Record its intended outcome and references to the
 approved decisions. Once every decision is settled, use `to-spec` to draft one
 specification/backlog parent and its executable breakdown. For a settled compact
-map, record its agreed direction in the map's resolution comment. Record
-resolution and close the map once its open follow-up is verified; `to-tickets`
-publishes the approved batch after the map closes. While design remains
+map, record its agreed direction in the map's resolution comment. The follow-up
+can be the drafted specification parent under `to-spec`'s review: `to-tickets`
+publishes its body, with no children, before closure. Record resolution and close
+the map once the parent is an approved specification under `to-spec`, normally
+through a pass of that review, and its open follow-up is verified; a major
+finding keeps the map open for its decision. `to-tickets` publishes the approved
+children after the map closes. While design remains
 unsettled, keep the follow-up explicitly awaiting planning rather than inventing
 executable scope.
 

@@ -42,6 +42,8 @@ copying an entire scaffolding tree.
   safeguards under [visibility and public work](#visibility-and-public-work).
 - Executable scripts/pr-to-test.sh and scripts/promote-to-main.sh, paired with
   docs/workflows/pr-to-test.md and docs/workflows/promote-to-main.md.
+- Owner-confirmed branch protection on `test` and `main`, with catch-up delivery,
+  under [checkouts and delivery](#checkouts-and-delivery).
 - One source/revision declaration in root AGENTS.md, delivered in the adoption or
   upgrade PR, using the exact fields below.
 
@@ -59,6 +61,12 @@ Unmarked repos
 need Repository Adoption; ordinary upgrades use the recorded source's default
 branch unless the user requests a revision. Select one concrete revision and apply
 its relevant delta, preserving unrelated work.
+
+The default branch carries this standard from `v0.1.0`, so ordinary adoption and
+upgrades use its HEAD. A target explicitly pinned to a pre-default revision, such
+as a rollup or `test` commit, depends on that commit staying reachable: verify it
+is reachable from a source branch before selecting it, and keep source delivery to
+merge commits only so later integration retains it.
 
 ## Target assessment and planning
 
@@ -97,10 +105,10 @@ preserving each phase's authorization and completion boundary. If the target
 tracker is unavailable, continue conversational planning and resolve the artifact
 location before implementation. Follow publication policy for planning writes.
 
-Before implementation, resolve the map and approve the specification and executable
-breakdown through the existing planning owners, unless the operator explicitly
-waives planning. A workflow invocation carries its normal authorized outcome; it
-does not waive planning. Keep small plans brief. Plan actual changes, including
+Before implementation, resolve the map and obtain an approved specification and
+executable breakdown, as `to-spec` defines approval, through the existing
+planning owners, unless the operator explicitly waives planning. A workflow
+invocation carries its normal authorized outcome; it does not waive planning. Keep small plans brief. Plan actual changes, including
 executable verification alignment, prerequisites, explicit blockers, separately
 owned work and evidence for the target's completion boundary, rather than create
 a universal bootstrap program. Research and planning records may precede approval;
@@ -248,8 +256,12 @@ from active service. Record coverage, justified exceptions and exact blocked
 capabilities in the existing alignment evidence. Missing permissions or unavailable
 hosting features leave protection explicitly incomplete; continue independent
 alignment work. Configuration awaiting separately authorized default-branch
-delivery can finish verified test delivery with activation reported as pending. Do
-not claim active coverage or require promotion merely to complete source delivery.
+delivery can finish verified test delivery with activation reported as pending.
+Dependabot alerts cover only the default branch, so a target that delivers to
+`test` and promotes rarely has no alert coverage of code delivered since its last
+promotion. Record that gap, with the default-branch revision alerts cover, in the
+alignment evidence. Do not claim active coverage or require promotion merely to
+complete source delivery or close the gap.
 Additional credentials, paid features, visibility changes and separately required
 main promotion retain their own approval boundaries. Do not widen permissions,
 change hosting or invent a new updater to claim completion.
@@ -388,6 +400,12 @@ Exact head/base/parent pins, review, branch protection and real deployment or
 processing acceptance remain separate gates. Reused build or test evidence never
 satisfies deployment acceptance.
 
+Under non-admin access, GitHub returns 404 for branch protection and the
+[Dependabot settings](../skills/dependabot-upkeep/SKILL.md#establish-alert-only-protection),
+so 404 does not separate disabled from forbidden. Report such a setting as
+unreadable, not disabled, and give the owner its readback or set step, such as
+the [branch protection](#checkouts-and-delivery) readback.
+
 ## Checkouts and delivery
 
 Keep the primary local checkout on `test`, refreshed from `origin/test` by
@@ -418,6 +436,23 @@ protection bypasses are not delivery alternatives. Separately requested promotio
 uses the global `promote-to-main` skill, `docs/workflows/promote-to-main.md`, and
 `scripts/promote-to-main.sh` from the clean primary `test` checkout, completing
 verification and main-to-test synchronization.
+
+Protect `test` and `main`: require a pull request, the target's full CI check or
+checks and up-to-date branches; disable force pushes and deletions; and turn on
+"Do not allow bypassing the above settings". Approvals follow the target's review
+policy, defaulting to none. Drastic recovery is a deliberate, one-time disable of
+the no-bypass setting, re-enabled afterwards. Agents usually lack admin, so
+adoption gives the owner these exact settings and a readback of
+`gh api repos/<owner>/<repo>/branches/<branch>/protection` for each branch:
+`required_pull_request_reviews` present, `required_status_checks.strict` true with
+the full CI contexts, `allow_force_pushes` and `allow_deletions` disabled, and
+`enforce_admins` enabled. The outcome is complete only after the owner confirms it.
+Already-adopted targets adopt it at their next Standards Upgrade.
+
+The PR-to-test script catches up by merging the latest `test` into the task branch
+before the first push and whenever `test` moves during its wait. It bounds
+catch-ups and waits, with limits chosen and recorded in the target runbook, stops
+on conflict with the branch unchanged, and never bypasses protection.
 
 Root guidance must direct agents to `cleanup-task-artifacts` before launching
 temporary compute to establish ownership and teardown, and before reporting at

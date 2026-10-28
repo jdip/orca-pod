@@ -14,7 +14,7 @@ relationships. This skill prepares work only; it neither selects an active
 backlog nor authorizes implementation.
 
 When resolving or changing a saved selection, read
-[selection scope and handoff](../set-map/SELECTIONS.md). Carry the explicit
+[selection scope and handoff](../select/SELECTIONS.md). Carry the explicit
 scope, task owner and generation through handoffs to selection/execution owners.
 Keep map and backlog bindings independent. Publication and closed design do not
 change another effort's selections or grant takeover authority.
@@ -26,10 +26,14 @@ instructions, the approved specification, its comments, and linked design and
 decision sources. Require a covering resolved Wayfinder map unless the operator
 explicitly waived that requirement; missing coverage returns to Wayfinder and
 `to-spec`. Confirm the whole map is closed and resolved before publishing
-executable children. Use issue bodies for the current approved scope and
-acceptance criteria; comments supply decision history and evidence. Update a
-body to incorporate an approved amendment before it becomes the published
-contract.
+executable children. While the map is still open, publish only the drafted
+parent body as the map's implementation follow-up under
+[Wayfinder's handoff](../wayfinder/SKILL.md#implementation-handoff), the subject
+of `to-spec`'s review against the map; return for the children once the parent
+is an approved specification, normally through a pass, and the map is closed.
+Use issue bodies for the current approved scope and acceptance criteria;
+comments supply decision history and evidence. Update a body to incorporate an
+approved amendment before it becomes the published contract.
 
 Confirm the parent's `Delivery` field is part of that approved contract. One-child
 parents default to `direct`. Multiple-child parents use `rollup` and name
@@ -44,12 +48,11 @@ parent, dependencies, state, and assignees; preserve claims and work attached to
 another effort. Never create a duplicate parent or ticket merely because a prior
 publication was partial.
 
-If the specification and ticket breakdown were not reviewed together, draft both
-and present one ordinary-text batch: parent scope and acceptance criteria; every
-ticket's independently verifiable outcome and acceptance criteria; and each real
-blocking edge. Wait for the user's approval. Reuse an earlier explicit approval
-only when it covers the same parent scope and breakdown. Do not create issues as
-an administrative substitute for missing approval.
+Publish children only for an
+[approved specification](../to-spec/SKILL.md#review-the-draft-against-the-map)
+covering the current parent body and breakdown; return any other draft to
+`to-spec`. Under a map waiver, record the operator's approval on the parent when
+publishing it.
 
 ## Publish the approved batch
 
@@ -84,7 +87,7 @@ concrete blast radius requires temporary coexistence.
 
 Create children without assignees. Publication alone supplies no execution
 authorization. Carry an existing implementation request through selection and
-`next-issue` or `next-issue-loop` when it covers this approved scope; those
+`next-issue` or its continue mode when it covers this approved scope; those
 owners select and claim work.
 
 For GitHub, use native sub-issues for membership. Before attaching an existing
@@ -122,8 +125,8 @@ dependencies, state, and claims before retrying. Retry only the missing attachme
 or edge after readback. Preserve completed writes and never create a replacement
 parent, duplicate ticket, steal a claim, or reparent another effort to recover.
 
-Report the parent and child URLs, verified membership and dependencies, and the
-source links. Publication alone leaves a newly created parent prepared; an
+Send the human a short spec-link report without waiting for a reply: the parent
+link and its approval basis, child URLs, verified membership and dependencies, and
+the source links. Publication alone leaves a newly created parent prepared; an
 existing parent's active or executing state is preserved. An explicitly authorized
-backlog selection and `next-issue` or `next-issue-loop` request controls future
-execution.
+backlog selection and `next-issue` request controls future execution.

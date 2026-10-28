@@ -1,7 +1,6 @@
 ---
 name: pr-to-test
 description: Deliver the intended task changes through the repository’s canonical PR-to-test workflow and actual test verification.
-disable-model-invocation: true
 ---
 
 # PR to Test
@@ -102,6 +101,13 @@ Call the fixed script with the local runbook's actual arguments. Follow the resu
 through the runbook's completion evidence, including test deployment/processing and
 usability checks when applicable. A launched script, open PR, or merge alone may be
 partial progress. All canonical task-to-test merges use merge commits.
+
+Under up-to-date protection, the script catches up by merging the latest `test`
+into the branch before pushing and whenever `test` moves during its wait, within
+the runbook's bounds. Being behind is routine, not a failure. A clean catch-up
+needs no new review. A conflict stops the script with the branch unchanged:
+resolve it with `resolving-merge-conflicts`, have the resolution reviewed, then
+re-run the script.
 
 On failure inspect the earliest error and actual partial effects before recovery.
 Use the target helper's named stage, native cause/result and confirmed/uncertain

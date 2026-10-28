@@ -30,7 +30,7 @@ while code work is active. Reuse a successful read within that pass; refresh at 
 next pass and after relevant remediation. Report disabled or inaccessible alert
 coverage separately from zero alerts. This read does not start maintenance edits.
 
-Read [selection scope and handoff](../set-map/SELECTIONS.md) whenever reading,
+Read [selection scope and handoff](../select/SELECTIONS.md) whenever reading,
 selecting, resuming, forking, moving or handing off a map/backlog. Use the existing
 selector owners with the explicit scope/task binding; preserve each effort. A closed
 historical selection permits discovering alternatives without replacing this scoped selection.
@@ -56,7 +56,9 @@ takeover through the selection handoff owner; verify source quiescence, included
 claims and recipient binding before assuming ownership. An assignee, inactivity, or a finished turn
 alone is not permission. If Orca inventory is unavailable or `orca worktree ps`
 reports a host as not covered, preserve uncertain claims and continue work whose
-ownership is established.
+ownership is established. A worktree listed by `git worktree list` but absent from
+`orca worktree ps`, such as one created by an agent outside Orca, is an uncertain
+claim; record its branch, any open PR for that branch and its dirty state as evidence.
 
 When starting selected work in a new Orca worktree, attach its issue at creation
 with `orca worktree create --reference <issue-url>`, or afterwards with
@@ -72,20 +74,20 @@ rule. Reuse a resolved map and approved spec covering the actual change. If cove
 is missing, begin or resume Wayfinder from the inspected target and desired
 outcome. Hand control to Wayfinder's **Chart the map** entry and stay in its
 grilling dialogue until its completion gate is satisfied. A concrete destination
-is the result of that dialogue, not an alternative gate. Smallness or a delivery
-request does not supply a planning waiver.
-Read-only assessment may continue while planning remains open.
+is the result of that dialogue, not an alternative gate. A delivery request does
+not supply a planning waiver.
 
 After Wayfinder's entry dialogue and user confirmation, carry the request's
 planning authority through
-`wayfinder`, `set-map` and `next-waypoint-loop`; resolve their repository
+`wayfinder`, `select map` and `next-waypoint` continue mode; resolve their repository
 context against the target. A compact settled map may have no decision children.
 Select a new map while it is open, before resolution/closure; reusing resolved
 coverage needs no new map selection. Then use `to-spec` and `to-tickets` for the
-approved specification parent and
-executable children, and the existing selection/execution owners. Preserve
-another effort's selection and ownership. Ask about a competing selection only
-when existing authority does not settle it. Missing capabilities leave a
+specification parent and executable children: `to-spec`'s independent review
+against the map stands in for a spec approval prompt, and the spec-link report
+needs no reply. Continue through the existing selection/execution owners under
+the confirmation. Preserve another effort's selection and ownership. Ask about a
+competing selection only when existing authority does not settle it. Missing capabilities leave a
 concrete planning blocker; continue independent discovery without silently
 implementing.
 
@@ -99,19 +101,17 @@ step unresolved, with a concrete limitation reported to the human.
 
 Reuse explicit consent only when it covers the same repository, target, scope, and
 action and has not been superseded. Labels, assignment, publication, or an open PR
-alone do not establish permission. Before asking, finish independent investigation
-and present the actual missing decision or approval with a recommendation. Batch
-ready questions; the human supplies the answers. Execute only the approved portion
-of a combined proposal and carry it forward across ordinary skill boundaries.
+alone do not establish permission. Execute only the approved portion of a
+combined proposal and carry it forward across ordinary skill boundaries.
 
 | Selected work | Owning handoff |
 | --- | --- |
 | Almost-delivered code/PR | Establish map/spec coverage, requirements, ownership, and delivery authority; use `code-review` when needed and `next-issue` for a rollup child under its parent's integration boundary; use `pr-to-test` for a completed rollup or direct test delivery. Ask about finishing that specific PR if delivery consent is missing. |
-| Approved Active Backlog | Use `next-issue-loop`, supplying the eligible selection when completion-first ranking changes ordinary order. Preserve the associated map's Design gate and existing claim/delivery rules. |
-| Prepared inactive backlog | Use `triage` for necessary intake/admission and `set-backlog` for approved selection. Present only missing admission, activation, and execution approvals together, then start `next-issue-loop` to the extent approved. |
-| Selected Wayfinder map | Continue `next-waypoint-loop`; research facts and present human decisions. A different map needs an approved select-and-start proposal through `set-map`. |
-| New planning destination | Hand off to Wayfinder's **Chart the map** dialogue and completion gate before map creation; then use `set-map` and `next-waypoint-loop` under existing authority. Preserve its required human questions and confirmation. |
-| Entire map resolved | Use `to-spec` to draft the parent and complete ticket breakdown automatically. Present the batch and missing publication/admission/activation/execution approvals together; use `to-tickets` and selection/execution owners for the approved portion. Reuse the effort's implementation follow-up. |
+| Approved Active Backlog | Use `next-issue` in continue mode, supplying the eligible selection when completion-first ranking changes ordinary order. Preserve the associated map's Design gate and existing claim/delivery rules. |
+| Prepared inactive backlog | Use `triage` for necessary intake/admission and `select backlog` for approved selection. Present only missing admission, activation, and execution approvals together, then start `next-issue` in continue mode to the extent approved. |
+| Selected Wayfinder map | Use `next-waypoint` continue mode; research facts and present human decisions. A different map needs an approved select-and-start proposal through `select map`. |
+| New planning destination | Hand off to Wayfinder's **Chart the map** dialogue and completion gate before map creation; then use `select map` and `next-waypoint` continue mode under existing authority. Preserve its required human questions and confirmation. |
+| Entire map resolved | Use `to-spec` to draft the parent and complete ticket breakdown automatically and run its review against the map. Once the parent is an approved specification under `to-spec`, normally through a pass, use `to-tickets`, send the spec-link report and continue through admission, activation and execution under `to-spec`'s handoff. Reuse the effort's implementation follow-up. |
 | Alert-protection gaps, actionable dependency alerts or existing remediation | Follow [dependency upkeep](maintenance.md#dependency-upkeep), then hand the selected repository-owned remediation or protection scope and existing approval to `dependabot-upkeep`. Return after the coherent step. |
 | Hygiene, adopted repository verification or Orca Pod alignment | Follow [maintenance and alignment](maintenance.md) once the relevant baseline is stable. |
 | Missing or unclear project purpose | Use `define-project-goal` with the human operator when direction is needed; reuse an existing clear root README purpose. Agree missing invocation authority with a concrete offer, then carry approved wording through its owning documentation workflow. |

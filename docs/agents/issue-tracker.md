@@ -91,7 +91,7 @@ Used after `wayfinder`'s grilling entry confirms direction for new work. The
 native children. A compact settled map records the agreed direction directly and
 needs no invented children. Keep it open through handoff bookkeeping, then
 record resolution and close it before executable ticket publication. Use the
-existing `set-map` owner for selection; retain completed pointers until an
+existing `select map` owner for selection; retain completed pointers until an
 authorized selection replaces them.
 
 - **Map**: a single issue labelled `wayfinder:map`, holding the Notes / Decisions-so-far / Fog body. `gh issue create --label wayfinder:map`.
@@ -107,20 +107,22 @@ authorized selection replaces them.
 
 ## Implementation backlogs
 
-Used by `to-spec`, `to-tickets`, `triage`, `set-backlog`, `next-issue`, and
-`next-issue-loop`.
+Used by `to-spec`, `to-tickets`, `triage`, `select backlog` and `next-issue`,
+including its continue mode.
 
 The Implementation Specification body owns current approved scope and acceptance;
-comments hold decisions, discussion, and evidence. Present the proposed parent and
-child breakdown together for one batch approval, reusing explicit prior approval.
-Publish the approved relationships through `to-tickets` and verify them before
-reporting completion. Publication alone does not select or execute a backlog.
+comments hold decisions, discussion, and evidence. `to-spec` reviews the drafted
+parent and child breakdown independently against the map, recording each
+iteration as a parent comment, in place of human approval; under a map waiver
+the operator approves them. Publish the approved relationships through
+`to-tickets` and verify them before reporting completion. Publication alone does
+not select or execute a backlog.
 
 - **Parent**: an open issue labelled `implementation:backlog`, containing the
   implementation objective, approved design links, execution boundaries, and
   completion criteria. Native sub-issues hold the ordered work set. Do not use
   the closed planning map as the implementation parent.
-- **Selection**: use [selection scope and handoff](../../skills/set-map/SELECTIONS.md)
+- **Selection**: use [selection scope and handoff](../../skills/select/SELECTIONS.md)
   and the owning selectors for all reads and writes. Each effort has an explicit
   scope and task-owner binding; map and backlog selections remain independent.
   State is untracked in Git's common directory but isolated by scope. Retain
@@ -136,8 +138,8 @@ reporting completion. Publication alone does not select or execute a backlog.
   `GET repos/<owner>/<repo>/issues/<child>/parent` before attaching existing work.
   Do not silently reparent issues from another effort. Preserve dependencies.
 - **Design gate**: before taking or continuing implementation, require covering
-  resolved map and approved specification evidence, or an explicit scoped operator
-  planning waiver. Follow next-issue’s Design gate against the specification’s
+  resolved map and approved specification evidence under `to-spec`'s definition,
+  or an explicit scoped operator planning waiver. Follow next-issue’s Design gate against the specification’s
   associated map, not the saved planning pointer. An open/reopened map pauses the whole backlog until resolved. Routine
   implementation choices do not reopen maps. A substantive missing decision is
   recorded in the reopened map and linked from the claimed, open implementation
@@ -188,7 +190,7 @@ selected parent means no active parent for this effort. Missing binding context
 is an error. An invalid, unreadable, wrong-repository, or inaccessible selection
 is unresolved, not an empty queue. Preserve it while investigating. Offer
 activation only when no parent is active in this scope, and carry out explicit approval through the shared
-`set-backlog/scripts/set-backlog.sh` mechanism. Routine triage preserves an open
-active parent; explicit `set-backlog` may switch it at the user's request.
+`select/scripts/select.sh backlog` mechanism. Routine triage preserves an open
+active parent; explicit `select backlog` may switch it at the user's request.
 Completion never selects another parent automatically. Readiness and activation
 provide no independent permission to execute work.

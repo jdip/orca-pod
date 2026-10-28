@@ -31,8 +31,8 @@ there is an actual term or decision to record.
   agreed direction, decisions so far and remaining fog. It is resolved and
   closed before executable tickets are published.
 - **Spec**: an Implementation Specification, the open `implementation:backlog`
-  parent issue that owns approved scope and acceptance. Its native sub-issues are
-  the ordered work set.
+  parent issue that owns approved scope and acceptance; `to-spec` defines when it
+  is approved. Its native sub-issues are the ordered work set.
 - **Backlog**: the work selected for execution. The Active Backlog is the spec
   selected in an effort's scope; the Ready Backlog is the open
   `implementation:ready` parents waiting for activation.

@@ -89,6 +89,12 @@ settings. Present the concrete delta and apply the authorized baseline:
 
 Read settings back after changes. Insufficient access or an unavailable capability
 is a blocker for that setting, not consent to broaden permissions or enable charges.
+Under non-admin access, `vulnerability-alerts` and `automated-security-fixes` return
+404 whether disabled or forbidden; report each as unreadable, not disabled, and give
+the owner the readback: `gh api -i repos/<owner>/<repo>/vulnerability-alerts` (204
+means enabled; `--method PUT` enables) and
+`gh api repos/<owner>/<repo>/automated-security-fixes` (expect `"enabled": false`;
+`--method DELETE` disables).
 Use supported APIs or UI; do not create another updater, Action or scheduler as a
 substitute. Existing competing automation needs a concrete authorized resolution.
 

@@ -1,22 +1,24 @@
 ---
 name: next-issue
-description: Claim and implement one eligible issue from this repository's saved implementation backlog, through verified delivery and safe cleanup.
+description: Claim and implement one eligible issue from this repository's saved implementation backlog, through verified delivery and safe cleanup. Continue mode works successive issues of the bound parent when asked to work through the backlog.
 ---
 
 # Next Issue
 
 Use this for a request to implement the next backlog issue. Discussing or
 creating this skill does not authorize executing the backlog. Work one issue per
-invocation; `next-issue-loop` overrides that boundary. Apply the Design gate
-before edits; resume covered implementation without another planning interview.
+invocation by default. A request to work through the backlog or parent, or a
+`whats-next` handoff that supplies it, runs [Continue mode](#continue-mode).
+Apply the Design gate before edits; resume covered implementation without another
+planning interview.
 An authorized coordinator or named workflow handoff carries the request's
 execution authority for the target Active Backlog without waiving scope, claims
 or planning.
 
 ## Load the backlog and select work
 
-Read [selection scope and handoff](../set-map/SELECTIONS.md). Resolve the
-explicit backlog scope and task owner through `set-backlog`'s selector. Establish
+Read [selection scope and handoff](../select/SELECTIONS.md). Resolve the
+explicit backlog scope and task owner through `select backlog`. Establish
 a new authorized binding with `show`, retain scope, owner, generation and parent
 URL, and use `check` with that binding for continuation and before mutations.
 Missing, invalid or transferred state returns to the selection owner with existing
@@ -72,7 +74,8 @@ remaining fog. Distinguish this effort's map from incidental historical
 references. Use the specification's sources, not the independently selected
 planning map, which may belong to an unrelated effort. Require a resolved map
 and approved specification that cover this child, unless the operator explicitly waived the
-missing planning requirement for this scope. Record and honor only that
+missing planning requirement for this scope. Approval follows `to-spec`'s
+approved-specification definition. Record and honor only that
 exception. Small fixes, standalone decisions and direct implementation requests
 do not self-exempt. Missing coverage returns to Wayfinder and `to-spec` through
 the invoking owner; continue read-only discovery and preserve claims while
@@ -93,8 +96,8 @@ clearance from a failed read.
 
 Recheck the selection owner and generation, parent state, and associated design
 state before a claim, when resuming after human input or interruption, before each repository or
-tracker mutation, before delivery or issue closure, and between loop issues. Stop
-on a changed selection, transferred ownership, stale generation or closed parent;
+tracker mutation, before delivery or issue closure, and between continue-mode
+issues. Stop on a changed selection, transferred ownership, stale generation or closed parent;
 resume only within explicit user authorization. If implementation exposes a
 substantive missing decision, reopen the associated map (or standalone decision),
 record the concrete question there and link it from the implementation issue,
@@ -107,8 +110,7 @@ choices stay with the implementing agent and do not reopen a map.
 Read the entire selected issue and relevant comments, repository instructions,
 domain docs, and linked acceptance criteria. Inspect actual code before choosing
 the approach. Use the issue's required skills and delegate bounded independent
-work when authorized. Make routine implementation choices within the approved
-design; do not turn every detail into a user decision.
+work when authorized.
 
 Use a suitable branch/worktree while preserving unrelated work. For a rollup,
 start the child branch from its current verified remote rollup, following the
@@ -125,7 +127,9 @@ Report a mismatch or failed launch to the operator; never relaunch on another
 model. WRK's authority is write within owned files, so it returns changes and
 evidence uncommitted and the coordinator inspects, commits and delivers them.
 Review goes through `code-review`, and independent bug proof through `tdd`, each
-with its roster roles. Settle every `worker_done` before integrating its work.
+with its roster roles. Wait on workers with `orca orchestration check --wait`, as
+the roster shows, and settle every `worker_done` before integrating its work; a
+`worker_done` alone never completes an issue.
 
 Before validation, choose execution and observation owners using
 [Execution ownership](../pr-to-test/SKILL.md#execution-ownership). Apply the
@@ -199,12 +203,12 @@ At coherent recovery or closeout, use
 
 Before pausing after a substantial phase, a failed/blocked operation, or for user
 input, complete independent work within the issue, then use `cleanup-task-artifacts`
-with local guidance and ask ALL ready questions together in ordinary text, with
-concrete recommendations, and wait for the actual answers. Phase cleanup does not
-complete this issue or detach its checkout. Do not use timed or disappearing
-question widgets.
+with local guidance before asking. Phase cleanup does not complete this issue or
+detach its checkout. Do not use timed or disappearing question widgets.
 Do not guess dependent answers, add confirmation for settled points, or treat a partial reply as approval
-of unanswered decisions. Resume this issue after the reply.
+of unanswered decisions. Wait only on genuine prerequisites, and keep a round to
+its full ready set rather than one question by habit. Apply supplied answers and
+resume this issue; unresolved answers stay pending.
 
 After delivery, use `cleanup-task-artifacts` with local guidance before final
 reporting. Follow its resource and retention policy. Deferred safe cleanup is
@@ -225,4 +229,44 @@ aggregate delivery under the shared rollup contract before closing it. If delive
 fails after child integration, leave the parent open and report the pending gate;
 do not reopen completed children merely to represent a parent delivery failure.
 Report integrated versus test-delivered work and any blocker or retained cleanup.
-Otherwise stop after this one issue unless running under `next-issue-loop`.
+Otherwise stop after this one issue unless in continue mode.
+
+## Continue mode
+
+Continue mode changes only the stopping rule: it authorizes continuing across
+issue boundaries of the initially selected parent in the current conversation.
+Scope, claims, delivery requirements, the Design gate and approval boundaries
+stay in force, and continuation or task size never waives planning. A changed
+selection or transferred ownership stops the run; never reload a newer
+generation to defeat the stop. Resume only through the authorized selection or
+handoff owner.
+
+Start a fresh WRK worker for each issue, as **Implement and verify** describes,
+and release or retain each settled worker before claiming the next issue. After
+resolving an issue, finish its tracker bookkeeping, refresh the parent's
+children, dependencies and claims, and recheck the Design gate before selecting
+the next eligible issue. Continue without asking whether to: a finished issue is
+not a stop, and main promotion never gates the child-completion boundary. Under
+`whats-next`, return at each verified child-completion boundary (rollup
+integration or direct test delivery) for reassessment, and continue this bound
+run while its parent remains the selected action. Claim no other issue while the
+current one waits on the human.
+
+Run until the backlog outcome is complete, the user stops or changes scope, or no
+authorized progress remains; when no issue is eligible, follow that rule in **Load
+the backlog and select work**. For a tool or access failure, report the exact
+blocker and preserve unresolved work. At a pause or completion under `whats-next`,
+return the outcome or the specific pending decision or blocker; the coordinator
+can progress unrelated authorized work while this issue keeps its claim and
+unresolved decisions.
+
+When all children are complete, recheck the full outcome and Design gate, then
+finish the parent's aggregate delivery as **Recover, clean up, and resolve**
+describes. An all-closed child list does not establish test delivery; resume a
+parent awaiting it without inventing or claiming another child. Retain this
+scope's binding as the completed selection and leave Ready Backlog parents
+unactivated and unclaimed; another effort needs its own explicit selection and
+execution authorization. At a pause, keep unfinished child work claimed and open;
+after child integration, keep pending aggregate delivery on the open parent. Give
+a concise linked account of the issues delivered and the pending decision or
+stopping reason. Partial work stays incomplete when the turn ends.

@@ -72,7 +72,7 @@ and after an Orca upgrade, which can change Orca's skills and its Codex hooks.
 | `~/.claude/agents/<role>.md`, `~/.codex/agents/<role>.toml` | Native roles rendered by `roster/generate.py` from `roster/roles.toml`. |
 | `~/.codex/orca-pod-sec.config.toml` | The SEC Daybreak profile (`codex --profile orca-pod-sec`), also from the generator. |
 | `~/.codex/AGENTS.md`, `~/.claude/rules/orca-pod.md` | The global rules in [`machine/global-rules.md`](../machine/global-rules.md). |
-| `~/.codex/config.toml` | Managed blocks only (below): root `model = "gpt-6.1-sol"` and `model_reasoning_effort = "high"`, `[agents] enabled = true`, `[features] hooks = true`, and hook trust for Orca's hooks. Every other line, comment and the end of the file are preserved byte for byte. |
+| `~/.codex/config.toml` | Managed blocks only (below): root `model = "gpt-6.1-sol"`, `model_reasoning_effort = "high"` and Codex Full Access, `[agents] enabled = true`, `[features] hooks = true`, and hook trust for Orca's hooks. Every other line, comment and the end of the file are preserved byte for byte. |
 | `~/.claude/settings.json` | Top-level `model` and the nested `modelSettings.<model>.effortLevel`, both from the roster's ORC default, `skipDangerousModePermissionPrompt: true`, and `theme: "dark"` only when no theme is set. Claude Code takes a session's default effort from that model's `modelSettings` entry; it treats a top-level `effortLevel` as a legacy value and does not apply it at startup, so the installer does not own one. Other `modelSettings` entries, and other fields of the model's entry, are left alone; uninstall removes the entry, or `modelSettings`, only when the installer created it and nothing else is left in it. Orca's hooks and status line, and every other key, keep their order and values; the file keeps its indent style and final newline, though JSON spelling such as escapes may be normalized. |
 | `~/.claude.json` | First-run keys, set only when missing: `hasCompletedOnboarding: true` and `lastOnboardingVersion` (from `claude --version`). Running Claude sessions rewrite this file, so it is only written when a key is missing. |
 | Orca's skills | `orca skills install --skill orca-cli --skill orchestration --agent claude,codex`, then `orca skills update` for the same skills. Orca owns these copies. |
@@ -98,8 +98,16 @@ blocks in `~/.codex/config.toml`:
 # >>> orca-pod managed: root >>> machine/install.py rewrites this block; edit roster or rerun instead
 model = "gpt-6.1-sol"
 model_reasoning_effort = "high"
+default_permissions = ":danger-full-access"
+approval_policy = "never"
+approvals_reviewer = "auto_review"
 # <<< orca-pod managed: root <<<
 ```
+
+The last three keys give a plain `codex` launch Full Access without approval
+prompts, as Orca's `agentPermissionDefault: "full-access"` does for the agents it
+launches. A `codex --profile` file, such as the SEC profile, layers on top of
+this base config and so inherits them.
 
 The root block sits before the first table. The `agents` and `features` blocks
 go inside an existing `[agents]` or `[features]` table, or carry their own
@@ -186,8 +194,8 @@ passed as `--extra-agent-args`:
 
 | Automation | Schedule (host local time) | Role · provider · model · effort | Runs |
 | --- | --- | --- | --- |
-| `Orca Pod: daily cleanup sweep` | `30 6 * * *`, daily at 06:30 | OPS · Codex · `gpt-6.1-sol` · high (`--model gpt-6.1-sol -c model_reasoning_effort=high`) | The `cleanup-task-artifacts` daily sweep as a dry run. It reports Orca-owned leftovers and their dispositions and removes nothing; its prompt grants no removal authority. |
-| `Orca Pod: engineering brief` | `0 7 * * 1,4`, Mondays and Thursdays at 07:00 | WRK · Claude · `claude-opus-5-5` · high (`--model claude-opus-5-5 --effort high`) | The `engineering-brief` skill's scheduled edition, with the weekly watchlist review when it is due. Every draft, note, report and render output stays in the archive the skill's `history.py context` returns. It authorizes no topic workspaces, repository changes, commits, pushes, publication, tracker writes or prerequisite repairs elsewhere. Its renderer writes no bytecode or pip cache and keeps its temporary files in the archive. |
+| `Orca Pod: daily cleanup sweep` | `30 6 * * *`, daily at 06:30 | OPS · Codex · `gpt-6.1-sol` · high (`--model gpt-6.1-sol -c model_reasoning_effort=high`) | The `cleanup-task-artifacts` daily sweep. Its prompt grants exactly the skill's conservative sweep removal: `orca worktree rm --worktree id:<worktreeId>` of a worktree whose inventory disposition is `candidate`, in a repository that passed this run's discovery, whose delivery is shown by hosted evidence, idle more than 7 days with no live Orca agent or terminal attached. Everything else is report-only. Each run reports its cleanup actions and only what changed since the previous sweep, kept in `orca-pod-cleanup-sweep/` under the primary checkout's Git common directory. |
+| `Orca Pod: engineering brief` | `0 7 * * 1,4`, Mondays and Thursdays at 07:00 | WRK · Claude · `claude-opus-5-5` · high (`--model claude-opus-5-5 --effort high`) | The `engineering-brief` skill's scheduled edition, with the weekly watchlist review when it is due. Every draft, note, report, scratch file such as a quote-check download, and render output stays in the archive the skill's `history.py context` returns. It authorizes no topic workspaces, repository changes, commits, pushes, publication, tracker writes or prerequisite repairs elsewhere. Its renderer writes no bytecode or pip cache and keeps its temporary files in the archive. |
 
 The sweep is operational diagnosis on the host, which is the OPS role. The brief
 is researched writing with its own acceptance check, saved to the skill's
@@ -195,6 +203,16 @@ private archive. That makes it a bounded piece of owned output, which is the WRK
 role, and map #1 found Opus 5.5 leads document work. OPS's
 `workspace-write` sandbox is not passed, since Orca accepts only model and effort
 as extra arguments. Each run gets Orca's default Codex permission instead.
+
+The installer ends each prompt with one sentence naming the interpreter it runs
+its own helpers with (`ORCA_POD_PYTHON`, else its own), as an absolute path
+resolved at install time: the run invokes each Python helper with it and passes
+it to each shell helper as `ORCA_POD_PYTHON`. Orca gives an automation no
+environment of its own and accepts only model and effort as extra arguments, so
+the prompt carries it. A run therefore does not depend on the host's default
+`python3`, which can be older than the 3.11 the skills need. Run the installer
+with the interpreter the automations should use; after that interpreter moves,
+rerun `--apply` with the new one, which edits both prompts in place.
 
 Both run in the repository's primary checkout as an existing workspace
 (`--workspace-mode existing`, a fresh session per run). The installer resolves

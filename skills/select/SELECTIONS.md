@@ -1,8 +1,8 @@
 # Selection scope and handoff
 
 Read this contract when a workflow selects, reads, resumes, forks, moves or hands
-off a saved map or implementation backlog. The set-map package owns the shared
-resolver; set-backlog uses that installed sibling. Use their scripts, never direct
+off a saved map or implementation backlog. The select package owns the shared
+resolver and its `map|backlog` entry script. Use that script, never direct
 state-file edits. Run `--help` for exact arguments. The existing Python 3.11+
 runtime is selected with `ORCA_POD_PYTHON` when needed.
 
@@ -10,16 +10,31 @@ runtime is selected with `ORCA_POD_PYTHON` when needed.
 
 An **effort scope** is a stable identifier for independently selected work in one
 repository. It is not a branch, checkout path, issue number or permission to act.
-A **task owner** is the task's Orca worktree identity, plus its dispatch ID when
-the task runs as a worker inside an Orca Run. Derive it with the selector's
-`owner` command (add `--dispatch <dispatch-id>` from the task's own dispatch
-context); it reads `orca worktree current` and verifies the dispatch's worktree
-through `orca orchestration worker-show`. Outside Orca, record an explicit unique
-path-safe identity with this task instead. Establish both from the current task's
-explicit context; missing or conflicting context is an error. Do not discover
-ownership by enumerating scope files or inheriting a shell environment from
-another task; Orca's `ORCA_WORKTREE_ID` can name the launching coordinator's
-worktree rather than the worker's.
+A **task owner** is derived by the selector's `owner` command from the current
+worktree's identity key in `orca worktree current`, in one of three forms:
+
+- `<worktree key>:<dispatch-id>` for a worker inside an Orca Run. Pass `--dispatch
+  <dispatch-id>` from the task's own dispatch context; the command verifies the
+  dispatch's worktree through `orca orchestration worker-show`.
+- `<worktree key>:session:<session-id>` for an Orca agent session outside a Run.
+  The command reads `ORCA_AGENT_SESSION_ID` and accepts it only when `orca
+  worktree ps` lists that structured agent session under the current worktree, so
+  two coordinator threads in one checkout get distinct owners.
+- `<worktree key>` when the session is unset or Orca lists no such agent, such as
+  in a plain terminal.
+
+Its JSON reports `session` and `dispatch` beside `worktree_identity`. A session
+that Orca lists under a different worktree, an unsafe session ID or an incomplete
+Orca listing is conflicting context, and `owner` fails. Outside Orca, record an
+explicit unique path-safe identity with this task instead. Establish both scope
+and owner from the current task's explicit context; missing or conflicting context
+is an error. Derive ownership only through `owner` or that explicit context, never
+by enumerating scope files or trusting a shell environment inherited from another
+task; Orca's `ORCA_WORKTREE_ID` can name the launching coordinator's worktree
+rather than the worker's.
+A scope selected under the earlier worktree-only owner keeps that owner and stays
+valid. A task with a new session owner receives a still-live scope only through
+the approved handoff's `transfer`; nothing migrates silently.
 For a new effort, the agent may choose a unique scope and report it under existing
 selection authority. Reuse the established scope on continuation.
 
@@ -40,6 +55,17 @@ context. For an existing binding use `check --scope <scope> --owner <task>
 a continuation succeed. A confirmed absent entry is different from unreadable,
 invalid, inaccessible, foreign or transferred state. Only explicit absence in a
 known scope permits initial `select --expect-absent`.
+
+## Assess selections
+
+To learn which efforts hold selections, run `list` under either kind instead of
+reading state files. It reads local state only, without locks or tracker lookups,
+and reports every scope's map and backlog issue, owner and generation, Agent Team
+scoped records and legacy root pointers; an unreadable record appears as that
+scope's `error`. The inventory is assessment evidence, never a binding: a task
+still establishes its own scope and owner from explicit context and binds through
+`show`. Agent Team records or pointers mean legacy state awaiting import, not an
+empty repository.
 
 Before repository/tracker mutations, on resume after interruption or human input,
 and between loop tickets, check the retained binding and current tracker/design
@@ -103,7 +129,7 @@ unrelated real transfer.
    records. Use existing tracker owners to transfer included claims explicitly;
    do not reparent issues or change dependencies. Verify their readback. Leave
    source and recipient stopped if a partial failure needs investigation.
-4. Invoke `transfer` on either selector with `--scope`, `--from-owner`,
+4. Invoke `transfer` under either kind with `--scope`, `--from-owner`,
    `--to-owner`, `--kinds map|backlog|both`, each selected kind's expected
    `--map-generation` / `--backlog-generation`, `--approval-ref`, and
    `--source-stopped-ref`. The references point to the actual evidence above.
@@ -124,18 +150,25 @@ cannot cancel an already-running command; verified source quiescence is essentia
 
 ## Legacy import and rename
 
-The root pointer files in Git's common directory are historical inputs, never
-fallback selections: `orca-pod-wayfinder-map` and `orca-pod-implementation-backlog`,
-or their Agent Team-era names `codex-wayfinder-map` and
-`codex-implementation-backlog`. Import reads whichever exist and refuses
-pointers that disagree. With explicit
-migration authority, run the relevant selector's `import-legacy --scope <scope>
---owner <task> --expect-absent`. It validates that one legacy URL belongs to the
-current repository and has the required issue role; closed historical issues are
-allowed. It creates only the absent scoped entry and leaves both legacy files and
-the other scoped entry unchanged. Import each kind separately and verify each
-result. Existing destination state, malformed input or a failed lookup preserves
-all state; investigate rather than choosing a different scope silently.
+Legacy state in Git's common directory is a historical input, never a fallback
+selection. Root pointer files are `orca-pod-wayfinder-map` and
+`orca-pod-implementation-backlog`, or their Agent Team-era names
+`codex-wayfinder-map` and `codex-implementation-backlog`; import reads whichever
+exist and refuses pointers that disagree. Agent Team scoped records live in
+`codex-selection-scopes/<scope>.json` with the current record format.
+
+With explicit migration authority, run the relevant selector's `import-legacy
+--scope <scope> --owner <task> --expect-absent`, adding `--agent-team-scope
+<scope>` to import that Agent Team scope's entry. Normally keep the scope name.
+Without that option, import refuses root pointers when the same-named Agent Team
+scope holds that kind. Import validates that the legacy URL belongs to the current
+repository and has the required issue role, and that an Agent Team entry still
+resolves to its recorded issue identity; closed historical issues are allowed. It
+creates only the absent scoped entry, owned by the importing task at generation 1,
+and leaves every legacy file and the other scoped entry unchanged. The Agent Team
+owner is not carried over. Import each kind separately and verify each result.
+Existing destination state, malformed input or a failed lookup preserves all
+state; investigate rather than choosing a different scope silently.
 
 For an authorized repository rename, capture the map's immutable issue node ID
 before the rename. After updating the remote, use map `refresh` with its scope,

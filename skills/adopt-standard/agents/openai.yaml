@@ -1,0 +1,6 @@
+interface:
+  display_name: "Adopt Standard"
+  short_description: "Adopt or upgrade the Repository Standard"
+  default_prompt: "Use adopt-standard to assess this repository, select its new, existing or upgrade branch, resolve its Wayfinder plan, and complete the approved workflow."
+policy:
+  allow_implicit_invocation: false

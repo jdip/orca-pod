@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 import re
 import secrets
+import shlex
 import shutil
 import stat
 import subprocess
@@ -44,7 +45,9 @@ CLAUDE_MODEL = re.compile(r'claude-[a-z0-9]+(?:-[a-z0-9]+)*')  # A roster Claude
 ORCA_SKILLS = ('orca-cli', 'orchestration')
 ORCA_PATCH = {'branchPrefix': 'custom', 'branchPrefixCustom': 'orca', 'agentPermissionDefault': 'full-access'}
 # roles.toml has no Codex ORC entry; the Codex coordinator alternative is pinned here (jdip/orca-pod#13).
-CODEX_ROOT = {'model': 'gpt-6.1-sol', 'model_reasoning_effort': 'high'}
+# Codex runs with Full Access, as Orca launches agents (jdip/orca-pod#43); a --profile file layers on top of these.
+CODEX_ROOT = {'model': 'gpt-6.1-sol', 'model_reasoning_effort': 'high', 'default_permissions': ':danger-full-access',
+              'approval_policy': 'never', 'approvals_reviewer': 'auto_review'}
 CODEX_TABLE_KEYS = {'agents': ('enabled', True), 'features': ('hooks', True)}
 BLOCKS = ('root', 'agents', 'features', 'hooks.state')
 # Each provider's --extra-agent-args for a roster model and effort; Orca 1.4.240 and 1.4.241 accept only these options.
@@ -57,6 +60,7 @@ AUTOMATION_PREFIX = 'Orca Pod: '
 AUTOMATION_ID = re.compile(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')  # Orca's UUIDs.
 CRON = re.compile(r'[0-9*,/-]+(?: [0-9*,/-]+){4}')
 PLAIN_TOKEN = re.compile(r'[A-Za-z0-9][A-Za-z0-9._-]*')
+PROMPT_SAFE_PATH = re.compile(r'/[A-Za-z0-9._+/-]+')  # An interpreter path that is safe in a prompt.
 ORCA_MISSED_RUN_GRACE = 720  # Orca's default missed-run grace window in minutes (1.4.240 and 1.4.241).
 
 # The known sets of command hooks Orca writes to ~/.codex/hooks.json, by event. Trust follows content, not the
@@ -524,9 +528,11 @@ def merge_codex_config(text, trust, old_hook_keys):
     original = tomllib.loads(text)  # Refuse invalid TOML before touching anything.
     base, old_blocks = strip_blocks(toml_lines(text))
     stmts = statements(base)
+    # Report the original file's line numbers: each stripped block sat, with its two markers, before its base index.
+    shifts = [(index, len(inner) + 2) for index, inner in old_blocks.values()]
     managed = codex_managed(trust)
     domain = {**managed, 'hooks.state': managed['hooks.state'] + [('hooks', 'state', k) for k in old_hook_keys]}
-    moved, removed, owner, first_removed, owned_tables = [], set(), {}, {}, set()
+    moved, removed, owner, first_removed, owned_tables, moved_paths = [], set(), {}, {}, set(), {}
     for start, end, kind, path in stmts:
         if kind is None:
             continue
@@ -536,9 +542,10 @@ def merge_codex_config(text, trust, old_hook_keys):
                 if kind != 'key':
                     owned_tables.add(path)
                 if kind != 'key' or path[:-1] not in owned_tables:  # Report a whole owned table once.
-                    moved.append((start + 1, '.'.join(path)))
+                    moved.append((start + 1 + sum(n for index, n in shifts if index <= start), '.'.join(path)))
                 removed.update(range(start, end))
                 owner[start] = name
+                moved_paths.setdefault(name, []).append(path)
                 first_removed.setdefault(name, start)
                 break
     # Move blank lines between two adopted statements, such as the gaps between adopted tables, along with
@@ -555,8 +562,9 @@ def merge_codex_config(text, trust, old_hook_keys):
         if start in owner:
             adopted[owner[start]] = adopted.get(owner[start], '') + ''.join(base[start:end])
     # An adopted key's original value is restored on uninstall; it cannot also sit in a block, or the
-    # original would not have parsed.
-    previous = {m: get_path(original, m)[0] for name in adopted for m in managed[name] if get_path(original, m)[1]}
+    # original would not have parsed. A managed key already in the block was not adopted and has no original.
+    previous = {m: get_path(original, m)[0] for name in adopted for m in managed[name]
+                if get_path(original, m)[1] and any(overlaps(path, m) for path in moved_paths[name])}
     headers = {path: start for start, _, kind, path in stmts if kind == 'table'}
     inserts = {}  # base index -> [(block lines, foreign lines)]
     for name in BLOCKS:
@@ -1012,8 +1020,27 @@ def plan_claude(plan):
 
 # ---------- Orca automations ----------
 
+def automation_python():
+    """The absolute path of the install-time interpreter, which each automation run uses for its Python helpers."""
+    found = shutil.which(PYTHON)
+    real = os.path.realpath(found) if found else None  # The link target, so a later repointed link is not used.
+    if not real or not os.path.isfile(real) or not os.access(real, os.X_OK):
+        raise Refusal(f'the Python interpreter {PYTHON!r} (ORCA_POD_PYTHON, else the installer\'s own) is not an '
+                      'executable; an automation run could not use it')
+    if not PROMPT_SAFE_PATH.fullmatch(real):  # It is written into unattended prompts, so no newlines or markup.
+        raise Refusal(f'the Python interpreter path {real!r} has characters outside letters, digits and ._+-/; '
+                      'install it at a plain path or set ORCA_POD_PYTHON to one')
+    return real
+
+
 def automation_definitions():
-    """The automations in machine/automations.toml, each run by its roster role's default model and effort."""
+    """The automations in machine/automations.toml, each run by its roster role's default model and effort. Each
+    prompt ends with the install-time interpreter, so a run does not depend on the host's default python3."""
+    path = automation_python()
+    python = shlex.quote(path)
+    python_line = (f'Run this run\'s Python helpers with ORCA_POD_PYTHON={python}, the interpreter the installer '
+                   f'resolved: invoke each `.py` script as `{python} <script>` and give each shell script the same '
+                   f'setting, as `ORCA_POD_PYTHON={python} <script>`.')
     table = tomllib.loads(AUTOMATIONS.read_text(encoding='utf-8'))
     if set(table) - {'automation'} or not isinstance(table.get('automation', []), list):
         raise Refusal('machine/automations.toml must hold only [[automation]] tables')
@@ -1032,8 +1059,8 @@ def automation_definitions():
         if model['provider'] not in AGENT_ARGS or not all(PLAIN_TOKEN.fullmatch(model[k]) for k in ('model', 'effort')):
             raise Refusal(f'roles.toml: the {entry["role"]} default model cannot run an Orca automation')
         definitions.append({'name': name, 'role': entry['role'], 'trigger': entry['trigger'],
-                            'prompt': entry['prompt'].strip(), 'provider': model['provider'],
-                            'extra_args': AGENT_ARGS[model['provider']].format(**model)})
+                            'prompt': f'{entry["prompt"].strip()} {python_line}', 'provider': model['provider'],
+                            'extra_args': AGENT_ARGS[model['provider']].format(**model), 'python': path})
     return definitions
 
 
@@ -1353,7 +1380,8 @@ def print_automations(plan):
         if definition and op['action'] != 'unchanged':
             workspace = definition.get('workspace_path', 'the primary checkout (not resolved on this run)')
             print(f'      {definition["provider"]} {definition["extra_args"]} (roster {definition["role"]}); '
-                  f'cron "{definition["trigger"]}"; workspace {workspace} (existing); fresh session per run')
+                  f'cron "{definition["trigger"]}"; workspace {workspace} (existing); fresh session per run; '
+                  f'Python helpers {definition["python"]}')
         if op.get('changes'):
             print(f'      changes: {", ".join(op["changes"])}')
 

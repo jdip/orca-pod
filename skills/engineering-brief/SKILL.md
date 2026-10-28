@@ -90,8 +90,10 @@ An unfinished review remains due; preserve its draft and disclose the limit.
 ## Check, save, and present
 
 Before archiving, verify each substantive source's exact URL, authorship, date, and
-support for the claim. Apply the brief format's editorial acceptance check as well
-as citation checks. A valid file or resolved URL does not establish a useful brief.
+support for the claim, keeping any downloaded copies in the run's own scratch
+directory from `history.py work` ([history](references/history.md)). Apply the brief format's editorial
+acceptance check as well as citation checks. A valid file or resolved URL does not
+establish a useful brief.
 
 Save only the finished, checked edition through the history helper. Follow
 [HTML presentation](references/presentation.md) to rebuild the local blog archive

@@ -42,16 +42,32 @@ From the repository root run:
 scripts/pr-to-test.sh --title 'Concrete change' --body-file /path/to/pr-body.md --semver "${contribution:?Set contribution from the actual change}"
 ```
 
-The script pushes the current named task branch, creates or reuses its open PR to
-test, applies the chosen advisory semver label, waits up to fifteen minutes for
-checks and GitHub merge readiness within one shared fifteen-minute limit, and
-merges the exact intended head with a merge commit. Passing older checks alone
-do not establish readiness while new PR checks register. Draft/review requirements,
-conflicts, branch drift, and failed checks return for investigation; no merge retry
-or protection bypass is performed. GitHub's protected
-branch gate remains authoritative; the required validate job runs the actual
-source checks or proves equivalent prior integration evidence. Missing/failed gates
-or head drift stop the script.
+The script catches the current named task branch up with test, pushes it, creates
+or reuses its open PR to test, applies the chosen advisory semver label, waits up
+to fifteen minutes for checks and GitHub merge readiness within one shared
+fifteen-minute limit, and merges the exact intended head with a merge commit.
+Passing older checks alone do not establish readiness while new PR checks register.
+Draft/review requirements, unexpected readiness, head drift and failed checks
+return for investigation. GitHub's protected branch gate remains authoritative;
+the required validate job runs the actual source checks or proves equivalent prior
+integration evidence. Missing/failed gates stop the script.
+
+Protection on test requires the branch to be up to date and allows no bypass.
+A **catch-up** merges fetched `origin/test` into the task branch with a merge
+commit under the repository-local no-reply identity, then reruns the privacy gate
+on the result. The script catches up before the first push when the branch lacks
+`origin/test`, and whenever test moves during the wait: a changed PR base or
+BEHIND readiness triggers a catch-up, a re-push and a fresh fifteen-minute wait.
+A run allows at most 3 catch-ups in total, counting a merging pre-push catch-up
+and every drift signal during the wait; the cap or a timeout stops the script, with
+each catch-up listed among its confirmed effects. After any push the wait tolerates
+the replaced head until GitHub shows the new one. Re-run once test
+settles. A catch-up is neither a merge retry nor a protection bypass. A clean
+catch-up needs no new review, because Validate reruns on the new integration.
+A conflict at any catch-up aborts the merge, verifies the branch is unchanged with
+a clean tree and stops: resolve it with `resolving-merge-conflicts`, have the
+resolution reviewed, then re-run the script. Promotion and main-to-test
+synchronization still stop when behind or when their base moves.
 
 The passing Validate run identifies the integration revision it tested. After
 merge the script fetches origin and verifies that the merge commit has that
@@ -189,9 +205,9 @@ evidence on the child before explicitly closing it. Do not rely on issue auto-cl
 keywords for a PR into a non-default branch. Keep the parent open for final delivery.
 The PR body links the parent without an auto-close instruction.
 
-For final delivery, fetch the rollup and test, merge any newer test changes into the
-rollup, and review the resulting combined diff. Use the canonical path above with one
-semver classification for the whole result; its PR to test runs full Validate. Promotion already counts only
+For final delivery, review the complete rollup-to-test diff and use the canonical
+path above with one semver classification for the whole result. It catches the
+rollup up with test like any task branch, and its PR to test runs full Validate. Promotion already counts only
 first-parent test PR merges, so child integration PRs are excluded without a new
 version ledger. On a failure inspect actual refs, PR state and merge effects before
 resuming; never blindly replay a merge or bypass branch protection.

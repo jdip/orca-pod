@@ -49,19 +49,18 @@ writes and Git integration, and dispatches workers through the
 
 A repository first adopts the [Repository Standard](standard/README.md): `test`
 and `main` branches, a short root `AGENTS.md`, tracker and domain guidance,
-development guidance and the canonical delivery scripts. Invoke the workflow that
-fits by name, for example `/brownfield-adoption` in Claude Code or
-`$brownfield-adoption` in Codex:
+development guidance and the canonical delivery scripts. Invoke `adopt-standard`
+by name, `/adopt-standard` in Claude Code or `$adopt-standard` in Codex. It takes
+the branch that fits the target:
 
-- `greenfield-init` for a new repository with no product behavior yet;
-- `brownfield-adoption` for an existing repository;
-- `standards-upgrade` for a repository that already records a Repository Standard
-  revision.
+- `new` for a new repository with no product behavior yet;
+- `existing` for an existing repository;
+- `upgrade` for a repository that already records a Repository Standard revision.
 
 When the target carries obsolete or conflicting process guidance, run
 `prepare-repository` from this checkout first; it leaves a local preparation
-branch for the adoption to continue from. Each workflow assesses the target, plans
-with you, then delivers on an `orca/` branch through `pr-to-test`. That adoption
+branch for the adoption to continue from. `adopt-standard` assesses the target,
+plans with you, then delivers on an `orca/` branch through `pr-to-test`. That adoption
 PR is the repository's first delivered change.
 
 ## Everyday workflow: whats-next
@@ -140,7 +139,7 @@ Every skill is installed for both Claude and Codex.
 
 | Area | Skills |
 | --- | --- |
-| Repository setup | `prepare-repository`, `greenfield-init` ‡, `brownfield-adoption` ‡, `standards-upgrade` ‡, `repository-verification` (optional verification instructions), `define-project-goal` (agree the README purpose) |
+| Repository setup | `prepare-repository`, `adopt-standard` ‡, `repository-verification` (optional verification instructions), `define-project-goal` (agree the README purpose) |
 | Choosing and planning | `whats-next`, `wayfinder`, `grilling`, `set-map`, `next-waypoint`, `research`, `prototype`, `to-spec`, `to-tickets`, `wait-what` † (re-explain the last answer) |
 | Implementing and delivering | `triage`, `set-backlog`, `next-issue`, `next-issue-loop`, `tdd`, `diagnosing-bugs`, `resolving-merge-conflicts`, `code-review`, `pr-to-test` ‡, `promote-to-main` ‡, `cleanup-task-artifacts` ‡ |
 | Delegation | `roster` (role, model and effort for each delegated task); Orca's own `orchestration` and `orca-cli` |

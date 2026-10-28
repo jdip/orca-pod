@@ -1,14 +1,15 @@
 ---
 name: prepare-repository
-description: Prepare target guidance for Greenfield Initialization, Brownfield Adoption, or Standards Upgrade by retiring obsolete process and resolving conflicts with the approved Orca Pod baseline.
+description: Prepare target guidance for Greenfield Initialization, Brownfield Adoption, or Standards Upgrade through adopt-standard by retiring obsolete process and resolving conflicts with the approved Orca Pod baseline.
 ---
 
 # Prepare Repository
 
 Use this skill from Orca Pod against an explicit target repository and named
-workflow: Greenfield Initialization, Brownfield Adoption, or Standards Upgrade.
-It assesses the target, plans with Wayfinder, then retires obsolete process guidance
-and resolves conflicts on a committed local preparation branch for the later work.
+`adopt-standard` branch: `new` (Greenfield Initialization), `existing` (Brownfield
+Adoption) or `upgrade` (Standards Upgrade). It assesses the target, plans with
+Wayfinder, then retires obsolete process guidance and resolves conflicts on a
+committed local preparation branch for the later work.
 
 ## Establish the preparation boundary
 
@@ -147,6 +148,5 @@ the filing failure. The issue supplies context for later work within the user's
 authorization.
 
 Return the verified handoff to the target child's executor for resolution.
-Preparation ends at the local branch handoff. Continue with Greenfield
-Initialization, Brownfield Adoption, or Standards Upgrade from that branch only
-under separate authorization.
+Preparation ends at the local branch handoff. Continue with `adopt-standard` from
+that branch only under separate authorization.

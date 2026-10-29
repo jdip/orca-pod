@@ -25,10 +25,14 @@ worktree's identity key in `orca worktree current`, in one of three forms:
 
 Its JSON reports `session` and `dispatch` beside `worktree_identity`. A session
 that Orca lists under a different worktree, an unsafe session ID or an incomplete
-Orca listing is conflicting context, and `owner` fails. Outside Orca, record an
-explicit unique path-safe identity with this task instead. Establish both scope
-and owner from the current task's explicit context; missing or conflicting context
-is an error. Derive ownership only through `owner` or that explicit context, never
+Orca listing is conflicting context, and `owner` fails. For the
+**cross-repository owner**, a coordinator working another repository runs `owner`
+in its own checkout, where Orca lists its session, and passes that owner with
+`--owner` to the target repository's commands. Selection state is per repository,
+so one owner string is valid in each. Outside Orca, record an explicit unique
+path-safe identity with this task instead. Establish both scope and owner from
+the current task's explicit context; missing or conflicting context is an error.
+Derive ownership only through `owner` or that explicit context, never
 by enumerating scope files or trusting a shell environment inherited from another
 task; Orca's `ORCA_WORKTREE_ID` can name the launching coordinator's worktree
 rather than the worker's.

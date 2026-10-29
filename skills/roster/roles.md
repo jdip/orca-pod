@@ -129,8 +129,8 @@ Return concise evidence and unresolved decisions to the coordinator.
 
 Reproduce behavior and verify changes with relevant checks and evidence.
 
-- Model: Codex · `gpt-6.1-sol` · medium, sandbox `workspace-write`
-- Alternate: Codex · `gpt-6.1-terra` · medium, when routine verification trial; record the outcome on #88
+- Model: Codex · `gpt-6.1-terra` · medium, sandbox `workspace-write`
+- Alternate: Codex · `gpt-6.1-sol` · medium, when complex evidence-heavy verification
 - Layer: orca; authority: read-only
 
 ```text
@@ -159,7 +159,7 @@ Return concise evidence and unresolved decisions to the coordinator.
 
 Verify rendered interfaces, interactions, accessibility, responsive layouts, and exported artifacts.
 
-- Model: Codex · `gpt-6.1-terra` · medium, sandbox `workspace-write`
+- Model: Codex · `gpt-6.1-sol` · medium, sandbox `workspace-write`
 - Layer: orca; authority: read-only
 
 ```text

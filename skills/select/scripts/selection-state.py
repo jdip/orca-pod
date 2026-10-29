@@ -360,7 +360,10 @@ def verified_session(worktree_id: str, instance_id: Any) -> str | None:
     if not holders:
         return None
     if holders != {(worktree_id, instance_id)}:
-        fail(f"Orca lists agent session '{session_id}' under a different worktree")
+        fail(
+            f"Orca lists agent session '{session_id}' under a different worktree; to coordinate another "
+            "repository, derive your owner in your own checkout and pass it with --owner"
+        )
     return session_id
 
 

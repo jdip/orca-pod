@@ -19,8 +19,10 @@ Resolve scripts relative to this skill directory. `scripts/select.sh <kind>` pas
 Derive the owner with `scripts/select.sh <kind> owner [--dispatch <dispatch-id>]`:
 this task's Orca worktree identity plus its dispatch ID inside a Run, or its
 Orca-verified agent session outside one, so two threads in one checkout get
-distinct owners. The shared contract owns the owner forms and verification. A missing
-script or resolver is a concrete failure, never a reason to write state manually.
+distinct owners. The shared contract owns the owner forms and verification,
+including the cross-repository owner for a coordinator working another repository.
+A missing script or resolver is a concrete failure, never a reason to write state
+manually.
 
 For a new selection run `scripts/select.sh <kind> select --scope <scope> --owner
 <task> --expect-absent <issue-url>`. For an authorized change use the retained

@@ -108,8 +108,9 @@ promotion, host installation and background scheduling are separate requests.
 ## How work flows
 
 - **Plan before implementing.** Every change, documentation included, needs a
-  resolved map and an approved spec unless you explicitly waive planning for a
-  stated scope. Small work keeps both brief. `wayfinder` charts the map (a
+  resolved map and an approved spec, a fresh fast-lane confirmation of an
+  eligible fix, or your explicit planning waiver for a stated scope. Small work
+  keeps the map and spec brief. `wayfinder` charts the map (a
   `wayfinder:map` issue); `to-spec` drafts the spec parent and its executable
   children; `to-tickets` publishes them as an `implementation:backlog` parent
   with native sub-issues and dependencies.

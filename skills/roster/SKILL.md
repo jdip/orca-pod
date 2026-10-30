@@ -298,7 +298,8 @@ relaxes "no commit, push or merge unless assigned". Never Daybreak Red.
 ## SEC launch
 
 `worker-start` cannot pass Daybreak, so SEC adopts a terminal started with the
-`orca-pod-sec` Codex profile (`gpt-5.6-sol`, xhigh, `daybreak = true`):
+`orca-pod-sec` Codex profile (`gpt-5.6-sol`, xhigh, `daybreak = true`,
+`check_for_update_on_startup = false`):
 
 ```bash
 orca terminal create --worktree <sel> --title "🛡️ SEC <purpose>" \
@@ -312,6 +313,9 @@ orca orchestration worker-start --terminal <handle> --worktree <sel> \
   worktree. For SEC-PROOF and SEC-WRK, first create SEC's own child worktree
   with `orca worktree create --name <short-name> --base-branch <branch>
   --parent-worktree current --json` and select it exactly.
+- If `tui-idle` still reports `blockedReason: agent-update-prompt`, Codex is
+  showing its update menu. Dismiss it with Escape, never Enter, which runs the
+  update, then wait again. Never update Codex from a SEC launch.
 - Do not pass `--agent`, `--model` or `--effort` with `--terminal`. The
   receipt's `launch` fields are null for adopted terminals, so the receipt
   proves nothing about the model.

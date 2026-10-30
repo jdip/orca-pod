@@ -43,9 +43,9 @@ report the missing dependency.
    Grilling and other human-dependent tickets require the human's actual
    participation; never supply their answers yourself.
 3. For a human decision, follow Wayfinder's **Human-decision completion** rule,
-   invoking `grilling` for the actual dialogue. Keep the ticket claimed and
-   unresolved while waiting; do not claim another ticket to bypass that
-   dependency.
+   running `brainstorm`'s dialogue-only entry for the actual dialogue. Keep the
+   ticket claimed and unresolved while waiting; do not claim another ticket to
+   bypass that dependency.
 4. When the ticket is resolved, finish **all** Wayfinder bookkeeping: record the
    resolution, satisfy Wayfinder's implementation handoff, close the ticket,
    append the map's context pointer, and create or update newly surfaced tickets
@@ -73,12 +73,12 @@ escalated for churn or its round cap, a panel finding returned to the map, or
 changed scope. Otherwise continue until the map is complete, the user stops the
 run, or no actionable frontier remains.
 
-For a map with direction confirmed through Wayfinder's entry and no decision
-children, complete Wayfinder's implementation handoff and resolution directly;
+For a map with direction confirmed through the `brainstorm` confirmation and no
+decision children, complete Wayfinder's implementation handoff and resolution directly;
 do not create work just to populate the frontier. Once every decision is
 settled, carry `whats-next` or an existing implementation request through
 `to-spec`'s review against the map, publication and the backlog owners under the
-Chart-the-map confirmation. A planning-only request ends at the approved,
+`brainstorm` confirmation. A planning-only request ends at the approved,
 published spec.
 
 An empty frontier is not necessarily a complete map: distinguish completion

@@ -77,10 +77,12 @@ calls them:
 2. **Choose.** Approved work continues. When paths compete or approval is
    missing, it offers options with rough effort and a recommendation; reply with
    your choice and the scope you authorize.
-3. **Plan.** New work starts with a `wayfinder` grilling dialogue; confirm the
-   shared understanding before it records a map. For a full map or a new
-   mechanism, a reviewer on the other provider first checks the draft, and its
-   findings come to you as questions before you confirm. That confirmation is
+3. **Plan.** New work starts with a `brainstorm` dialogue: rounds of numbered
+   questions, each with a recommendation. For a full map or a new mechanism, a
+   panel of isolated reviewers on the other provider checks the drafted map
+   first; its judgment findings come to you as questions, and you see its
+   fresh-reader paraphrase before you confirm the shared understanding and
+   `wayfinder` records the map. That confirmation is
    your one planning approval: a panel of isolated reviewers on the other
    provider then checks the spec and its tickets against the map until two
    rounds in a row come back clean, and you get a short report with the spec
@@ -143,7 +145,7 @@ Every skill is installed for both Claude and Codex.
 | Area | Skills |
 | --- | --- |
 | Repository setup | `prepare-repository`, `adopt-standard` ‡, `repository-verification` (optional verification instructions), `define-project-goal` (agree the README purpose) |
-| Choosing and planning | `whats-next`, `wayfinder`, `grilling`, `select map`, `next-waypoint`, `research`, `prototype`, `to-spec`, `to-tickets`, `wait-what` † (re-explain the last answer) |
+| Choosing and planning | `whats-next`, `brainstorm`, `wayfinder`, `select map`, `next-waypoint`, `research`, `prototype`, `to-spec`, `to-tickets`, `wait-what` † (re-explain the last answer) |
 | Implementing and delivering | `triage`, `select backlog`, `next-issue`, `tdd`, `diagnosing-bugs`, `resolving-merge-conflicts`, `code-review`, `pr-to-test` ‡, `promote-to-main` ‡, `cleanup-task-artifacts` ‡ |
 | Delegation | `roster` (role, model and effort for each delegated task); Orca's own `orchestration` and `orca-cli` |
 | Maintenance | `codebase-hygiene`, `dependency-review`, `dependabot-upkeep`, `code-simplification`, `reflect` (turn a lesson into an issue), `audit-agent-instructions` |

@@ -96,9 +96,9 @@ planning and verification using [reflect's follow-through](../skills/reflect/SKI
 Keep the mechanism at its existing target type, lint, schema, test, runtime or data
 boundary, under that target's covering plan and authority.
 
-Conduct or resume Wayfinder with that evidence, following its grilling entry
-before charting new work, to resolve how this target should reach the workflow's
-goals. The target owns the map and specification, including
+Conduct or resume Wayfinder with that evidence, starting new work through
+`brainstorm`'s full entry before charting, to resolve how this target should
+reach the workflow's goals. The target owns the map and specification, including
 when preparation is driven from Orca Pod. Reuse covering plans and settled
 decisions; one plan may cover preparation and subsequent adoption/upgrade while
 preserving each phase's authorization and completion boundary. If the target

@@ -88,7 +88,11 @@ calls them:
    rounds in a row come back clean, and you get a short report with the spec
    link. You are asked again only when the panel churns or reaches five rounds,
    a finding changes a map decision, or the scope changes. If you waive
-   the map, you approve the spec and tickets directly instead.
+   the map, you approve the spec and tickets directly instead. A small fix to
+   an existing mechanism can take the fast lane: you say yes to one tracking
+   issue, it skips the map, spec and panels, and it keeps the real checks,
+   review on the other provider and normal delivery. A real decision moves it
+   to the full flow.
 4. **Run.** Approved tickets are claimed, implemented in their own Orca
    worktrees, reviewed on the other provider and delivered. Your approval carries
    across these handoffs; you don't repeat it per ticket.
@@ -104,8 +108,9 @@ promotion, host installation and background scheduling are separate requests.
 ## How work flows
 
 - **Plan before implementing.** Every change, documentation included, needs a
-  resolved map and an approved spec unless you explicitly waive planning for a
-  stated scope. Small work keeps both brief. `wayfinder` charts the map (a
+  resolved map and an approved spec, a fresh fast-lane confirmation of an
+  eligible fix, or your explicit planning waiver for a stated scope. Small work
+  keeps the map and spec brief. `wayfinder` charts the map (a
   `wayfinder:map` issue); `to-spec` drafts the spec parent and its executable
   children; `to-tickets` publishes them as an `implementation:backlog` parent
   with native sub-issues and dependencies.

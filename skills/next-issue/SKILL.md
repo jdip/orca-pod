@@ -1,11 +1,12 @@
 ---
 name: next-issue
-description: Claim and implement one eligible issue from this repository's saved implementation backlog, through verified delivery and safe cleanup. Continue mode works successive issues of the bound parent when asked to work through the backlog.
+description: Claim and implement one eligible issue from this repository's saved implementation backlog, or a confirmed fast-lane issue, through verified delivery and safe cleanup. Continue mode works successive issues of the bound parent when asked to work through the backlog.
 ---
 
 # Next Issue
 
-Use this for a request to implement the next backlog issue. Discussing or
+Use this for a request to implement the next backlog issue, or a confirmed
+fast-lane issue through [Fast lane](#fast-lane). Discussing or
 creating this skill does not authorize executing the backlog. Work one issue per
 invocation by default. A request to work through the backlog or parent, or a
 `whats-next` handoff that supplies it, runs [Continue mode](#continue-mode).
@@ -65,7 +66,35 @@ a continuation. If all children are integrated but the rollup is not delivered, 
 parent's final delivery under the approved execution authority; this is remaining
 work, not an empty backlog. Close the parent only after its full outcome is verified.
 
+## Fast lane
+
+A **fast-lane issue** is one standalone tracking issue whose body holds
+`## Problem`, `## Outcome`, `## Acceptance` and the line `**Lane:** fast`, for
+work eligible under the global fast-lane rule. After the owner says yes to that
+issue, the coordinator posts a comment starting `Fast-lane confirmation` that
+quotes the yes. The confirmation is **fresh** when the body's GraphQL
+`lastEditedAt`, or its `createdAt` when never edited, is strictly earlier than
+the comment's `createdAt`; an equal or unclear order is not fresh, so ask the
+owner again.
+
+Run it as a single issue with no parent and no `select backlog` change, in place
+of **Load the backlog and select work** and continue mode: claim it with that
+section's assignee and claim comment, apply the Design gate, then **Implement
+and verify**, **Deliver** in direct mode, and resolve and close it under
+**Recover, clean up, and resolve**. Clear up a detail with `brainstorm`'s
+dialogue-only entry; any body edit needs a fresh confirmation.
+
+When a real decision appears, stop edits and record it in the issue body, which
+leaves the confirmation stale. Keep the issue claimed and open and hand it to
+`brainstorm`'s full entry as the origin of that planning.
+
 ## Design gate
+
+A fast-lane issue passes only with a fresh confirmation, a body still in the
+fast-lane shape and an outcome still eligible; the map and specification
+requirements below do not apply to it. Otherwise it fails: return it to the
+owner for a fresh confirmation, or to `brainstorm`'s full entry when it is no
+longer eligible. Recheck it at the points listed below.
 
 Identify the associated Wayfinder map from the specification's approved design
 links and the originating decision's parent relationship. Read that map's body,
@@ -76,8 +105,9 @@ planning map, which may belong to an unrelated effort. Require a resolved map
 and approved specification that cover this child, unless the operator explicitly waived the
 missing planning requirement for this scope. Approval follows `to-spec`'s
 approved-specification definition. Record and honor only that
-exception. Small fixes, standalone decisions and direct implementation requests
-do not self-exempt. Missing coverage returns to Wayfinder and `to-spec` through
+exception. Eligible small fixes take the [fast lane](#fast-lane) on the owner's
+confirmation; size, standalone decisions and direct implementation requests do
+not self-exempt. Missing coverage returns to Wayfinder and `to-spec` through
 the invoking owner; continue read-only discovery and preserve claims while
 planning is unresolved.
 

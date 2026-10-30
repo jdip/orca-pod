@@ -71,7 +71,9 @@ Apply the global Planning before implementation rule to every implementation
 candidate, including an existing PR and direct maintenance or alignment work.
 Before reusing any map or approved spec, apply Wayfinder's **Map-entry evidence**
 rule. Reuse a resolved map and approved spec covering the actual change. If coverage
-is missing, begin or resume Wayfinder from the inspected target and desired
+is missing and the change is eligible for the global fast lane, propose it on one
+tracking issue and, on the owner's yes, run `next-issue`'s **Fast lane**.
+Otherwise begin or resume Wayfinder from the inspected target and desired
 outcome. Hand control to `brainstorm`'s full entry and stay in its dialogue
 until the `brainstorm` confirmation; Wayfinder's **Chart the map** then records
 the map. A concrete destination is the result of that dialogue, not an
@@ -109,6 +111,7 @@ combined proposal and carry it forward across ordinary skill boundaries.
 | Approved Active Backlog | Use `next-issue` in continue mode, supplying the eligible selection when completion-first ranking changes ordinary order. Preserve the associated map's Design gate and existing claim/delivery rules. |
 | Prepared inactive backlog | Use `triage` for necessary intake/admission and `select backlog` for approved selection. Present only missing admission, activation, and execution approvals together, then start `next-issue` in continue mode to the extent approved. |
 | Selected Wayfinder map | Use `next-waypoint` continue mode; research facts and present human decisions. A different map needs an approved select-and-start proposal through `select map`. |
+| Fast-lane-eligible fix or confirmed fast-lane issue | Propose the lane on one tracking issue unless it is already confirmed; after the owner's yes, use `next-issue`'s **Fast lane**. Its single confirmation carries through direct delivery. |
 | New planning destination | Hand off to `brainstorm`'s full entry, through its map panel and confirmation, before Wayfinder's **Chart the map** creates the map; then use `select map` and `next-waypoint` continue mode under existing authority. Preserve its required human questions and confirmation. |
 | Entire map resolved | Use `to-spec` to draft the parent and complete ticket breakdown automatically and run its review against the map. Once the parent is an approved specification under `to-spec`, normally through a converged spec panel, use `to-tickets`, send the spec-link report and continue through admission, activation and execution under `to-spec`'s handoff. Reuse the effort's implementation follow-up. |
 | Alert-protection gaps, actionable dependency alerts or existing remediation | Follow [dependency upkeep](maintenance.md#dependency-upkeep), then hand the selected repository-owned remediation or protection scope and existing approval to `dependabot-upkeep`. Return after the coherent step. |

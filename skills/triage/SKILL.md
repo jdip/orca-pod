@@ -52,8 +52,9 @@ preserving claims. Surface external blockers rather than absorbing them into an
 unrelated parent.
 
 Apply the global Planning before implementation rule. Reuse a resolved map and
-approved specification only when they cover the candidate. Otherwise begin or
-resume Wayfinder, then use `to-spec` and `to-tickets` for a proportionate parent
+approved specification only when they cover the candidate. Propose the fast
+lane for an eligible candidate on its tracking issue. Otherwise begin or resume
+Wayfinder, then use `to-spec` and `to-tickets` for a proportionate parent
 and executable-child batch. Substantive unresolved design pauses associated
 execution; ordinary refinement within approved coverage does not reopen the map.
 

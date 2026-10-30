@@ -20,10 +20,11 @@ acting; do not invent a competing release process or copy Orca Pod's own runtime
 assumptions into another repository.
 
 For implementation changes, confirm covering resolved map/spec evidence under
-the global Planning before implementation rule, or the operator's explicit scoped
-exception. Pure planning records and research artifacts may be delivered under
-that rule's planning-work boundary while a map remains open; this does not admit
-implementation changes alongside them. A pre-existing
+the global Planning before implementation rule, a fresh confirmation of a
+still-eligible issue under `next-issue`'s **Fast lane**, or the operator's
+explicit scoped exception. Pure planning records and research artifacts may be
+delivered under that rule's planning-work boundary while a map remains open;
+this does not admit implementation changes alongside them. A pre-existing
 PR or delivery request does not waive it; return missing coverage to Wayfinder
 through the originating owner. Reuse coverage without restarting settled design.
 

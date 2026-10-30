@@ -18,7 +18,8 @@ skill owns the planning dialogue, the map panel and the single confirmation;
   reopened the map.
 - **Dialogue-only entry:** a human decision inside an already-confirmed scope:
   a waypoint decision such as a `wayfinder:grilling` ticket,
-  `define-project-goal`, or an `improve-codebase-architecture` candidate. Run
+  `define-project-goal`, an `improve-codebase-architecture` candidate, or
+  clearing up a fast-lane issue. Run
   **Ground** and **Rounds** only. The rounds end when no human decision within
   that scope remains; the caller owns completion and its record. There is no
   panel and no extra confirmation.

@@ -1907,7 +1907,8 @@ def main():
     try:
         source = source_state(args.allow_unpublished)
     except Refusal as error:
-        raise SystemExit(f'install.py: {error}')
+        print(f'install.py: REFUSED: {error}')
+        return 2
     plan = build_plan(home, old, args)
     print_plan(plan, args, source)
     if plan.refusals:

@@ -11,8 +11,8 @@ Copyright (c) 2026 Matt Pocock. This adaptation is licensed under the included [
 Turn resolved Wayfinder design into the draft for one implementation
 specification parent and its executable ticket breakdown. The parent is also the
 implementation backlog; do not create a parallel planning or queue issue.
-`to-tickets` publishes the parent as the review subject, and the children after
-the draft passes independent review against the map.
+`to-tickets` publishes the parent as the review subject, and the children once
+the draft is an approved specification, normally through a converged spec panel.
 
 When resolving or changing a saved selection, read
 [selection scope and handoff](../select/SELECTIONS.md). Carry the explicit
@@ -102,83 +102,71 @@ a concrete blast radius requires both forms to coexist temporarily.
 ## Review the draft against the map
 
 With a map, the Chart-the-map confirmation is the only human planning gate. An
-independent review of the parent and full breakdown against the map replaces
-human spec and ticket approval.
+isolated spec panel reviewing the parent and full breakdown against the map
+replaces human spec and ticket approval.
 
 Under a recorded, scoped map waiver there is no map to review against: present
 the parent and its full breakdown to the operator in one ordinary-text batch and
 wait for their approval, which `to-tickets` records on the parent. That waiver
-covers the map alone; every other gate still applies. Otherwise run this loop:
+covers the map alone; every other gate still applies. Otherwise run the spec
+panel under the [panel rules](review-lenses/panel.md):
 
 1. **Publish the review subject.** Through `to-tickets`, publish or update the
    parent body, without children, as the map's implementation follow-up. The map
    stays open.
-2. **Dispatch a fresh reviewer.** Per `roster`, dispatch REV on the other provider
-   from the drafter (PLN, or the primary for a compact record), as a new dispatch
-   each iteration. The brief carries:
-   - the map URL with its Destination, Decisions so far and Out of scope text;
-   - the parent URL with its current body;
-   - the child breakdown: each ticket's outcome, acceptance criteria, source
-     links and blockers; and
-   - every earlier iteration's findings with their dispositions.
+2. **Run a round.** Freeze the parent body with its `lastEditedAt` (or
+   `createdAt`) and the child breakdown: each ticket's outcome, acceptance
+   criteria, source links and blockers. Start the round per `roster`'s **Review
+   panel**, on the provider opposite the drafter (PLN, or the primary for a
+   compact record): five personas in `SPEC REVIEW` mode, each in its own fresh
+   session:
+   - [fidelity and grounding](review-lenses/fidelity_and_grounding.md);
+   - [zoom out](review-lenses/zoom_out.md) with its adapted
+     [standard](review-lenses/zoom-out-standard.md);
+   - [design critic](review-lenses/design_critic.md);
+   - [implementation readiness](review-lenses/implementation_readiness.md); and
+   - [comprehension](review-lenses/comprehension.md).
 
-   Leave out the drafter's reasoning; the reviewer works from the brief and the
-   repository.
-3. **Review against the checklist.** The reviewer reports each finding with
-   evidence, checking:
-   - scope fidelity: every map decision is reflected and none is contradicted;
-   - acceptance criteria and the completion boundary against the map;
-   - ticket granularity: each child is an independently verifiable outcome;
-   - dependency edges: only real blockers;
-   - the `Delivery` mode and, for `rollup`, its named branch;
-   - source links to the map and material decisions; and
-   - the `SPEC REVIEW` mode instructions of all four review lenses:
-     [zoom out](review-lenses/zoom_out.md) with its adapted
-     [standard](review-lenses/zoom-out-standard.md),
-     [design critic](review-lenses/design_critic.md),
-     [implementation readiness](review-lenses/implementation_readiness.md) and
-     [comprehension](review-lenses/comprehension.md).
-4. **Classify and dispose.** The reviewer flags each finding major or minor and the
-   primary confirms; a lens severity informs but does not replace that
-   classification. A finding is **major** when it shows a missing or
-   contradicted map decision, a scope expansion or reduction, or a new decision the
-   map does not record. A substantive design choice left open for the implementer
-   is major; a routine choice within the approved scope is not a finding. A reuse
-   that would change a map decision is major; other reuse findings are minor.
-   A disagreement over major versus minor makes the finding major. Return a
-   major finding to the map under Wayfinder's Implementation handoff; the spec
-   never absorbs it. Once the map settles that decision,
-   redraft and start a fresh loop of up to 3 iterations. Fix each minor finding
-   or reject it with a recorded rationale, then run the next iteration; its
-   reviewer receives that disposition.
-5. **Record the iteration.** Post one comment on the parent per iteration,
-   sanitized under the target's publication policy: `Spec review <n>/3`, the
-   reviewer role and its receipt-verified model and effort, each finding with its
-   classification and disposition, and the result: `pass`, `revise`,
-   `returned to map` or `escalated`.
+   Each brief carries the map URL with its Destination, Decisions so far and Out
+   of scope text, and the frozen parent and breakdown. The settled list and
+   earlier findings stay with the coordinator.
+3. **Synthesize and dispose** under the panel rules. A substantive design choice
+   left open for the implementer, or a reuse that would change a map decision, has
+   `map` impact; a routine choice within the approved scope is not a finding.
+   Return a `map` finding to the map under Wayfinder's Implementation handoff;
+   the spec never absorbs it. Once the map settles that decision, redraft and
+   start a fresh loop of up to 5 rounds.
+4. **Record the round.** Post one `Spec panel <n>` comment on the parent per
+   round, in the panel record format.
 
-An iteration passes when the reviewer reports no actionable findings for the
-current parent body and breakdown. Run at most 3 iterations per loop. Escalate
-findings that remain after the 3rd to the human in ordinary text, with the parent
-link and iteration comments, and record the human's decision on the parent.
+Repeat until the loop converges. Escalate churn, or reaching 5 rounds without
+converging, to the human in ordinary text with the parent link and round
+comments, and record the human's decision on the parent.
 
 An **approved specification** is a parent with one of:
 
-- a latest spec review comment that passed and is fresh: the body's GraphQL
-  `lastEditedAt`, or its `createdAt` when `lastEditedAt` is null (never edited),
-  is strictly earlier than that comment's `createdAt`; an equal or unclear order
-  is not fresh, so review again;
-- the human's approval after escalation;
-- a human approval recorded before this loop existed; or
+- a latest `Spec panel` record whose result is `converged` and which is fresh;
+- the human's approving decision after escalation;
+- a passing `Spec review <n>/3` comment, the format used before the spec panel,
+  that is still fresh;
+- a human approval recorded before the review loop existed; or
 - the operator's approval under a recorded, scoped map waiver.
 
-An in-scope amendment to the body goes back through this loop, or to the operator
-under a map waiver.
+A record is **fresh** when the body's GraphQL `lastEditedAt`, or its `createdAt`
+when `lastEditedAt` is null (never edited), is strictly earlier than the
+`createdAt` of that record or of a later administrative-edit comment; an equal or
+unclear order is not fresh, so review again.
+
+An **administrative edit** changes no scope, acceptance criterion or decision,
+such as recording the rollup's creation revision in the Delivery field or adding
+a source link. Make it without a new panel, then post a comment on the parent
+naming exactly what changed. Every other body edit is a material amendment and
+goes back through the spec panel, or to the operator under a map waiver.
 
 ## Publish and continue
 
-Once the parent is an approved specification, normally through a fresh pass, and
-every map decision is settled, complete Wayfinder's resolution/handoff
+Once the parent is an approved specification, normally through a converged spec
+panel, and every map decision is settled, complete Wayfinder's resolution/handoff
 bookkeeping and close the map, reusing this draft rather than replanning; a map
 waiver has no map to close. Then hand the approved draft and sources to
 `to-tickets`. It creates the children, records separate native membership and

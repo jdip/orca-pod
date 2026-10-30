@@ -51,13 +51,14 @@ Every other package is original to Agent Team and was imported from its
 
 ## Adapted (Apache-2.0)
 
-`to-spec`'s review lenses in `skills/to-spec/review-lenses/` are adapted from
+`to-spec`'s review lenses and panel rules in `skills/to-spec/review-lenses/` are
+adapted from
 [google/elephant-goldfish-model](https://github.com/google/elephant-goldfish-model)
 at the reviewed pin `05f8984cb6e0077b072ba034f66d95ffdde200ee`, under the Apache
 License 2.0. The directory keeps upstream's `LICENSE` verbatim; upstream has no
 `NOTICE` file at the pin. Each file opens with its upstream path, the pin, the
-license and Orca Pod's modifications. The wayfinder map pass and the to-spec spec
-review load them.
+license and Orca Pod's modifications. The map panel and `to-spec`'s spec panel
+load them.
 
 | File | Upstream path |
 | --- | --- |
@@ -66,3 +67,5 @@ review load them.
 | `review-lenses/zoom_out.md` | `agents/zoom_out.md` |
 | `review-lenses/implementation_readiness.md` | `agents/implementation_readiness.md` |
 | `review-lenses/zoom-out-standard.md` | `resources/document_standards/zoom-out-standard.md` |
+| `review-lenses/fidelity_and_grounding.md` | `agents/codebase_details.md` |
+| `review-lenses/panel.md` | `skills/egm-review-loop/SKILL.md`, `skills/egm-resolve/SKILL.md`, `agents/synthesizer.md` |

@@ -68,8 +68,8 @@ at this boundary before the next selection, continuing here when the same map
 remains the chosen action. Otherwise immediately repeat from step 1 without
 asking whether to continue or ending the turn merely because one ticket finished.
 
-Pause for required human input: a waypoint's human decision, a spec review
-escalated after its 3rd iteration, a major review finding returned to the map, or
+Pause for required human input: a waypoint's human decision, a spec panel
+escalated for churn or its round cap, a panel finding returned to the map, or
 changed scope. Otherwise continue until the map is complete, the user stops the
 run, or no actionable frontier remains.
 

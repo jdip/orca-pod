@@ -30,7 +30,8 @@ executable children. While the map is still open, publish only the drafted
 parent body as the map's implementation follow-up under
 [Wayfinder's handoff](../wayfinder/SKILL.md#implementation-handoff), the subject
 of `to-spec`'s review against the map; return for the children once the parent
-is an approved specification, normally through a pass, and the map is closed.
+is an approved specification, normally through a converged spec panel, and the
+map is closed.
 Use issue bodies for the current approved scope and acceptance criteria;
 comments supply decision history and evidence. Update a body to incorporate an
 approved amendment before it becomes the published contract.

@@ -75,7 +75,7 @@ resolution before implementation, rather than a new fallback framework.
 An implementation request means carry the outcome through planning, approved
 publication/selection, execution, review and verified PR-to-test delivery under
 local rules. Reuse that authority across skill boundaries; ask only for
-unresolved human decisions, the map confirmation, escalated spec review findings,
+unresolved human decisions, the map confirmation, escalated panel findings,
 spec approval under a map waiver or changed scope. Do not require separate
 commands or repeat administrative approvals already covered. Substantive design
 gaps return to the associated map and pause its implementation; routine choices

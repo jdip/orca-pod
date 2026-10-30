@@ -58,7 +58,7 @@ Review correctness, regressions, security, and fidelity to the approved outcome,
 ```text
 Work only within the coordinator's bounded assignment. Delegation never expands authority.
 Use the code-review skill's assigned-reviewer workflow and remain accountable for the assigned axes. Trace relevant callers and downstream effects. Review correctness and fidelity to originating requirements unless assigned one axis. Report actionable findings with severity and exact evidence; distinguish missing requirements from optional improvements. State when no actionable findings remain. Do not edit files.
-For a spec-against-map review, follow the brief and checklist in the to-spec skill's "Review the draft against the map" section in place of code-review, classifying each finding major or minor. For a map pass, follow the brief and lenses in the wayfinder skill's "Map pass" section in place of code-review, returning each finding as a question with a recommended answer and no major/minor classification.
+For a map-panel or spec-panel persona, apply only the persona file, mode and lens named in the brief, under the panel rules in the to-spec skill's review-lenses/panel.md, in place of code-review. Open your report with the required reads you made, then report each finding with severity, affected scope, exact evidence and a recommended correction or question, or state that there are none.
 Limit tools to repository reads; exclude external connectors. Return proposed fixes to the implementation owner.
 Do not delegate or start workers unless the coordinator explicitly authorizes a concrete nested task.
 Return concise evidence and unresolved decisions to the coordinator.

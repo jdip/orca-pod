@@ -2,8 +2,8 @@
 
 `machine/install.py` sets up a macOS host for Orca Pod: the shared skills, the
 generated Claude and Codex roles, the global rules, the managed keys in both
-agents' settings, Orca's own skills, Orca's app settings and two scheduled Orca
-automations. It owns specific
+agents' settings, Orca's own skills, Orca's app settings, two scheduled Orca
+automations and the Orca default base ref of Orca Pod's primary checkout. It owns specific
 paths and keys inside the default agent homes (`~/.claude`, `~/.codex`,
 `~/.agents`) and never takes over a whole home. It needs Python 3.11+ (standard
 library only) and runs on macOS only.
@@ -38,6 +38,8 @@ being set. It also lists the Orca steps (`run`, `patch`, `skip` or `unchanged`),
 each automation's action (`create`, `update`, `unchanged`, `adopt (identical)`,
 `remove`, `forget` for a record of an adopted or already deleted automation that
 is no longer managed, `planned` on a scratch run, or `skip` with
+`--skip-orca-settings`), the default base ref action (`set`, showing the current
+value or `unset`, `unchanged`, `planned` on a scratch run, or `skip` with
 `--skip-orca-settings`), the sign-in status, notes and any refusals. It exits 2 when
 something is refused, including a dirty or unpublished source checkout without
 `--allow-unpublished`; `--apply` then writes nothing.
@@ -58,9 +60,9 @@ automation UUID and an `adopted` flag under a plain name, with no id recorded tw
 
 | Option | Effect |
 | --- | --- |
-| `--home <dir>` | Resolve every target under `<dir>` instead of `~`. Any other directory is a scratch run, which skips Orca's skills and app settings and the sign-in checks, and lists the automations as planned without reading or changing Orca's live automations. |
+| `--home <dir>` | Resolve every target under `<dir>` instead of `~`. Any other directory is a scratch run, which skips Orca's skills and app settings and the sign-in checks, and lists the automations and the default base ref as planned without reading or changing Orca's live automations or repositories. |
 | `--adopt-config` | Move managed keys that `~/.codex/config.toml` defines outside the Orca Pod blocks into those blocks. Without it, such keys are refused. |
-| `--skip-orca-settings` | Leave Orca's app settings and automations alone. |
+| `--skip-orca-settings` | Leave Orca's app settings, automations and default base ref alone. |
 | `--allow-unpublished` | For testing only: install from a dirty or unpublished checkout. |
 | `--verbose` | Also list unchanged paths. |
 
@@ -86,6 +88,7 @@ and after an Orca upgrade, which can change Orca's skills and its Codex hooks.
 | Orca's skills | `orca skills install --skill orca-cli --skill orchestration --agent claude,codex`, then `orca skills update` for the same skills. Orca owns these copies. |
 | Orca app settings | `branchPrefix: "custom"`, `branchPrefixCustom: "orca"` and `agentPermissionDefault: "full-access"`, applied by [`machine/orca_settings.py`](../machine/orca_settings.py) (below). |
 | Orca automations | The automations in [`machine/automations.toml`](../machine/automations.toml), through `orca automations create/edit/remove` (below). |
+| Orca default base ref | `origin/test` for Orca Pod's primary checkout, through `orca repo set-base-ref` (below). Not recorded in the manifest; `--uninstall` leaves it set. |
 
 Credentials are never copied or written. `config.toml`, `settings.json` and
 `~/.claude.json` can hold credentials and private state, so the installer never
@@ -263,6 +266,22 @@ On-demand runs stay available. Run an automation now with
 `orca automations run <id>`, using the full id from `orca automations list`, and
 follow it with `orca automations runs --id <id>`. You can also invoke either
 skill directly in an agent session.
+
+### Orca default base ref
+
+The [Standard](../standard/README.md#checkouts-and-delivery) has new Orca
+worktrees start from `origin/test`, through Orca's per-repository default base
+ref. The installer sets it only for Orca Pod's own primary checkout, found as for
+the automations; `adopt-standard` sets it for other repositories. The dry run
+shows `unchanged` when `orca repo list` already gives the checkout's
+`worktreeBaseRef` as `origin/test`, and otherwise `set` with the current value or
+`unset`. `--apply` runs `orca repo set-base-ref --ref origin/test` after the
+automations and before the Orca settings patch, then reads the value back from
+`orca repo show`; a readback other than `origin/test` fails that step and the run
+exits 1. A scratch `--home` run lists it as planned and `--skip-orca-settings`
+skips it, neither reading nor changing Orca. It is host-local Orca state and the
+Standard's repository setting, not an installed artifact, so the manifest does
+not record it and `--uninstall` leaves it set.
 
 ## What stays manual
 

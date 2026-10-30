@@ -415,6 +415,10 @@ documentation, and small fixes, on `orca/` feature branches in separate worktree
 based on fresh `origin/test` for direct delivery or rollup creation. Rollup child
 branches start from the current rollup. Preserve unrelated local work and attached checkouts.
 Detached revision worktrees are valid for canonical verification.
+Each host that works the target sets the target's Orca default base ref to
+`origin/test` with `orca repo set-base-ref` and reads it back as `worktreeBaseRef`
+from `orca repo show`, so new Orca worktrees start from `test`. This is host-local
+Orca state, not Git content.
 
 The two primary workflows are:
 

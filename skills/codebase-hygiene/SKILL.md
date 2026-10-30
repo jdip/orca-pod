@@ -54,6 +54,11 @@ authored-code cleanup while inspecting its integration when relevant.
 - **Simplification:** inspect redundant branches, overlapping implementations,
   indirection, obsolete configuration, and partially retired paths. Verify why each
   exists before calling it waste. Similar-looking code may represent different rules.
+- **Docs drift:** compare the requested areas' maintained docs and guidance with
+  actual behavior. Check each behavioral claim against the symbol, command or
+  native invocation it describes, and cite the doc line beside the file:symbol
+  or command evidence. Current approved decisions set the baseline; undocumented
+  details and superseded closed specs are not drift.
 
 Use configured static analysis to locate candidates and inspect its entry points,
 generated inputs, dynamic use, and exclusions before trusting an absence report.
@@ -69,6 +74,10 @@ verification approach. Rank by benefit and confidence against migration risk and
 effort. Explain why a recommendation earns its place; skip aesthetic churn and
 speculative abstractions. Record important keep/defer decisions with their rationale
 in the existing task or decision location, without creating a separate ledger.
+
+Classify each drift discrepancy as a stale doc, an implementation regression, an
+approved evolution (cite the approved decision) or unassessed (name the unread or
+unrun part, or the missing decision on which side is intended).
 
 Use the repository's tracker guidance for deduplication and actionable
 remediation findings. Recommendations and issue filing do not change the Active

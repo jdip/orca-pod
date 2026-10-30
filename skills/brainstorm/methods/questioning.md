@@ -51,5 +51,6 @@ with its mechanism, trade-offs, and the conditions under which it fails, and ask
 the owner to choose, giving your recommendation. Decide mechanical choices with
 one defensible answer (e.g., file naming, formatting) yourself.
 
-Record each option rejected, with the reason, in the map's Decisions so far.
-Later drafting has no other source for them: it often runs in a new session.
+On the full entry, record each option rejected, with the reason, in the draft
+map's Decisions so far. Later drafting has no other source for them: it often
+runs in a new session. On other entries, the record stays with its owner.

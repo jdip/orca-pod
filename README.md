@@ -77,15 +77,22 @@ calls them:
 2. **Choose.** Approved work continues. When paths compete or approval is
    missing, it offers options with rough effort and a recommendation; reply with
    your choice and the scope you authorize.
-3. **Plan.** New work starts with a `wayfinder` grilling dialogue; confirm the
-   shared understanding before it records a map. For a full map or a new
-   mechanism, a reviewer on the other provider first checks the draft, and its
-   findings come to you as questions before you confirm. That confirmation is
-   your one planning approval: a reviewer on the other provider then checks the
-   spec and its tickets against the map, and you get a short report with the
-   spec link. You are asked again only when findings remain after three review
-   rounds, a finding changes a map decision, or the scope changes. If you waive
-   the map, you approve the spec and tickets directly instead.
+3. **Plan.** New work starts with a `brainstorm` dialogue: rounds of numbered
+   questions, each with a recommendation. For a full map or a new mechanism, a
+   panel of isolated reviewers on the other provider checks the drafted map
+   first; its judgment findings come to you as questions, and you see its
+   fresh-reader paraphrase before you confirm the shared understanding and
+   `wayfinder` records the map. That confirmation is
+   your one planning approval: a panel of isolated reviewers on the other
+   provider then checks the spec and its tickets against the map until two
+   rounds in a row come back clean, and you get a short report with the spec
+   link. You are asked again only when the panel churns or reaches five rounds,
+   a finding changes a map decision, or the scope changes. If you waive
+   the map, you approve the spec and tickets directly instead. A small fix to
+   an existing mechanism can take the fast lane: you say yes to one tracking
+   issue, it skips the map, spec and panels, and it keeps the real checks,
+   review on the other provider and normal delivery. A real decision moves it
+   to the full flow.
 4. **Run.** Approved tickets are claimed, implemented in their own Orca
    worktrees, reviewed on the other provider and delivered. Your approval carries
    across these handoffs; you don't repeat it per ticket.
@@ -101,8 +108,9 @@ promotion, host installation and background scheduling are separate requests.
 ## How work flows
 
 - **Plan before implementing.** Every change, documentation included, needs a
-  resolved map and an approved spec unless you explicitly waive planning for a
-  stated scope. Small work keeps both brief. `wayfinder` charts the map (a
+  resolved map and an approved spec, a fresh fast-lane confirmation of an
+  eligible fix, or your explicit planning waiver for a stated scope. Small work
+  keeps the map and spec brief. `wayfinder` charts the map (a
   `wayfinder:map` issue); `to-spec` drafts the spec parent and its executable
   children; `to-tickets` publishes them as an `implementation:backlog` parent
   with native sub-issues and dependencies.
@@ -142,7 +150,7 @@ Every skill is installed for both Claude and Codex.
 | Area | Skills |
 | --- | --- |
 | Repository setup | `prepare-repository`, `adopt-standard` ‡, `repository-verification` (optional verification instructions), `define-project-goal` (agree the README purpose) |
-| Choosing and planning | `whats-next`, `wayfinder`, `grilling`, `select map`, `next-waypoint`, `research`, `prototype`, `to-spec`, `to-tickets`, `wait-what` † (re-explain the last answer) |
+| Choosing and planning | `whats-next`, `brainstorm`, `wayfinder`, `select map`, `next-waypoint`, `research`, `prototype`, `to-spec`, `to-tickets`, `wait-what` † (re-explain the last answer) |
 | Implementing and delivering | `triage`, `select backlog`, `next-issue`, `tdd`, `diagnosing-bugs`, `resolving-merge-conflicts`, `code-review`, `pr-to-test` ‡, `promote-to-main` ‡, `cleanup-task-artifacts` ‡ |
 | Delegation | `roster` (role, model and effort for each delegated task); Orca's own `orchestration` and `orca-cli` |
 | Maintenance | `codebase-hygiene`, `dependency-review`, `dependabot-upkeep`, `code-simplification`, `reflect` (turn a lesson into an issue), `audit-agent-instructions` |

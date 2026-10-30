@@ -1,6 +1,6 @@
 ---
 name: wayfinder
-description: Plan new work through grilling before creating a map, or resume mapped decisions before specification and implementation.
+description: Chart a map from the `brainstorm` confirmation, or resume mapped decisions before specification and implementation.
 ---
 
 Begin from the desired **destination** and the actual repository. This skill
@@ -20,7 +20,7 @@ change another effort's selections or grant takeover authority.
 
 ## Plan, don't do
 
-Wayfinder is **planning** by default: each ticket resolves a decision, and the map is done when the way is clear, with nothing left to decide before someone goes and does the thing. The pull to just do the work is usually the signal you've reached the edge of the map and it's time to hand off. Record standing preferences in **Notes**. Execute associated implementation through `next-issue` only after the entire map is resolved and its spec is an [approved specification](../to-spec/SKILL.md#review-the-draft-against-the-map), normally through a pass of `to-spec`'s review against the map, under the execution authority of **Chart the map**. Decision-unblocking tasks remain part of planning.
+Wayfinder is **planning** by default: each ticket resolves a decision, and the map is done when the way is clear, with nothing left to decide before someone goes and does the thing. The pull to just do the work is usually the signal you've reached the edge of the map and it's time to hand off. Record standing preferences in **Notes**. Execute associated implementation through `next-issue` only after the entire map is resolved and its spec is an [approved specification](../to-spec/SKILL.md#review-the-draft-against-the-map), normally through a converged `to-spec` spec panel, under the execution authority of the `brainstorm` confirmation. Decision-unblocking tasks remain part of planning.
 
 ## Refer by name
 
@@ -53,15 +53,17 @@ The whole map at low resolution, loaded once per session. Open tickets are **not
 
 <what reaching the end of this map looks like: the spec, decision, or change this effort is finding its way to. One or two lines; every session orients to it before choosing a ticket.>
 
+Success: <the observable criteria that show the destination is reached>
+
 ## Notes
 
 <domain; skills every session should consult; standing preferences for this effort>
 
 ## Decisions so far
 
-<!-- the index: one line per closed ticket, enough to judge relevance, then zoom the link for the detail the ticket holds -->
+<!-- the index: one line per closed ticket or decision settled while charting, enough to judge relevance, then zoom the link for the detail the ticket holds -->
 
-- [<closed ticket title>](link): <one-line gist of the answer>
+- [<closed ticket title>](link): <one-line gist of the answer>. Rejected: <alternative> (<reason>).
 
 ## Not yet specified
 
@@ -92,7 +94,7 @@ The answer isn't part of the body; it's recorded on resolution (see [Work throug
 
 ## Ticket Types
 
-Every ticket is either **HITL** (human in the loop, worked _with_ a human who speaks for themselves) or **AFK**, driven by the agent alone. A HITL ticket only resolves through that live exchange; the agent never stands in for the human's side of it (a grilling agent that answers its own questions has broken this).
+Every ticket is either **HITL** (human in the loop, worked _with_ a human who speaks for themselves) or **AFK**, driven by the agent alone. A HITL ticket only resolves through that live exchange; the agent never stands in for the human's side of it (a `brainstorm` agent that answers its own questions has broken this).
 
 - **Research** (AFK): Reading documentation, third-party APIs, or local resources like knowledge bases to surface a fact a decision waits on. Use the `research` skill; an assigned researcher investigates directly and returns cited evidence within its write authority. Use when knowledge outside the current working directory is required.
 - **Prototype** (HITL or AFK): Use the `prototype` skill when a small experiment can
@@ -100,7 +102,7 @@ Every ticket is either **HITL** (human in the loop, worked _with_ a human who sp
   or when a concrete artifact helps the human judge a design. Its inquiry rules
   own the factual-experiment versus human-decision boundary. Link the prototype
   as an asset; let the question determine its shape and number of alternatives.
-- **Grilling** (HITL): Conversation. The default case. Read and apply the `grilling` and `domain-modeling` skills.
+- **Grilling** (HITL): Conversation. The default case. Run `brainstorm`'s dialogue-only entry, with `domain-modeling` when terminology needs resolution.
 - **Task** (HITL or AFK): Manual work that must happen before a _decision_ can be made: nothing to decide, prototype, or research, but the discussion is blocked until it's done. Signing up for a service so its API can be judged, provisioning access, moving data so its shape can be seen. This is the one type that _does_ rather than decides, and it earns its place by unblocking a decision, not by delivering the destination. Keep it limited to unblocking a decision within existing action authority;
   repository implementation changes intended to ship follow the global planning
   gate. The agent drives authorized work alone where it can (AFK); otherwise it
@@ -133,110 +135,38 @@ Two modes. Either way, **never resolve more than one ticket per session**, with 
 
 ### Chart the map
 
-A new-work discussion invokes this entry directly or through `whats-next` or
-another owning workflow. Invoke `grilling` to establish the destination, constraints,
-success criteria, scope, assumptions and tradeoffs with the user. Follow its rounds:
-ask the ready questions, wait for actual answers, and follow dependent questions
-until no human decision about the destination remains. Deeper design decisions
-may become map tickets. Grilling owns the dialogue procedure; this entry owns
-the boundary between establishing the destination and mapping its remaining design.
+A new-work discussion begins with `brainstorm`'s full entry, directly or through
+`whats-next` or another owning workflow. `brainstorm` owns the dialogue, the map
+panel and the `brainstorm` confirmation, the single human planning gate. Chart
+only after that confirmation, from its confirmed draft.
 
-Before creating a map, summarize the shared understanding and obtain the user's
-explicit confirmation. Run the [Map pass](#map-pass) before asking for that
-confirmation when it applies. A detailed request, agent proposal, or reading the skill
-does not establish completed grilling. This confirmation is the single human
-planning gate. Under `whats-next` or an implementation request it carries through
-spec review, publication, backlog selection, execution and verified test
-delivery; a planning-only request ends at the reviewed, published spec. Record
-the confirmed direction and a concise summary of the actual dialogue in the
-map's existing Notes/Decisions so far; use available conversation evidence
-without publishing private transcripts. Preserve the global Planning before
-implementation rule and its explicit-waiver boundary.
-
-1. **Name the destination.** Complete the `grilling` entry above with the user.
-   Use `domain-modeling` when terminology or domain relationships need resolution.
-   Chart only after the user confirms shared understanding of the destination.
-2. **Map the frontier.** Inspect the whole destination for actual open decisions,
-   using `grilling` where human judgment is unresolved. Reuse supplied answers.
-   If the route is clear after that dialogue, keep the map compact with the agreed direction;
-   it still precedes the spec unless the operator explicitly waived planning.
-3. **Create or reuse the map** (label `wayfinder:map`): record Destination, Notes, settled direction and only real remaining fog. Keep it open until its resolution and implementation handoff are recorded.
-4. **Create the tickets you can specify now** as child issues of the map, then wire blocking edges in a **second pass** (issues need ids before they can reference each other). Wiring sorts them into the frontier and the blocked; everything you can't yet specify stays in the fog: the **Not yet specified** section.
-5. **Research actual open questions.** When research tickets exist, use the `research` skill to assign independent research with bounded questions and evidence requirements. Dispatch delegated work per the `roster` skill (skills/roster/SKILL.md). Prepare artifacts in a separate worktree on a `orca/research-<name>` branch from fresh `origin/test`, following the target repository's checkout and delivery rules. Each assigned researcher investigates directly and returns cited findings; the primary owns any repository artifact and tracker resolution. Link the retained findings from the ticket. The primary serializes shared Git mutations and resolves the research tickets from the returned evidence.
-6. For a chart-only request, return the map. When the request includes continuation
+1. **Create or reuse the map** (label `wayfinder:map`) from the confirmed draft:
+   record Destination, Notes, settled direction and only real remaining fog.
+   Record the confirmed direction and a concise summary of the actual dialogue in
+   Notes/Decisions so far; use available conversation evidence without
+   publishing private transcripts. Keep the map open until its resolution and
+   implementation handoff are recorded.
+2. **Create the tickets you can specify now** as child issues of the map, then wire blocking edges in a **second pass** (issues need ids before they can reference each other). Wiring sorts them into the frontier and the blocked; everything you can't yet specify stays in the fog: the **Not yet specified** section.
+3. **Research actual open questions.** When research tickets exist, use the `research` skill to assign independent research with bounded questions and evidence requirements. Dispatch delegated work per the `roster` skill (skills/roster/SKILL.md). Prepare artifacts in a separate worktree on a `orca/research-<name>` branch from fresh `origin/test`, following the target repository's checkout and delivery rules. Each assigned researcher investigates directly and returns cited findings; the primary owns any repository artifact and tracker resolution. Link the retained findings from the ticket. The primary serializes shared Git mutations and resolves the research tickets from the returned evidence.
+4. For a chart-only request, return the map. When the request includes continuation
    or implementation, select the open map through `select map` before closure, then
    use `next-waypoint` in continue mode under that authority. Reusing an already resolved map
    needs no new selection; retain its source links and existing pointer.
    A compact map with confirmed direction proceeds directly to the Implementation handoff:
    draft its specification and executable breakdown, then record resolution and
    close the map once the spec is approved under `to-spec`, normally through a
-   pass of its review, and no decision remains.
+   converged spec panel, and no decision remains.
    No dummy frontier is needed.
-
-### Map pass
-
-One fresh reviewer on the other provider reads the drafted map before the
-shared-understanding confirmation, and its findings reach the user as grilling
-questions.
-
-**When it runs.** On a full map, one that will carry decision tickets or **Not
-yet specified** fog, and on any map that introduces a new mechanism: a new skill,
-script, role, workflow step, gate, tracker convention, or language, runtime or
-environment, as opposed to a change to the mechanism that already owns the
-behavior. A compact map for small, settled work that introduces no new mechanism
-skips it. A map waiver means no map pass.
-
-**Dispatch.** Per `roster`, dispatch one fresh REV on the other provider from the
-map drafter (PLN, or the primary when it drafted the summary). The pass is
-read-only and single, with no iterations. The brief carries:
-
-- the target repository and revision;
-- the drafted Destination, Notes constraints and Out of scope;
-- Decisions so far with the user's actual answers, sanitized; and
-- any decision tickets and Not-yet-specified fog drafted so far.
-
-Frontier mapping still follows the confirmation; do not manufacture frontier detail
-to dispatch the pass. Leave out the drafter's reasoning and the dialogue transcript. The reviewer
-applies the `MAP PASS` mode instructions of all four review lenses, with the
-drafted map as the raw feature concept:
-[zoom out](../to-spec/review-lenses/zoom_out.md),
-[design critic](../to-spec/review-lenses/design_critic.md),
-[implementation readiness](../to-spec/review-lenses/implementation_readiness.md)
-and [comprehension](../to-spec/review-lenses/comprehension.md).
-
-It returns each finding with repository evidence and a recommended answer, or
-states that it has no findings. It leaves findings unclassified, neither major
-nor minor; the lenses' own severities stay as reported.
-
-**Disposition.** Resolve factual findings under `grilling`'s existing procedure,
-building on the facts the reviewer already established rather than redoing them.
-Turn each finding that needs human judgment into a numbered grilling question
-with its recommendation, asked in a round before the confirmation request. Record
-a finding the user already answered in this dialogue with that answer instead of
-asking it again. Once those rounds are answered, ask for the confirmation as
-before; the pass adds no gate.
-
-**Reruns.** One pass per confirmation. When a material change to scope,
-assumptions or outcome reopens an existing map's dialogue, including through
-**Map-entry evidence**, **Work through the map** or the **Implementation
-handoff**, the reopened confirmation gets a fresh pass if the map qualifies. A
-compact map that later grows through frontier mapping gets no retroactive pass.
-
-**Record.** Once the map exists, post one comment on it, sanitized under the
-target's publication policy: `Map pass`, the reviewer role with its
-receipt-verified model and effort, and each finding with its disposition: asked
-as Q<n> with the gist of the answer, settled by fact, or already answered. A
-skipped pass records nothing. A missing map-pass record alone does not block
-**Map-entry evidence**; that entry's dialogue and confirmation requirements still
-apply.
 
 ### Map-entry evidence
 
 Before resuming a map or reusing its design for specification or implementation,
-establish from recorded decisions and available conversation that the **Chart the
-map** entry dialogue and confirmation occurred. Closure and an approved spec alone
-do not establish that evidence. If evidence is missing, complete that entry with
-the user before advancing; reuse supported answers and record the recovered
+establish from recorded decisions and available conversation that its entry
+dialogue and confirmation occurred: the `brainstorm` confirmation, or a
+shared-understanding confirmation recorded under the earlier **Chart the map**
+dialogue before the switch to `brainstorm`. Closure and an approved spec alone
+do not establish that evidence. If evidence is missing, complete `brainstorm`'s
+full entry with the user before advancing; reuse supported answers and record the recovered
 understanding in the existing map. Recovering evidence does not require a new map.
 If the dialogue reveals an unsettled substantive decision, reopen the map under
 the implementation handoff rule. An explicit scoped planning waiver retains its
@@ -257,19 +187,18 @@ User invokes with a map (URL or number). A ticket is **optional**: without one, 
 
 ### Human-decision completion
 
-Invoke `grilling` for a waypoint involving human judgment, including choices that
-emerge from research or prototypes. Follow its actual question-and-answer rounds,
-reusing settled answers. Keep the waypoint unresolved while relevant questions or
-dependent follow-ups await the user. Pure factual research can finish autonomously;
-its findings alone do not settle a resulting human choice.
+Run `brainstorm`'s dialogue-only entry for a waypoint involving human judgment,
+including choices that emerge from research or prototypes, reusing settled
+answers. Keep the waypoint unresolved while relevant questions or dependent
+follow-ups await the user. Pure factual research can finish autonomously; its
+findings alone do not settle a resulting human choice.
 
 For waypoint resolution, the completion criterion is that the user has answered
 the relevant questions, dependent questions have been followed through, and no
-human decision within that waypoint remains unresolved. This waypoint-specific
-criterion replaces grilling's separate final shared-understanding confirmation;
-record the resolution and close the waypoint without an additional confirmation
-prompt. Asking questions or presenting a recommendation alone is not completion.
-The **Chart the map** entry retains its explicit confirmation gate.
+human decision within that waypoint remains unresolved. Record the resolution and
+close the waypoint without an additional confirmation prompt. Asking questions or
+presenting a recommendation alone is not completion. The `brainstorm`
+confirmation stays with its full entry.
 
 ## Implementation handoff
 
@@ -285,8 +214,8 @@ map, record its agreed direction in the map's resolution comment. The follow-up
 can be the drafted specification parent under `to-spec`'s review: `to-tickets`
 publishes its body, with no children, before closure. Record resolution and close
 the map once the parent is an approved specification under `to-spec`, normally
-through a pass of that review, and its open follow-up is verified; a major
-finding keeps the map open for its decision. `to-tickets` publishes the approved
+through a converged spec panel, and its open follow-up is verified; a panel
+finding returned to the map keeps it open for its decision. `to-tickets` publishes the approved
 children after the map closes. While design remains
 unsettled, keep the follow-up explicitly awaiting planning rather than inventing
 executable scope.

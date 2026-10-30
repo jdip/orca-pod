@@ -33,9 +33,9 @@ Maps, specifications, and ticket handoffs are required records: they preserve
 decisions and context across tasks and prevent long-term drift. Keep the records
 complete while scaling discovery and discussion to what remains unresolved.
 
-For every new-work discussion, invoke `wayfinder` and its `grilling` entry before
-creating a map. Complete the actual dialogue and obtain the user's confirmation
-of shared understanding; reading the skills or drafting a proposal alone does not
+For every new-work discussion, invoke `brainstorm`'s full entry before creating
+a map. Complete the actual dialogue and obtain the `brainstorm` confirmation of
+shared understanding; reading the skills or drafting a proposal alone does not
 complete that entry. That confirmation is the single human planning gate; under
 a map waiver, the operator approves the spec instead. Approved continuations
 reuse settled answers; material changes to scope, assumptions, or outcome reopen
@@ -43,9 +43,9 @@ the dialogue.
 
 Implementation, including documentation, maintenance, dependency and
 alignment changes, requires a resolved map and an approved specification, as
-`to-spec` defines approval, covering the work. Reuse settled decisions and
-existing coverage. Keep small maps/specs brief, with no invented research or
-decision tickets; use the existing
+`to-spec` defines approval, covering the work, or the fast lane below. Reuse
+settled decisions and existing coverage. Keep small maps/specs brief, with no
+invented research or decision tickets; use the existing
 specification parent and executable-child workflow through `to-spec`,
 `to-tickets` and `next-issue`. Direct workflow requests hand approved work to
 that executor before edits; an already claimed child runs its named skill
@@ -64,6 +64,15 @@ to PR-to-test and/or separately requested promotion, with equivalent full eviden
 reusable under local policy. Use the `pr-to-test` skill's rollup reference for the
 shared branch and CI rules.
 
+The fast lane is a sanctioned path, not a waiver. It is open to a single outcome
+that changes an existing mechanism, with no new mechanism and no product,
+contract or security decision. The agent proposes it; the owner's yes to one
+tracking issue, recorded under `next-issue`'s **Fast lane**, is its single
+confirmation. It skips the map, spec and panels, using `brainstorm`'s
+dialogue-only entry only to clear something up, and keeps the repository's real
+checks, cross-provider `code-review` and direct PR-to-test delivery. A real
+decision stops edits and sends the issue to `brainstorm`'s full entry.
+
 Only the operator can explicitly waive planning for a stated scope. Record that
 exception in existing task/tracker context. Size, apparent simplicity, a direct
 skill call or “implement this” is not a waiver. Read-only investigation,
@@ -75,9 +84,10 @@ resolution before implementation, rather than a new fallback framework.
 An implementation request means carry the outcome through planning, approved
 publication/selection, execution, review and verified PR-to-test delivery under
 local rules. Reuse that authority across skill boundaries; ask only for
-unresolved human decisions, the map confirmation, escalated spec review findings,
-spec approval under a map waiver or changed scope. Do not require separate
-commands or repeat administrative approvals already covered. Substantive design
+unresolved human decisions, the map confirmation, a fast-lane confirmation,
+escalated panel findings, spec approval under a map waiver or changed scope.
+Do not require separate commands or repeat administrative approvals already
+covered. Substantive design
 gaps return to the associated map and pause its implementation; routine choices
 within approved scope stay with the implementer. Planning does not require a recursive map for its own records.
 Existing workflow-specific completion boundaries and the separate authority

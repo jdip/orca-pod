@@ -205,6 +205,10 @@ orca orchestration worker-release --dispatch <dispatch_id> --json
 orca orchestration worker-retain --dispatch <dispatch_id> --json
 ```
 
+A `worker_done` body is only a summary: its `payload.reportPath` names the full
+report and `payload.filesModified` lists the changed files. Keep both fields when
+filtering messages, and read the report, when given, before accepting the result.
+
 After each accepted `worker_done`, validate it against the expected Dispatch,
 then do exactly one:
 

@@ -25,14 +25,22 @@ example `export ORCA_POD_PYTHON="$(uv python find 3.13)"`. The installer runs it
 child helpers (`roster/generate.py`, `machine/orca_settings.py`) with
 `ORCA_POD_PYTHON` too, falling back to its own interpreter.
 
-The dry run lists every action per target (`create`, `update`, `replace (backed
-up)`, `adopt`, `remove`). It shows a diff only for content Orca Pod owns: a file
-it wrote, and the owned lines of the managed `config.toml` blocks. Other lines of
-`config.toml` are counted (`… N unowned line(s) not shown …`), never printed, and
-the JSON files show only the owned keys being set. It also lists the Orca steps,
-including each automation it would create, update, adopt or remove, the sign-in
-status, notes and any refusals. It exits 2 when something is refused;
-`--apply` then writes nothing.
+The dry run lists every action per target: `create`, `update`, `update (changed
+since install; current copy backed up)`, `update keys` (a managed JSON file),
+`update managed blocks` (`config.toml`), `replace (backed up)`, `adopt (identical;
+backed up)` and `unchanged` (counted unless `--verbose`). A path an earlier
+revision installed that the source no longer ships shows `remove`, or `restore
+backup` when the installer backed up its original. The dry run shows a diff only
+for content Orca Pod owns: a file it wrote, and the owned lines of the managed
+`config.toml` blocks. Other lines of `config.toml` are counted (`… N unowned
+line(s) not shown …`), never printed, and the JSON files show only the owned keys
+being set. It also lists the Orca steps (`run`, `patch`, `skip` or `unchanged`),
+each automation's action (`create`, `update`, `unchanged`, `adopt (identical)`,
+`remove`, `forget` for a record of an adopted or already deleted automation that
+is no longer managed, `planned` on a scratch run, or `skip` with
+`--skip-orca-settings`), the sign-in status, notes and any refusals. It exits 2 when
+something is refused, including a dirty or unpublished source checkout without
+`--allow-unpublished`; `--apply` then writes nothing.
 
 Before reading or writing anything, every target, state and backup path is
 checked to lie below the selected home with no symlinked or non-directory

@@ -163,11 +163,14 @@ rollup child, otherwise fresh `origin/test`. Make Git selectors exact.
 
 ```bash
 orca orchestration worker-start --agent codex --model gpt-6.1-sol --effort xhigh \
-  --worktree branch:<worker-branch> --task-title "🔍 REV <purpose>" \
+  --worktree path:<worktree-path> --task-title "🔍 REV <purpose>" \
   --spec "$(cat <brief-file>)" --json
 ```
 
-`path:<worktree-path>` and `id:<repo-id>::<path>` are equivalent selectors.
+`<worktree-path>` is the path after `::` in the worker's `worker.worktreeId`
+from `worker-show`. A worker's branch can differ from its `--name`, so never
+guess a `branch:` selector. `path:<worktree-path>` and `id:<repo-id>::<path>`
+are equivalent selectors.
 Creation flags (`--name`, `--base-branch`) are rejected for existing worktrees.
 
 **Wait, then parse the last JSON object.** `check --wait` emits NDJSON keepalive
@@ -309,10 +312,12 @@ orca orchestration worker-start --terminal <handle> --worktree <sel> \
   --task-title "🛡️ SEC <purpose>" --spec "$(cat <sec-brief-file>)" --json
 ```
 
-- `<sel>` is the coordinator's worktree for SEC-REV, or the reviewed worker's
-  worktree. For SEC-PROOF and SEC-WRK, first create SEC's own child worktree
-  with `orca worktree create --name <short-name> --base-branch <branch>
-  --parent-worktree current --json` and select it exactly.
+- `<sel>` is the coordinator's worktree for SEC-REV, or
+  `path:<worktree-path>` for the reviewed worker's worktree, taken from
+  `worker-show` as for a reviewer. For SEC-PROOF and SEC-WRK, first create
+  SEC's own child worktree with `orca worktree create --name <short-name>
+  --base-branch <branch> --parent-worktree current --json` and select it
+  exactly.
 - If `tui-idle` still reports `blockedReason: agent-update-prompt`, Codex is
   showing its update menu. Dismiss it with Escape, never Enter, which runs the
   update, then wait again. Never update Codex from a SEC launch.

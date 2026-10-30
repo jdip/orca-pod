@@ -132,13 +132,16 @@ def validation(repository, head, parents):
         detail = github('run', 'view', str(item['databaseId']), '-R', repository,
                         '--json', 'status,conclusion,jobs,attempt,url', timeout=API_TIMEOUT)
         jobs = [job for job in detail['jobs'] if job['name'] == 'validate']
-        contexts = [context_match[1] for job in jobs for step in job['steps']
-                    if (context_match := CONTEXT_STEP.fullmatch(step['name']))
-                    and step['conclusion'] == 'success']
-        passed = (detail['status'] == 'completed' and detail['conclusion'] == 'success'
-                  and len(jobs) == 1 and jobs[0]['conclusion'] == 'success' and len(contexts) == 1)
+        steps = [(context_match[1], step['conclusion']) for job in jobs for step in job['steps']
+                 if (context_match := CONTEXT_STEP.fullmatch(step['name']))]
+        contexts = [context for context, conclusion in steps if conclusion == 'success']
+        succeeded = (detail['status'] == 'completed' and detail['conclusion'] == 'success'
+                     and len(jobs) == 1 and jobs[0]['conclusion'] == 'success')
+        # GitHub can list a successful job's steps late or without conclusions; that is not yet evidence.
         return {'integration': match[1], 'tree': tree,
-                'context': contexts[0] if len(contexts) == 1 else None, 'passed': passed,
+                'context': contexts[0] if len(contexts) == 1 else None,
+                'passed': succeeded and len(contexts) == 1,
+                'context_unexposed': succeeded and not any(conclusion for _, conclusion in steps),
                 'evidence': f'{detail["url"]} attempt {detail["attempt"]}'}
     return None
 
@@ -266,6 +269,9 @@ def merge(repository, number, expected_head, expected_base, pushed_over=None):
     if validated is None:
         raise ValueError(f'PR {number} has no Validate pull_request run recording an integration of '
                          f'{expected_head} onto {expected_base}; inspect its runs and base before merging')
+    if validated['context_unexposed']:
+        raise ValueError(f'latest Validate run for PR {number} integration passed, but GitHub has not yet exposed '
+                         f'its runtime-context step: {validated["evidence"]}; re-run delivery once it does')
     if not validated['passed']:
         raise ValueError(f'latest Validate run for PR {number} integration did not pass: {validated["evidence"]}')
     run.confirm(f'Validate {validated["evidence"]} passed on integration {validated["integration"]}')

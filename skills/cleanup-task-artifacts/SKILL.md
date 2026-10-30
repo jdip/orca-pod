@@ -99,7 +99,9 @@ never a missing value read as an empty default. A gap in a worktree's row retain
 that worktree; a gap in a listing that covers all worktrees (`inventory_gaps`)
 retains every worktree. Both report the gap. A live Orca terminal or agent, an
 unsettled or unreleased worker, the main checkout, the sweep's own worktree, local
-changes or unpublished commits also retain the worktree. A candidate also needs
+changes or unpublished commits also retain the worktree. A settled worker's adopted
+terminal (`external`, `retained`), which `worker-release` keeps, counts as released
+once closed and absent from a complete `orca terminal list`. A candidate also needs
 hosted delivery evidence (`delivery`): a `gh` compare against discovery's repository
 showing its HEAD already on its `test` delivery branch. Local remote-tracking refs never count. A
 failed inventory preserves every resource. A candidate is only a proposal for the

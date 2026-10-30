@@ -57,8 +57,8 @@ Standing instructions for each role are in [roles.md](roles.md).
 
 1. **Only ORC selects models**, from the roster. Workers never reroute.
 2. **Cross-provider review and proof.** REV and the independent bug proof
-   (TST-proof, SEC-PROOF) run on the other provider from the implementer; a spec
-   review or a map pass runs REV on the other provider from that record's
+   (TST-proof, SEC-PROOF) run on the other provider from the implementer; every
+   map-panel and spec-panel persona runs on the provider opposite the record's
    drafter. When WRK runs on Codex, REV flips to Claude Opus 5.5 xhigh and
    TST-proof to Claude Opus 5.5 medium. TST and BRW stay on Codex.
 3. **Read the receipt; never trust self-report.** On every `worker-start`
@@ -91,9 +91,9 @@ Standing instructions for each role are in [roles.md](roles.md).
    with the operator's actual answers and the relevant repository evidence, and
    reuse that PLN for later revisions. ORC keeps the live dialogue, reconciles
    PLN's proposed text and publishes through the owning workflow. It routes the
-   map pass through `wayfinder` and spec review through `to-spec`, and asks the
-   human only for map decisions, the Chart-the-map confirmation and escalated
-   review findings. ORC may draft a compact, fully settled record itself and
+   map panel through `brainstorm` and the spec panel through `to-spec`, and asks
+   the human only for map decisions, the `brainstorm` confirmation and
+   escalated panel findings. ORC may draft a compact, fully settled record itself and
    makes administrative updates without PLN.
 
 Launch failures are reported, never rerouted. Delegation never expands
@@ -163,11 +163,14 @@ rollup child, otherwise fresh `origin/test`. Make Git selectors exact.
 
 ```bash
 orca orchestration worker-start --agent codex --model gpt-6.1-sol --effort xhigh \
-  --worktree branch:<worker-branch> --task-title "🔍 REV <purpose>" \
+  --worktree path:<worktree-path> --task-title "🔍 REV <purpose>" \
   --spec "$(cat <brief-file>)" --json
 ```
 
-`path:<worktree-path>` and `id:<repo-id>::<path>` are equivalent selectors.
+`<worktree-path>` is the path after `::` in the worker's `worker.worktreeId`
+from `worker-show`. A worker's branch can differ from its `--name`, so never
+guess a `branch:` selector. `path:<worktree-path>` and `id:<repo-id>::<path>`
+are equivalent selectors.
 Creation flags (`--name`, `--base-branch`) are rejected for existing worktrees.
 
 **Wait, then parse the last JSON object.** `check --wait` emits NDJSON keepalive
@@ -204,6 +207,10 @@ orca orchestration worker-read --dispatch <dispatch_id> --source auto --limit 50
 orca orchestration worker-release --dispatch <dispatch_id> --json
 orca orchestration worker-retain --dispatch <dispatch_id> --json
 ```
+
+A `worker_done` body is only a summary: its `payload.reportPath` names the full
+report and `payload.filesModified` lists the changed files. Keep both fields when
+filtering messages, and read the report, when given, before accepting the result.
 
 After each accepted `worker_done`, validate it against the expected Dispatch,
 then do exactly one:
@@ -294,7 +301,8 @@ relaxes "no commit, push or merge unless assigned". Never Daybreak Red.
 ## SEC launch
 
 `worker-start` cannot pass Daybreak, so SEC adopts a terminal started with the
-`orca-pod-sec` Codex profile (`gpt-5.6-sol`, xhigh, `daybreak = true`):
+`orca-pod-sec` Codex profile (`gpt-5.6-sol`, xhigh, `daybreak = true`,
+`check_for_update_on_startup = false`):
 
 ```bash
 orca terminal create --worktree <sel> --title "🛡️ SEC <purpose>" \
@@ -304,10 +312,15 @@ orca orchestration worker-start --terminal <handle> --worktree <sel> \
   --task-title "🛡️ SEC <purpose>" --spec "$(cat <sec-brief-file>)" --json
 ```
 
-- `<sel>` is the coordinator's worktree for SEC-REV, or the reviewed worker's
-  worktree. For SEC-PROOF and SEC-WRK, first create SEC's own child worktree
-  with `orca worktree create --name <short-name> --base-branch <branch>
-  --parent-worktree current --json` and select it exactly.
+- `<sel>` is the coordinator's worktree for SEC-REV, or
+  `path:<worktree-path>` for the reviewed worker's worktree, taken from
+  `worker-show` as for a reviewer. For SEC-PROOF and SEC-WRK, first create
+  SEC's own child worktree with `orca worktree create --name <short-name>
+  --base-branch <branch> --parent-worktree current --json` and select it
+  exactly.
+- If `tui-idle` still reports `blockedReason: agent-update-prompt`, Codex is
+  showing its update menu. Dismiss it with Escape, never Enter, which runs the
+  update, then wait again. Never update Codex from a SEC launch.
 - Do not pass `--agent`, `--model` or `--effort` with `--terminal`. The
   receipt's `launch` fields are null for adopted terminals, so the receipt
   proves nothing about the model.
@@ -359,3 +372,47 @@ Claude Opus 5.5 max.
    synthesize: agreements, disagreements with the evidence for each, a
    recommendation, and what would falsify it. Return to high afterward.
 4. Return genuine human decisions to the operator with a recommendation.
+
+## Review panel
+
+A map panel or spec panel runs one fresh REV per persona on one frozen subject,
+under the [panel rules](../to-spec/review-lenses/panel.md). The owning skill
+names the personas and mode.
+
+1. **Brief each persona.** Use the Brief template, with read-only authority, and
+   add:
+
+   ```text
+   Panel: <map | spec> panel, round <n>.
+   Persona: <persona file path>. Mode: <MAP PASS | SPEC REVIEW>.
+   Lens: <the persona file's Lens line for that mode>.
+   Required reads: <panel rules path>, <persona file path>, <its standard path, if any>, the subject and the governing decisions. Open your report with the reads you made.
+   Subject: <repository SHA plus the inline draft | parent URL with its body, the body's lastEditedAt (or createdAt), and each child's outcome, acceptance, source links and blockers>.
+   Governing decisions: <map URL with its Destination, Decisions so far and Out of scope text>.
+   ```
+
+   The brief carries the frozen subject alone: never the dialogue, the
+   drafter's reasoning, another persona's output, earlier findings or the
+   settled list.
+2. **Start the whole wave before any waiting**, one `worker-start` per persona
+   (and per A/B session), each a new session:
+
+   ```bash
+   orca orchestration worker-start --agent <opposite> --model <REV model> --effort xhigh \
+     --worktree current --task-title "🔍 REV <panel> <persona> r<n>" \
+     --spec "$(cat <brief-file>)" --json
+   ```
+
+   `<opposite>` is the provider opposite the record's drafter: Codex
+   `gpt-6.1-sol` for a Claude drafter, Claude `claude-opus-5-5` (REV's
+   alternate) for a Codex drafter. Never pass `--terminal` or resume an earlier
+   reviewer.
+3. **Verify every receipt** under **Verify the model**. Personas share the
+   worktree, so match each provider record to its worker by creation time.
+4. **Settle the wave.** A failed launch, a missing report, a missing read or a
+   model or effort mismatch means not run. Recover a failed launch through
+   **Commands**; retry a not-run persona once on the same assignment, only after
+   the earlier attempt is settled or stopped. Never substitute a model or
+   provider. Release each worker after its accepted `worker_done`.
+5. **Synthesize** at ORC's xhigh alternate under the panel rules, then return to
+   high.

@@ -86,7 +86,7 @@ Run `gh issue view <number> --comments`.
 
 ## Wayfinding operations
 
-Used after `wayfinder`'s grilling entry confirms direction for new work. The
+Used after the `brainstorm` confirmation settles direction for new work. The
 **map** is a single issue; real decision tickets are
 native children. A compact settled map records the agreed direction directly and
 needs no invented children. Keep it open through handoff bookkeeping, then
@@ -111,9 +111,9 @@ Used by `to-spec`, `to-tickets`, `triage`, `select backlog` and `next-issue`,
 including its continue mode.
 
 The Implementation Specification body owns current approved scope and acceptance;
-comments hold decisions, discussion, and evidence. `to-spec` reviews the drafted
-parent and child breakdown independently against the map, recording each
-iteration as a parent comment, in place of human approval; under a map waiver
+comments hold decisions, discussion, and evidence. `to-spec`'s isolated spec
+panel reviews the drafted parent and child breakdown against the map, recording
+each round as a parent comment, in place of human approval; under a map waiver
 the operator approves them. Publish the approved relationships through
 `to-tickets` and verify them before reporting completion. Publication alone does
 not select or execute a backlog.
@@ -139,6 +139,7 @@ not select or execute a backlog.
   Do not silently reparent issues from another effort. Preserve dependencies.
 - **Design gate**: before taking or continuing implementation, require covering
   resolved map and approved specification evidence under `to-spec`'s definition,
+  a fresh confirmation of a still-eligible [fast-lane issue](#fast-lane-issues),
   or an explicit scoped operator planning waiver. Follow next-issue’s Design gate against the specification’s
   associated map, not the saved planning pointer. An open/reopened map pauses the whole backlog until resolved. Routine
   implementation choices do not reopen maps. A substantive missing decision is
@@ -161,6 +162,16 @@ not select or execute a backlog.
   are closed but the parent still awaits delivery. Planning maps retain the
   separate planning/handoff lifecycle above. Promotion is separately requested.
 
+## Fast-lane issues
+
+`next-issue`'s **Fast lane** owns the shape, confirmation and escalation of a
+standalone fast-lane issue; it has no label, parent or backlog selection. Create
+it with a body file holding `## Problem`, `## Outcome`, `## Acceptance` and
+`**Lane:** fast`. After the owner's yes, post the `Fast-lane confirmation`
+comment with `gh issue comment`. `gh issue view --json` lacks `lastEditedAt`, so
+read the freshness timestamps with GraphQL:
+`gh api graphql -f query='query{repository(owner:"<owner>",name:"<repo>"){issue(number:<n>){createdAt lastEditedAt comments(last:100){nodes{createdAt body}}}}}'`.
+
 ## Ready Backlog and Triage
 
 `implementation:backlog` identifies an Implementation Specification parent.
@@ -178,10 +189,10 @@ paginate the relevant open issues without filtering out blocked or claimed work.
 
 Triage refines, deduplicates, and orders within approved scope, preserving
 claims and dependencies. Group approved small fixes only where the existing
-resolved map and approved spec cover them. Otherwise use Wayfinder and the
-spec/ticket owners for a compact plan; only an explicit scoped operator waiver
-changes the planning gate. Expanding scope, moving work between efforts, and
-admitting prepared parents to the Ready Backlog require a human decision.
+resolved map and approved spec cover them. Otherwise propose the fast lane for an
+eligible fix, or use Wayfinder and the spec/ticket owners for a compact plan;
+only an explicit scoped operator waiver changes the planning gate. Expanding
+scope, moving work between efforts, and admitting prepared parents to the Ready Backlog require a human decision.
 Current scope and acceptance live in issue bodies; comments hold evidence.
 
 Triage reads and validates the explicit scope and owner binding before offering

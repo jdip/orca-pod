@@ -33,9 +33,9 @@ Maps, specifications, and ticket handoffs are required records: they preserve
 decisions and context across tasks and prevent long-term drift. Keep the records
 complete while scaling discovery and discussion to what remains unresolved.
 
-For every new-work discussion, invoke `wayfinder` and its `grilling` entry before
-creating a map. Complete the actual dialogue and obtain the user's confirmation
-of shared understanding; reading the skills or drafting a proposal alone does not
+For every new-work discussion, invoke `brainstorm`'s full entry before creating
+a map. Complete the actual dialogue and obtain the `brainstorm` confirmation of
+shared understanding; reading the skills or drafting a proposal alone does not
 complete that entry. That confirmation is the single human planning gate; under
 a map waiver, the operator approves the spec instead. Approved continuations
 reuse settled answers; material changes to scope, assumptions, or outcome reopen

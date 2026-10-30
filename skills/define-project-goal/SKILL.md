@@ -19,8 +19,8 @@ Use a clear existing purpose as the baseline. Reuse settled wording and answers;
 a valid existing blurb can complete this step without edits or another interview.
 
 When purpose is missing, unclear, conflicting, or the operator requests a change,
-use `grilling` to work through the unresolved questions with the operator. Ground
-options in available repository facts; ask what the project should serve rather
+use `brainstorm`'s dialogue-only entry to work through the unresolved questions
+with the operator. Ground options in available repository facts; ask what the project should serve rather
 than inferring intent solely from what it happens to implement today. Batch
 independent questions when useful and wait for the human's actual answers.
 

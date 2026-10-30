@@ -91,8 +91,8 @@ Standing instructions for each role are in [roles.md](roles.md).
    with the operator's actual answers and the relevant repository evidence, and
    reuse that PLN for later revisions. ORC keeps the live dialogue, reconciles
    PLN's proposed text and publishes through the owning workflow. It routes the
-   map pass through `wayfinder` and the spec panel through `to-spec`, and asks
-   the human only for map decisions, the Chart-the-map confirmation and
+   map panel through `brainstorm` and the spec panel through `to-spec`, and asks
+   the human only for map decisions, the `brainstorm` confirmation and
    escalated panel findings. ORC may draft a compact, fully settled record itself and
    makes administrative updates without PLN.
 

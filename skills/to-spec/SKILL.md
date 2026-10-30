@@ -101,7 +101,7 @@ a concrete blast radius requires both forms to coexist temporarily.
 
 ## Review the draft against the map
 
-With a map, the Chart-the-map confirmation is the only human planning gate. An
+With a map, the `brainstorm` confirmation is the only human planning gate. An
 isolated spec panel reviewing the parent and full breakdown against the map
 replaces human spec and ticket approval.
 
@@ -174,7 +174,7 @@ dependency edges, reads them back and sends the human its spec-link report
 without waiting for a reply.
 
 Publication does not select the parent or authorize execution. Under `whats-next`
-or an implementation request, the Chart-the-map confirmation, or the operator's
+or an implementation request, the `brainstorm` confirmation, or the operator's
 approval under a map waiver, carries on with no further prompt: `triage` admits
 the parent to `implementation:ready`, `select backlog` activates it when no parent is
 active in that scope, and `next-issue` or its continue mode carries it to

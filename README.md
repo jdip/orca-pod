@@ -88,7 +88,11 @@ calls them:
    rounds in a row come back clean, and you get a short report with the spec
    link. You are asked again only when the panel churns or reaches five rounds,
    a finding changes a map decision, or the scope changes. If you waive
-   the map, you approve the spec and tickets directly instead.
+   the map, you approve the spec and tickets directly instead. A small fix to
+   an existing mechanism can take the fast lane: you say yes to one tracking
+   issue, it skips the map, spec and panels, and it keeps the real checks,
+   review on the other provider and normal delivery. A real decision moves it
+   to the full flow.
 4. **Run.** Approved tickets are claimed, implemented in their own Orca
    worktrees, reviewed on the other provider and delivered. Your approval carries
    across these handoffs; you don't repeat it per ticket.

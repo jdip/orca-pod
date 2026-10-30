@@ -111,9 +111,9 @@ Used by `to-spec`, `to-tickets`, `triage`, `select backlog` and `next-issue`,
 including its continue mode.
 
 The Implementation Specification body owns current approved scope and acceptance;
-comments hold decisions, discussion, and evidence. `to-spec` reviews the drafted
-parent and child breakdown independently against the map, recording each
-iteration as a parent comment, in place of human approval; under a map waiver
+comments hold decisions, discussion, and evidence. `to-spec`'s isolated spec
+panel reviews the drafted parent and child breakdown against the map, recording
+each round as a parent comment, in place of human approval; under a map waiver
 the operator approves them. Publish the approved relationships through
 `to-tickets` and verify them before reporting completion. Publication alone does
 not select or execute a backlog.

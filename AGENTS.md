@@ -45,6 +45,8 @@ in separate Orca worktrees. Direct-delivery branches and implementation rollups
 start from fresh `origin/test`; rollup child branches start from the current
 rollup. Preserve existing local work before switching or updating a checkout.
 Detached revision worktrees remain valid for the canonical scripts' verification.
+On each host, Orca's default base ref for this repository is `origin/test`;
+`machine/install.py` sets it and reads back `worktreeBaseRef` from `orca repo show`.
 
 Multi-ticket implementation parents use reviewed child PRs with targeted checks
 into their recorded rollup branch, then one final PR to `test` with full CI;

@@ -44,6 +44,7 @@ CLAUDE_MODEL = re.compile(r'claude-[a-z0-9]+(?:-[a-z0-9]+)*')  # A roster Claude
 
 ORCA_SKILLS = ('orca-cli', 'orchestration')
 ORCA_PATCH = {'branchPrefix': 'custom', 'branchPrefixCustom': 'orca', 'agentPermissionDefault': 'full-access'}
+BASE_REF = 'origin/test'  # The Standard's Orca default base ref, so new worktrees start from test.
 # roles.toml has no Codex ORC entry; the Codex coordinator alternative is pinned here (jdip/orca-pod#13).
 # Codex runs with Full Access, as Orca launches agents (jdip/orca-pod#43); a --profile file layers on top of these.
 CODEX_ROOT = {'model': 'gpt-6.1-sol', 'model_reasoning_effort': 'high', 'default_permissions': ':danger-full-access',
@@ -685,6 +686,7 @@ class Plan:
         self.notes = []
         self.refusals = []
         self.automations = []
+        self.base_ref = None
 
     def show(self, path):
         try:
@@ -1094,8 +1096,8 @@ def orca_list(*args, key):
     return [row for row in rows if isinstance(row, dict)]
 
 
-def primary_workspace():
-    """The Orca worktree (id, path) of this repository's primary checkout."""
+def primary_repo():
+    """The Orca repository row of this repository's primary checkout, and that checkout's path."""
     common = Path(subprocess.run(['git', '-C', str(ROOT), 'rev-parse', '--path-format=absolute', '--git-common-dir'],
                                  capture_output=True, text=True, check=True).stdout.strip())
     if common.name != '.git':
@@ -1103,11 +1105,17 @@ def primary_workspace():
     primary = common.parent.resolve()
     repos = [repo for repo in orca_list('repo', 'list', key='repos')
              if isinstance(repo.get('path'), str) and Path(repo['path']).resolve() == primary]
-    if len(repos) != 1:
+    if len(repos) != 1 or not isinstance(repos[0].get('id'), str):
         raise Refusal(f'the primary checkout {primary} is not an Orca repository; add it with '
                       f'`orca repo add --path {primary}` and rerun')
-    mains = [tree for tree in orca_list('worktree', 'list', '--repo', f'id:{repos[0].get("id")}', key='worktrees')
-             if tree.get('isMainWorktree') is True and tree.get('repoId') == repos[0].get('id')]
+    return repos[0], primary
+
+
+def primary_workspace():
+    """The Orca worktree (id, path) of this repository's primary checkout."""
+    repo, primary = primary_repo()
+    mains = [tree for tree in orca_list('worktree', 'list', '--repo', f'id:{repo["id"]}', key='worktrees')
+             if tree.get('isMainWorktree') is True and tree.get('repoId') == repo['id']]
     if len(mains) != 1 or not all(isinstance(mains[0].get(k), str) for k in ('id', 'path')):
         raise Refusal(f'Orca lists no single main worktree for {primary}')
     return mains[0]['id'], mains[0]['path']
@@ -1220,6 +1228,37 @@ def plan_automations(plan, args):
     plan.automations = ops
 
 
+def plan_base_ref(plan, args):
+    """Plan the primary checkout's Orca default base ref. It is the Standard's repository setting, not an installed
+    artifact, so the manifest does not record it and --uninstall leaves it set."""
+    if args.scratch or args.skip_orca_settings:
+        plan.base_ref = {'action': 'planned' if args.scratch else 'skip',
+                         'reason': 'not set: scratch --home run' if args.scratch else '--skip-orca-settings'}
+        return
+    repo, primary = primary_repo()
+    current = repo.get('worktreeBaseRef')
+    plan.base_ref = {'action': 'unchanged' if current == BASE_REF else 'set', 'repo_id': repo['id'],
+                     'primary': str(primary), 'current': current}
+
+
+def apply_base_ref(plan):
+    """Set the primary checkout's Orca default base ref, then confirm it with `orca repo show`."""
+    op = plan.base_ref
+    if not op or op['action'] != 'set':
+        return True
+    try:
+        orca_json('repo', 'set-base-ref', '--repo', f'id:{op["repo_id"]}', '--ref', BASE_REF)
+        repo = orca_json('repo', 'show', '--repo', f'id:{op["repo_id"]}').get('repo')
+        current = repo.get('worktreeBaseRef') if isinstance(repo, dict) else None
+        if current != BASE_REF:
+            raise Refusal(f'`orca repo show` reads back {json.dumps(current)}, not {BASE_REF}')
+    except Refusal as error:
+        print(f'Orca default base ref: FAILED: {error}')
+        return False
+    print(f'Orca default base ref: set to {BASE_REF} for {op["primary"]}')
+    return True
+
+
 def apply_automations(plan, writer, manifest):
     """Carry out the planned automation changes, recording each owned id in the manifest as soon as it changes."""
     ok, records = True, manifest.setdefault('automations', {})
@@ -1301,11 +1340,12 @@ def build_plan(home, old, args):
     for path, leaf_dir in ((home / STATE, True), (home / STATE / 'backups', True), (home / STATE / 'manifest.json', False)):
         plan.check(path, leaf_dir)
     for step in (plan_skills, plan_roles, plan_rules, lambda p: plan_codex_config(p, args.adopt_config),
-                 plan_claude, plan_stale, lambda p: plan_automations(p, args)):
+                 plan_claude, plan_stale, lambda p: plan_automations(p, args), lambda p: plan_base_ref(p, args)):
         try:
             step(plan)
         except (Refusal, ValueError, OSError, subprocess.CalledProcessError) as error:
-            plan.refusals.append(str(error))
+            if str(error) not in plan.refusals:  # The automations and base ref share the primary checkout lookup.
+                plan.refusals.append(str(error))
     return plan
 
 
@@ -1346,6 +1386,7 @@ def print_plan(plan, args, source):
         print(f'  run          orca skills install {" ".join("--skill " + s for s in ORCA_SKILLS)} --agent claude,codex')
         print(f'  run          orca skills update {" ".join("--skill " + s for s in ORCA_SKILLS)}')
     print_automations(plan)
+    print_base_ref(plan)
     if not args.scratch:
         if args.skip_orca_settings:
             print('  skip         Orca app settings (--skip-orca-settings)')
@@ -1384,6 +1425,19 @@ def print_automations(plan):
                   f'Python helpers {definition["python"]}')
         if op.get('changes'):
             print(f'      changes: {", ".join(op["changes"])}')
+
+
+def print_base_ref(plan):
+    op = plan.base_ref
+    if not op:
+        return
+    if op.get('reason'):
+        detail = f' ({op["reason"]})'
+    elif op['action'] == 'set':
+        detail = f' for {op["primary"]} (was {json.dumps(op["current"]) if op["current"] else "unset"})'
+    else:
+        detail = f' for {op["primary"]}'
+    print(f'  {op["action"]:<12} Orca default base ref {BASE_REF}{detail}')
 
 
 SIGN_IN = {'claude': (('claude', 'auth', 'status', '--json'), ('claude', 'auth', 'login', '--claudeai')),
@@ -1679,8 +1733,8 @@ def settle_orca_record(writer, manifest, result, earlier):
 
 
 def orca_steps(plan, args, writer, manifest, stamp):
-    """Install Orca's own skills, apply the managed automations, then patch Orca's app settings, recording owned
-    automation ids and previous settings values in the manifest."""
+    """Install Orca's own skills, apply the managed automations and default base ref, then patch Orca's app settings,
+    recording owned automation ids and previous settings values in the manifest."""
     if args.scratch:
         return True
     ok = True
@@ -1693,6 +1747,7 @@ def orca_steps(plan, args, writer, manifest, stamp):
     if args.skip_orca_settings:
         return ok
     ok &= apply_automations(plan, writer, manifest)  # Before the settings patch, which restarts Orca.
+    ok &= apply_base_ref(plan)
     pre = orca_settings_module().preflight(ORCA_PATCH)
     if not pre['ok']:
         print(f'Orca app settings refused: {pre["error"]}')
@@ -1882,7 +1937,7 @@ def main():
     parser.add_argument('--adopt-config', action='store_true',
                         help='move unmarked managed keys in ~/.codex/config.toml into the managed blocks')
     parser.add_argument('--skip-orca-settings', action='store_true',
-                        help="leave Orca's app settings and automations alone")
+                        help="leave Orca's app settings, automations and default base ref alone")
     parser.add_argument('--allow-unpublished', action='store_true',
                         help='testing only: install from a dirty or unpublished checkout')
     parser.add_argument('--verbose', action='store_true', help='also list unchanged paths')

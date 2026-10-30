@@ -119,6 +119,13 @@ here for this workflow's delivery; existing verification opt-in does not require
 Apply the selected standard's Claude guidance bridge contract to root and applicable
 nested repository-owned guidance.
 
+Set the target's Orca default base ref to `origin/test` on the current host with
+`orca repo set-base-ref --repo <selector> --ref origin/test`, and confirm
+`worktreeBaseRef` reads back as `origin/test` from `orca repo show`. This applies at
+adoption and at upgrade. When Orca is unavailable or the target isn't registered in
+it on this host, don't guess a repository: report the exact `orca repo add --path
+<primary checkout>` and `set-base-ref` steps as a host step for the operator.
+
 ## Validate
 
 Apply the selected standard's Validation and adoption and Verification evidence

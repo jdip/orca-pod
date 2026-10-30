@@ -145,18 +145,23 @@ comments, and record the human's decision on the parent.
 
 An **approved specification** is a parent with one of:
 
-- a latest `Spec panel` record whose result is `converged` and which is fresh:
-  the body's GraphQL `lastEditedAt`, or its `createdAt` when `lastEditedAt` is
-  null (never edited), is strictly earlier than that record's `createdAt`; an
-  equal or unclear order is not fresh, so review again;
+- a latest `Spec panel` record whose result is `converged` and which is fresh;
 - the human's approving decision after escalation;
 - a passing `Spec review <n>/3` comment, the format used before the spec panel,
-  that is still fresh by the same rule;
+  that is still fresh;
 - a human approval recorded before the review loop existed; or
 - the operator's approval under a recorded, scoped map waiver.
 
-A material amendment to the body goes back through the spec panel, or to the
-operator under a map waiver.
+A record is **fresh** when the body's GraphQL `lastEditedAt`, or its `createdAt`
+when `lastEditedAt` is null (never edited), is strictly earlier than the
+`createdAt` of that record or of a later administrative-edit comment; an equal or
+unclear order is not fresh, so review again.
+
+An **administrative edit** changes no scope, acceptance criterion or decision,
+such as recording the rollup's creation revision in the Delivery field or adding
+a source link. Make it without a new panel, then post a comment on the parent
+naming exactly what changed. Every other body edit is a material amendment and
+goes back through the spec panel, or to the operator under a map waiver.
 
 ## Publish and continue
 

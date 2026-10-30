@@ -122,7 +122,9 @@ rare even when the draft improves:
 - **Converged:** two consecutive clean rounds. One clean round is not enough,
   because the next fresh reviewer can find a different gap in the same text. In
   the converging round, decline remaining Nits or fix them and run another
-  round; an edit after a `converged` record makes it stale.
+  round. An edit after a `converged` record makes it stale, except a spec's
+  recorded administrative edit under the
+  [freshness rule](../SKILL.md#review-the-draft-against-the-map).
 - **Cap:** 5 rounds per loop.
 - **Churn:** a new finding is at the scope of an applied fix, and reverting that
   fix would resolve it.

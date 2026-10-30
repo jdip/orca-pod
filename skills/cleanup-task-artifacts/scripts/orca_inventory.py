@@ -130,6 +130,15 @@ def workers():
     return runs, [worker for worker in rows if worker['resource'] is not None]
 
 
+def closed_adoption(worker, open_handles):
+    """An adopted terminal that worker-release retains and the supervisor has since closed."""
+    if open_handles is None or worker['terminalState'] != 'retained':
+        return False
+    resource = worker['resource']
+    return (field(resource, 'ownershipState', str, 'worker resource') == 'external'
+            and field(resource, 'terminalHandle', str, 'worker resource') not in open_handles)
+
+
 def git(path, *arguments):
     return subprocess.run(['git', '-C', path, *arguments], capture_output=True, text=True, timeout=TIMEOUT_SECONDS)
 
@@ -299,7 +308,11 @@ def inventory(discovery):
     rows = field(listing, 'worktrees', list, 'worktree ps')
     gathered(gaps, 'worktree ps', lambda: complete(listing, 'worktrees', 'worktree ps'), None)
     terminals = gathered(gaps, 'terminal list', lambda: complete(orca('terminal', 'list', '--limit', '1000'),
-                                                                  'terminals', 'terminal list'), [])
+                                                                  'terminals', 'terminal list'), None)
+    # Only a complete listing can show that a terminal is closed.
+    open_handles = None if terminals is None else gathered(
+        gaps, 'terminal list', lambda: {field(terminal, 'handle', str, 'terminal') for terminal in terminals}, None)
+    terminals = terminals or []
     by_worktree = {}
     for terminal in terminals:
         terminal_id = gathered(gaps, 'terminal list', lambda: field(terminal, 'worktreeId', str, 'terminal'), None)
@@ -309,7 +322,10 @@ def inventory(discovery):
         coverage.append('no orchestration Runs listed')
     live_workers = {}
     for worker in worker_rows:
-        if worker['terminalState'] not in IDLE_TERMINAL_STATES or worker['workerState'] not in SETTLED_WORKER_STATES:
+        settled = worker['workerState'] in SETTLED_WORKER_STATES and (
+            worker['terminalState'] in IDLE_TERMINAL_STATES
+            or gathered(gaps, 'orchestration workers', lambda: closed_adoption(worker, open_handles), False))
+        if not settled:
             live_workers.setdefault(worker['resource']['worktreeId'], []).append(worker['dispatchId'])
 
     ids = [row.get('worktreeId') if isinstance(row, dict) else None for row in rows]

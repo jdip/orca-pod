@@ -165,6 +165,7 @@ def codex_profile(role):
         f'model = {toml_string(entry["model"])}',
         f'model_reasoning_effort = {toml_string(entry["effort"])}',
         'daybreak = true',
+        'check_for_update_on_startup = false',
         '',
     ])
 

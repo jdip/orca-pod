@@ -14,7 +14,7 @@ resuming; never fall back to a personal address.
 An implementation request includes preparation, intended commits, push, PR, checks,
 merge, and verified test delivery. Preserve unrelated work and use a clean committed
 task checkout. Read AGENTS.md and docs/development.md. Required tools are Git,
-authenticated gh, Bash, and Python 3.11+ (`ORCA_POD_PYTHON` can select it).
+authenticated gh, Bash, and Python 3.14+ selected by `ORCA_POD_PYTHON`.
 
 Review all submitted changes. Reuse completed review only with evidence covering
 every change and resolved/accepted findings; doubt requires the relevant review.

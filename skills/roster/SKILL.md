@@ -11,7 +11,7 @@ description: >-
 
 The coordinator (ORC) dispatches every delegated task from this roster. The
 source of truth is [`roster/roles.toml`](../../roster/roles.toml) in the Orca Pod
-repository; change models there and rerun `roster/generate.py`, never here.
+repository; change models there and rerun `"$ORCA_POD_PYTHON" roster/generate.py`, never here.
 Standing instructions for each role are in [roles.md](roles.md).
 
 ## Roles
@@ -179,7 +179,7 @@ object. Skip the keepalives and take the last object:
 
 ```bash
 orca orchestration check --wait --types worker_done,escalation,question \
-  --timeout-ms 900000 --json 2>&1 | python3 -c '
+  --timeout-ms 900000 --json 2>&1 | "$ORCA_POD_PYTHON" -c '
 import json, sys
 text, decoder, pos, last = sys.stdin.read(), json.JSONDecoder(), 0, None
 while (pos := text.find("{", pos)) != -1:
@@ -242,7 +242,7 @@ confirm it; use the worker's worktree path from `worker-show`.
 sqlite3 -readonly ~/.codex/state_5.sqlite \
   "SELECT id, model, reasoning_effort, daybreak_enabled, rollout_path FROM threads
    WHERE cwd = '<worktree-path>' ORDER BY created_at_ms DESC LIMIT 3;"
-python3 - <rollout_path> <<'EOF'
+"$ORCA_POD_PYTHON" - <rollout_path> <<'EOF'
 import json, sys
 for line in open(sys.argv[1]):
     entry = json.loads(line)
@@ -257,8 +257,8 @@ slug is the worktree path with every non-alphanumeric character replaced by
 `-`:
 
 ```bash
-slug=$(python3 -c 'import re, sys; print(re.sub(r"[^A-Za-z0-9]", "-", sys.argv[1]))' "<worktree-path>")
-python3 - "$(ls -t ~/.claude/projects/"$slug"/*.jsonl | head -1)" <<'EOF'
+slug=$("$ORCA_POD_PYTHON" -c 'import re, sys; print(re.sub(r"[^A-Za-z0-9]", "-", sys.argv[1]))' "<worktree-path>")
+"$ORCA_POD_PYTHON" - "$(ls -t ~/.claude/projects/"$slug"/*.jsonl | head -1)" <<'EOF'
 import json, sys
 seen = set()
 for line in open(sys.argv[1]):

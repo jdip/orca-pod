@@ -23,7 +23,7 @@ work, and worktrees still backing live Orca agents.
 
 ## Languages and environments
 
-Tooling logic uses Python 3.11+ with the standard library only. One named
+Tooling logic uses Python 3.14+ (`.python-version`) with the standard library only. One named
 exception: the `engineering-brief` renderer installs its hash-pinned
 Python-Markdown (`skills/engineering-brief/requirements.txt`) into a skill-owned
 virtual environment in its private local archive, never globally or through

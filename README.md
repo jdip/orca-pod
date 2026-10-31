@@ -14,7 +14,7 @@ Orca Pod supports macOS hosts.
 1. Install [Orca](https://github.com/stablyai/orca),
    [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview),
    [Codex](https://developers.openai.com/codex/), Git, the GitHub CLI (then
-   `gh auth login`) and Python 3.11+.
+   `gh auth login`) and Python 3.14+.
 2. Clone this repository and keep the checkout on `test`, a published branch the
    installer accepts. This is your primary checkout; the scheduled automations run
    in it.
@@ -30,7 +30,7 @@ Orca Pod supports macOS hosts.
    automations, and starts (or prints) any missing Claude or Codex sign-in.
 
    ```bash
-   export ORCA_POD_PYTHON="$(command -v python3)"   # any Python 3.11+
+   export ORCA_POD_PYTHON="$(uv python find 3.14)"   # any Python 3.14+
    "$ORCA_POD_PYTHON" machine/install.py
    "$ORCA_POD_PYTHON" machine/install.py --apply
    ```

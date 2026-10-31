@@ -15,7 +15,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
-          python-version: '3.12'
+          python-version-file: .python-version
       - name: Record source-check runtime
         id: runtime
         run: echo "context=${ImageOS:?}/${ImageVersion:?}/$(python3 --version)" >> "$GITHUB_OUTPUT"

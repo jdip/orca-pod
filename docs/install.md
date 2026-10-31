@@ -5,8 +5,8 @@ generated Claude and Codex roles, the global rules, the managed keys in both
 agents' settings, Orca's own skills, Orca's app settings, two scheduled Orca
 automations and the Orca default base ref of Orca Pod's primary checkout. It owns specific
 paths and keys inside the default agent homes (`~/.claude`, `~/.codex`,
-`~/.agents`) and never takes over a whole home. It needs Python 3.11+ (standard
-library only) and runs on macOS only.
+`~/.agents`) and never takes over a whole home. It needs Python 3.14+, the
+minimum in `.python-version` (standard library only), and runs on macOS only.
 
 ## Usage
 
@@ -14,16 +14,41 @@ Run it from a clean checkout of a published revision, that is, one whose HEAD
 is on `origin/test` or `origin/main` (run `git fetch` first):
 
 ```bash
-export ORCA_POD_PYTHON="$(command -v python3)"   # any Python 3.11+; see below
+export ORCA_POD_PYTHON="$(uv python find 3.14)"  # any Python 3.14+; see below
 "$ORCA_POD_PYTHON" machine/install.py              # dry run (the default): print the plan, write nothing
 "$ORCA_POD_PYTHON" machine/install.py --apply      # install or update
 "$ORCA_POD_PYTHON" machine/install.py --uninstall  # remove what the installer owns, restoring backups
 ```
 
-When the host's `python3` is older than 3.11, select another interpreter, for
-example `export ORCA_POD_PYTHON="$(uv python find 3.13)"`. The installer runs its
-child helpers (`roster/generate.py`, `machine/orca_settings.py`) with
-`ORCA_POD_PYTHON` too, falling back to its own interpreter.
+### Python interpreter
+
+The installer resolves one interpreter: `ORCA_POD_PYTHON`, else its own, as an
+absolute path with symlinks resolved. It refuses one older than the
+`.python-version` minimum. It runs its child helpers (`roster/generate.py`,
+`machine/orca_settings.py`) with that interpreter, names it in both automation
+prompts ([below](#orca-automations)) and records it as `ORCA_POD_PYTHON` in both
+agents' environments: `env` in `~/.claude/settings.json` and
+`[shell_environment_policy.set]` in `~/.codex/config.toml`. Every Claude and
+Codex session then runs the skills' Python helpers and shell entry points on it.
+Sessions started before `--apply` keep their old environment until restarted.
+
+A plain terminal gets no such setting; export it there, for example in the shell
+you run the delivery scripts from:
+
+```bash
+export ORCA_POD_PYTHON="$(uv python find 3.14)"
+```
+
+Each shell entry point refuses an older or missing interpreter with a message
+naming `ORCA_POD_PYTHON`. When the recorded interpreter moves, for example after
+uv replaces a patch release, which changes the resolved path, rerun `--apply`
+with the new one; it updates both keys and both prompts in place.
+
+To roll back to a revision older than this one, first run this or a newer
+installer's `--uninstall` with a 3.14+ interpreter, then apply the older
+revision and restart running sessions. An older installer refuses a manifest
+that owns the `ORCA_POD_PYTHON` keys, and a `config.toml` holding their managed
+block.
 
 The dry run lists every action per target: `create`, `update`, `update (changed
 since install; current copy backed up)`, `update keys` (a managed JSON file),
@@ -82,8 +107,8 @@ and after an Orca upgrade, which can change Orca's skills and its Codex hooks.
 | `~/.claude/agents/<role>.md`, `~/.codex/agents/<role>.toml` | Native roles rendered by `roster/generate.py` from `roster/roles.toml`. |
 | `~/.codex/orca-pod-sec.config.toml` | The SEC Daybreak profile (`codex --profile orca-pod-sec`), also from the generator. It turns off Codex's startup update check, so SEC launches never stop at the update menu. |
 | `~/.codex/AGENTS.md`, `~/.claude/rules/orca-pod.md` | The global rules in [`machine/global-rules.md`](../machine/global-rules.md). |
-| `~/.codex/config.toml` | Managed blocks only (below): root `model = "gpt-6.1-sol"`, `model_reasoning_effort = "high"` and Codex Full Access, `[agents] enabled = true`, `[features] hooks = true`, and hook trust for Orca's hooks. Every other line, comment and the end of the file are preserved byte for byte. |
-| `~/.claude/settings.json` | Top-level `model` and the nested `modelSettings.<model>.effortLevel`, both from the roster's ORC default, `skipDangerousModePermissionPrompt: true`, and `theme: "dark"` only when no theme is set. Claude Code takes a session's default effort from that model's `modelSettings` entry; it treats a top-level `effortLevel` as a legacy value and does not apply it at startup, so the installer does not own one. Other `modelSettings` entries, and other fields of the model's entry, are left alone; uninstall removes the entry, or `modelSettings`, only when the installer created it and nothing else is left in it. Orca's hooks and status line, and every other key, keep their order and values; the file keeps its indent style and final newline, though JSON spelling such as escapes may be normalized. |
+| `~/.codex/config.toml` | Managed blocks only (below): root `model = "gpt-6.1-sol"`, `model_reasoning_effort = "high"` and Codex Full Access, `[agents] enabled = true`, `[features] hooks = true`, `ORCA_POD_PYTHON` in `[shell_environment_policy.set]` ([Python interpreter](#python-interpreter)), and hook trust for Orca's hooks. Every other line, comment and the end of the file are preserved byte for byte. |
+| `~/.claude/settings.json` | Top-level `model` and the nested `modelSettings.<model>.effortLevel`, both from the roster's ORC default, `skipDangerousModePermissionPrompt: true`, `env.ORCA_POD_PYTHON` ([Python interpreter](#python-interpreter)), and `theme: "dark"` only when no theme is set. Claude Code takes a session's default effort from that model's `modelSettings` entry; it treats a top-level `effortLevel` as a legacy value and does not apply it at startup, so the installer does not own one. Other `modelSettings` entries, and other fields of the model's entry, are left alone; uninstall removes the entry, or `modelSettings`, only when the installer created it and nothing else is left in it; `env` and its other keys are treated the same way. Orca's hooks and status line, and every other key, keep their order and values; the file keeps its indent style and final newline, though JSON spelling such as escapes may be normalized. |
 | `~/.claude.json` | First-run keys, set only when missing: `hasCompletedOnboarding: true` and `lastOnboardingVersion` (from `claude --version`). Running Claude sessions rewrite this file, so it is only written when a key is missing. |
 | Orca's skills | `orca skills install --skill orca-cli --skill orchestration --agent claude,codex`, then `orca skills update` for the same skills. Orca owns these copies. |
 | Orca app settings | `branchPrefix: "custom"`, `branchPrefixCustom: "orca"` and `agentPermissionDefault: "full-access"`, applied by [`machine/orca_settings.py`](../machine/orca_settings.py) (below). |
@@ -120,9 +145,11 @@ prompts, as Orca's `agentPermissionDefault: "full-access"` does for the agents i
 launches. A `codex --profile` file, such as the SEC profile, layers on top of
 this base config and so inherits them.
 
-The root block sits before the first table. The `agents` and `features` blocks
-go inside an existing `[agents]` or `[features]` table, or carry their own
-header at the end of the file. The `hooks.state` block holds one table per Orca
+The root block sits before the first table. The `agents`, `features` and
+`shell_environment_policy.set` blocks go inside an existing table of that name,
+or carry their own header at the end of the file; other keys in that table, such
+as another app's `[shell_environment_policy.set]` entries, are preserved. The
+`hooks.state` block holds one table per Orca
 hook. A statement, comment or blank line added inside a block is kept byte for
 byte, in order, just after the block on the next run and on uninstall.
 A block that carries its own table header keeps that header on uninstall when a
@@ -221,7 +248,7 @@ resolved at install time: the run invokes each Python helper with it and passes
 it to each shell helper as `ORCA_POD_PYTHON`. Orca gives an automation no
 environment of its own and accepts only model and effort as extra arguments, so
 the prompt carries it. A run therefore does not depend on the host's default
-`python3`, which can be older than the 3.11 the skills need. Run the installer
+`python3`, which can be older than the 3.14 the skills need. Run the installer
 with the interpreter the automations should use; after that interpreter moves,
 rerun `--apply` with the new one, which edits both prompts in place.
 

@@ -5,12 +5,17 @@ installer, and `scripts/` delivery helpers are Tooling: they maintain machines a
 repositories. There is no separate application, server, or deployable product
 runtime here. Classify future code by purpose rather than its language.
 
-Requirements: Git, authenticated `gh` for this repository, Bash, and Python 3.11+.
-Orca Pod supports macOS hosts; CI runs the same checks on Linux.
-Set `ORCA_POD_PYTHON` to select the interpreter when the host's `python3` is
-older, for example `ORCA_POD_PYTHON="$(uv python find 3.13)"` on macOS. CI uses 3.12.
+Requirements: Git, authenticated `gh` for this repository, Bash, and Python 3.14+,
+the minimum in `.python-version`. Orca Pod supports macOS hosts; CI runs the same
+checks on Linux with the `.python-version` interpreter. `ORCA_POD_PYTHON` selects
+the interpreter; installed agent sessions get it from the installer, and a plain
+terminal needs `export ORCA_POD_PYTHON="$(uv python find 3.14)"` or another 3.14+
+path. Each shell entry point (`scripts/*.sh`, `select.sh`, `render.sh`) carries
+its own `python_minimum=` copy and refuses an older interpreter;
+`scripts/check.sh` fails when a copy differs from `.python-version`, so change
+them together.
 
-Stage intended changes, then run `python3 scripts/check_secrets.py` for the
+Stage intended changes, then run `"$ORCA_POD_PYTHON" scripts/check_secrets.py` for the
 mandatory pre-push Git-index privacy check (see [SECURITY.md](../SECURITY.md)).
 `scripts/check.sh` adds native Python/TOML/shell syntax checks of every relevant
 file under `skills/`, `machine/`, `scripts/` and `roster/` for full delivery

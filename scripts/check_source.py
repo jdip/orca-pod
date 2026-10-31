@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""Native Python/TOML/shell syntax checks: every relevant file, or only those HEAD changes versus --base."""
+"""Native Python/TOML/shell syntax checks: every relevant file, or only those HEAD changes versus --base.
+
+Both forms also check that every shell entry point selecting ORCA_POD_PYTHON carries the .python-version minimum."""
 import argparse
 import ast
 from pathlib import Path
@@ -11,6 +13,7 @@ import tomllib
 ROOTS = ('skills', 'machine', 'scripts', 'roster')
 SUFFIXES = ('.toml', '.py', '.sh')
 REGULAR = (b'100644', b'100755')  # Symlinks and submodules carry no checked source.
+MINIMUM = re.compile(r'^python_minimum=(.*)$', re.M)
 
 
 def check(path, content):
@@ -26,6 +29,20 @@ def check(path, content):
     except (ValueError, SyntaxError, subprocess.CalledProcessError) as error:
         print(f'Syntax check failed: {path!r}: {error}', file=sys.stderr)
         return False
+
+
+def python_minimum():
+    """Return False after reporting a shell entry point whose Python minimum differs from .python-version."""
+    pinned = Path('.python-version').read_text(encoding='utf-8').strip()
+    passed = True
+    for path in sorted(p for root in ROOTS for p in Path(root).rglob('*.sh')):
+        text = path.read_text(encoding='utf-8')
+        found = MINIMUM.findall(text)
+        if 'ORCA_POD_PYTHON' in text and found != [pinned]:
+            print(f'Python minimum check failed: {path.as_posix()!r} carries {found or "none"}, but .python-version '
+                  f'holds {pinned!r}', file=sys.stderr)
+            passed = False
+    return passed
 
 
 def git(*args):
@@ -83,7 +100,8 @@ def main():
     args = parser.parse_args()
     if args.feature and not args.base:
         parser.error('--feature requires --base')
-    return 0 if (targeted(args.base, args.feature) if args.base else full()) else 1
+    passed = targeted(args.base, args.feature) if args.base else full()
+    return 0 if python_minimum() and passed else 1
 
 
 if __name__ == '__main__':

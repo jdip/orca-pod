@@ -29,6 +29,7 @@ ORCA_SETTINGS = ROOT / 'machine' / 'orca_settings.py'
 GENERATE = ROOT / 'roster' / 'generate.py'
 ROLES = ROOT / 'roster' / 'roles.toml'
 AUTOMATIONS = ROOT / 'machine' / 'automations.toml'
+PYTHON_VERSION = ROOT / '.python-version'  # The minimum Python version, as major.minor.
 PYTHON = os.environ.get('ORCA_POD_PYTHON') or sys.executable  # Interpreter for the child Python helpers.
 STATE = Path('.local/state/orca-pod')
 MANIFEST_VERSION = 1
@@ -49,8 +50,7 @@ BASE_REF = 'origin/test'  # The Standard's Orca default base ref, so new worktre
 # Codex runs with Full Access, as Orca launches agents (jdip/orca-pod#43); a --profile file layers on top of these.
 CODEX_ROOT = {'model': 'gpt-6.1-sol', 'model_reasoning_effort': 'high', 'default_permissions': ':danger-full-access',
               'approval_policy': 'never', 'approvals_reviewer': 'auto_review'}
-CODEX_TABLE_KEYS = {'agents': ('enabled', True), 'features': ('hooks', True)}
-BLOCKS = ('root', 'agents', 'features', 'hooks.state')
+BLOCKS = ('root', 'agents', 'features', 'shell_environment_policy.set', 'hooks.state')
 # Each provider's --extra-agent-args for a roster model and effort; Orca 1.4.240 and 1.4.241 accept only these options.
 AGENT_ARGS = {'claude': '--model {model} --effort {effort}',
               'codex': '--model {model} -c model_reasoning_effort={effort}'}
@@ -207,7 +207,8 @@ def automation_name(value):
 
 def owned_json_key(rel, name, record):
     """Whether a manifest record names a JSON key the installer owns in rel, with the shape the installer writes:
-    a listed top-level key, or the effortLevel of one Claude model under modelSettings in the Claude settings."""
+    a listed top-level key, or in the Claude settings env.ORCA_POD_PYTHON or the effortLevel of one Claude model
+    under modelSettings."""
     if not (isinstance(record, dict) and isinstance(record.get('had'), bool) and 'set' in record
             and 'previous' in record and (record['had'] or record['previous'] is None)):
         return False
@@ -215,10 +216,14 @@ def owned_json_key(rel, name, record):
     if name in JSON_KEYS[rel]:
         return not extra and type(record['set']) is JSON_KEYS[rel][name]
     model = name.removeprefix('modelSettings.').removesuffix('.effortLevel')
-    return (rel == '.claude/settings.json' and name == f'modelSettings.{model}.effortLevel'
-            and bool(CLAUDE_MODEL.fullmatch(model)) and extra == {'path', 'created_parents'}
-            and record['path'] == ['modelSettings', model, 'effortLevel']
-            and type(record['created_parents']) is int and 0 <= record['created_parents'] <= 2
+    if name == 'env.ORCA_POD_PYTHON':
+        path = ['env', 'ORCA_POD_PYTHON']
+    elif name == f'modelSettings.{model}.effortLevel' and CLAUDE_MODEL.fullmatch(model):
+        path = ['modelSettings', model, 'effortLevel']
+    else:
+        return False
+    return (rel == '.claude/settings.json' and extra == {'path', 'created_parents'} and record['path'] == path
+            and type(record['created_parents']) is int and 0 <= record['created_parents'] < len(path)
             and type(record['set']) is str)
 
 
@@ -429,10 +434,20 @@ def overlaps(path, managed):
     return path[:len(managed)] == managed or managed[:len(path)] == path
 
 
+def codex_tables(python):
+    """Each table block's one owned key and value; the shell environment carries the resolved interpreter."""
+    return {'agents': ('enabled', True), 'features': ('hooks', True),
+            'shell_environment_policy.set': ('ORCA_POD_PYTHON', python)}
+
+
+def table_path(name):
+    return tuple(name.split('.'))
+
+
 def codex_managed(trust):
     """Managed key paths per block; a hooks.state path owns its whole table."""
     return {'root': [(key,) for key in CODEX_ROOT],
-            'agents': [('agents', 'enabled')], 'features': [('features', 'hooks')],
+            **{name: [(*table_path(name), key)] for name, (key, _) in codex_tables(None).items()},
             'hooks.state': [('hooks', 'state', key) for key in trust]}
 
 
@@ -467,12 +482,14 @@ def toml_str(value):
     return json.dumps(value, ensure_ascii=False)  # A JSON string is a valid TOML basic string.
 
 
-def render_body(name, trust, header):
+def render_body(name, trust, header, python):
     if name == 'root':
         return [f'{key} = {toml_str(value)}\n' for key, value in CODEX_ROOT.items()]
-    if name in CODEX_TABLE_KEYS:
-        key, value = CODEX_TABLE_KEYS[name]
-        return ([f'[{name}]\n'] if header else []) + [f'{key} = {str(value).lower()}\n']
+    tables = codex_tables(python)
+    if name in tables:
+        key, value = tables[name]
+        value = toml_str(value) if isinstance(value, str) else str(value).lower()
+        return ([f'[{name}]\n'] if header else []) + [f'{key} = {value}\n']
     body = []
     for key, value in trust.items():
         state = trust_state(value)
@@ -520,7 +537,7 @@ def pruned(doc):
     return doc
 
 
-def merge_codex_config(text, trust, old_hook_keys):
+def merge_codex_config(text, trust, old_hook_keys, python):
     """Return (new text, moved, adopted {block: text}, previous {path: value}) for config.toml.
 
     moved lists (line, dotted key) for managed keys defined outside the blocks; the caller refuses them
@@ -567,13 +584,14 @@ def merge_codex_config(text, trust, old_hook_keys):
     previous = {m: get_path(original, m)[0] for name in adopted for m in managed[name]
                 if get_path(original, m)[1] and any(overlaps(path, m) for path in moved_paths[name])}
     headers = {path: start for start, _, kind, path in stmts if kind == 'table'}
+    tables = codex_tables(python)
     inserts = {}  # base index -> [(block lines, foreign lines)]
     for name in BLOCKS:
         old_index, inner = old_blocks.get(name, (None, []))
         foreign, _ = unowned(inner, table_at(stmts, old_index or 0), domain[name])
-        header = name in CODEX_TABLE_KEYS and (name,) not in headers
-        if name in CODEX_TABLE_KEYS and not header:
-            index = headers[(name,)] + 1
+        header = name in tables and table_path(name) not in headers
+        if name in tables and not header:
+            index = headers[table_path(name)] + 1
         elif old_index is not None:
             index = old_index
         elif header:  # A block carrying its own table header goes last, where it cannot capture other keys.
@@ -584,7 +602,7 @@ def merge_codex_config(text, trust, old_hook_keys):
             index = next((start for start, _, kind, _ in stmts if kind is not None), len(base))
         else:
             index = len(base)
-        body = render_body(name, trust, header)
+        body = render_body(name, trust, header, python)
         block = [BEGIN.format(name), *body, END.format(name)] if body else []
         inserts.setdefault(index, []).append((block, foreign))
     out = []
@@ -597,8 +615,8 @@ def merge_codex_config(text, trust, old_hook_keys):
     expected = without(original, [p for paths in domain.values() for p in paths])
     for path in managed['root']:
         set_path(expected, path, CODEX_ROOT[path[0]])
-    for name, (key, value) in CODEX_TABLE_KEYS.items():
-        set_path(expected, (name, key), value)
+    for name, (key, value) in tables.items():
+        set_path(expected, (*table_path(name), key), value)
     for path in managed['hooks.state']:
         set_path(expected, path, trust_state(trust[path[2]]))
     try:
@@ -627,7 +645,7 @@ def unmerge_codex_config(text, adopted, hook_keys, previous):
         # The block's own table header still opens that table for foreign keys inside or just after it.
         after = next((kind for start, _, kind, _ in stmts if start >= index and kind is not None), None)
         if foreign or after == 'key':
-            keep, _ = unowned(inner, table, domain[name], keep=[(name,)])
+            keep, _ = unowned(inner, table, domain[name], keep=[table_path(name)])
         inserts.setdefault(index, []).append(adopted.get(name, '') + ''.join(keep))
     out = []
     for i in range(len(base) + 1):
@@ -930,6 +948,7 @@ def plan_codex_config(plan, adopt):
     cur = read_key_file(plan, path)
     if cur is False:
         return
+    python = automation_python()
     matched = orca_hook_trust(plan.home, plan.notes)
     old_keys = entry.get('hook_keys', []) if entry else []
     text = cur.decode('utf-8') if cur else ''
@@ -947,7 +966,7 @@ def plan_codex_config(plan, adopt):
                               'set; check the Orca hooks and update the pinned set: '
                               + ', '.join(':'.join(key.rsplit(':', 3)[1:]) for key in kept))
         trust = {key: matched.get(key, kept.get(key)) for key in [*old_keys, *matched] if key in matched or key in kept}
-        new, moved, adopted, previous = merge_codex_config(text, trust, old_keys)
+        new, moved, adopted, previous = merge_codex_config(text, trust, old_keys, python)
         domain = codex_managed(list(trust) + old_keys)
         diff = managed_diff(text, new, domain)
     except (Refusal, tomllib.TOMLDecodeError) as error:
@@ -1005,10 +1024,11 @@ def claude_version():
 def plan_claude(plan):
     model, effort = orc_claude_model()
     # Claude Code reads the session's default effort from modelSettings.<model>.effortLevel; a top-level
-    # effortLevel is a legacy value it does not apply at startup.
+    # effortLevel is a legacy value it does not apply at startup. Every session gets the automations' interpreter
+    # in env, so the skills' helpers never fall back to an older host python3.
     plan_json(plan, 'claude settings', plan.home / '.claude' / 'settings.json',
               {'model': model, ('modelSettings', model, 'effortLevel'): effort,
-               'skipDangerousModePermissionPrompt': True},
+               'skipDangerousModePermissionPrompt': True, ('env', 'ORCA_POD_PYTHON'): automation_python()},
               {'theme': 'dark'})
     # First-run keys only; Orca's "Trust the folder" covers project trust for every agent it launches (#14).
     first_run = {'hasCompletedOnboarding': True}
@@ -1023,7 +1043,8 @@ def plan_claude(plan):
 # ---------- Orca automations ----------
 
 def automation_python():
-    """The absolute path of the install-time interpreter, which each automation run uses for its Python helpers."""
+    """The absolute path of the install-time interpreter, which each automation run and agent session uses for
+    the Python helpers; it must be at least the .python-version minimum."""
     found = shutil.which(PYTHON)
     real = os.path.realpath(found) if found else None  # The link target, so a later repointed link is not used.
     if not real or not os.path.isfile(real) or not os.access(real, os.X_OK):
@@ -1032,6 +1053,14 @@ def automation_python():
     if not PROMPT_SAFE_PATH.fullmatch(real):  # It is written into unattended prompts, so no newlines or markup.
         raise Refusal(f'the Python interpreter path {real!r} has characters outside letters, digits and ._+-/; '
                       'install it at a plain path or set ORCA_POD_PYTHON to one')
+    minimum = PYTHON_VERSION.read_text(encoding='utf-8').strip()
+    probe = run(real, '-I', '-c', 'import sys; print(*sys.version_info[:2])')
+    version = tuple(map(int, probe.stdout.split())) if probe.returncode == 0 else ()
+    if version < tuple(map(int, minimum.split('.'))):
+        raise Refusal(f'the Python interpreter {real} (ORCA_POD_PYTHON, else the installer\'s own) is Python '
+                      f'{".".join(map(str, version)) or "of unknown version"}, older than the {minimum} minimum in '
+                      f'.python-version; set ORCA_POD_PYTHON to a newer one, for example '
+                      f'ORCA_POD_PYTHON="$(uv python find {minimum})"')
     return real
 
 

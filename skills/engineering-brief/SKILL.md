@@ -16,8 +16,8 @@ from the installer-managed Orca automation (see `docs/install.md`).
 
 Read the target repository's root `AGENTS.md`, purpose, and relevant guidance;
 confirm Orca Pod from the remote and purpose. Record revision and dirty state
-for the supporting notes. Use this package's `scripts/history.py context --mode
-brief` with Python 3.11+ to capture the interval before research. Read
+for the supporting notes. Run this package's `scripts/history.py context --mode
+brief` with `"$ORCA_POD_PYTHON"` to capture the interval before research. Read
 [history](references/history.md) and relevant earlier reports for continuity.
 
 Read [sources](references/sources.md), [evidence](references/evidence.md), and

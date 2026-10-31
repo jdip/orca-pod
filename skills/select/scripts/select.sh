@@ -1,5 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# Refuse a Python older than .python-version's minimum; scripts/check_source.py keeps the copies in step.
+python_minimum=3.14
+python=${ORCA_POD_PYTHON:-python3}
+if ! "$python" -c 'import sys; sys.exit(sys.version_info < tuple(map(int, sys.argv[1].split("."))))' "$python_minimum" 2>/dev/null; then
+  printf '%s: %s is not Python %s or newer; set ORCA_POD_PYTHON to one, for example: export ORCA_POD_PYTHON="$(uv python find %s)"\n' \
+    "${0##*/}" "$python" "$python_minimum" "$python_minimum" >&2
+  exit 1
+fi
 
 usage() {
   cat <<'EOF'
@@ -31,10 +39,9 @@ case "${1:-}" in
 esac
 
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
-python_command=${ORCA_POD_PYTHON:-python3}
 resolver="$script_dir/selection-state.py"
 if [[ ! -f "$resolver" ]]; then
   echo "error: shared selection resolver is missing: $resolver" >&2
   exit 1
 fi
-exec "$python_command" "$resolver" --kind "$kind" "$@"
+exec "$python" "$resolver" --kind "$kind" "$@"

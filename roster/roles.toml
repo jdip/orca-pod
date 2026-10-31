@@ -1,6 +1,6 @@
 # Orca Pod role roster: the single source of truth for role models, authority and
-# standing instructions. Run roster/generate.py after editing; it renders native
-# agents for both CLIs and the role tables in skills/roster/.
+# standing instructions. Run "$ORCA_POD_PYTHON" roster/generate.py after editing; it
+# renders native agents for both CLIs and the role tables in skills/roster/.
 #
 # Each [[role]] holds:
 #   id, tag, emoji, purpose

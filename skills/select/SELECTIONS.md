@@ -3,8 +3,8 @@
 Read this contract when a workflow selects, reads, resumes, forks, moves or hands
 off a saved map or implementation backlog. The select package owns the shared
 resolver and its `map|backlog` entry script. Use that script, never direct
-state-file edits. Run `--help` for exact arguments. The existing Python 3.11+
-runtime is selected with `ORCA_POD_PYTHON` when needed.
+state-file edits. Run `--help` for exact arguments. The script runs on the
+`ORCA_POD_PYTHON` interpreter, Python 3.14+.
 
 ## Establish the binding
 

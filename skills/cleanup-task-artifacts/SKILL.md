@@ -44,8 +44,8 @@ by the supervisor or daily sweep, not a claim that exit handlers always ran.
 For a daily sweep, obtain exact known project roots from Orca's project inventory
 (each `path` in `orca repo list --json`), or use roots explicitly supplied by the
 supervising agent. Pass those roots to this package's
-`scripts/discover.py` with Python 3.9+ (resolve the script relative to this skill)
-and keep its output for the inventory's `--discovery`. It parses only the root AGENTS.md Repository Standard section and verifies the exact
+`scripts/discover.py`, run as `"$ORCA_POD_PYTHON" <script>` (resolve the script
+relative to this skill), and keep its output for the inventory's `--discovery`. It parses only the root AGENTS.md Repository Standard section and verifies the exact
 Orca Pod source and adopted commit through gh. One explicit exception: the
 Standard's own source repository adopts no Standard, so a checkout top level whose
 `origin` remote is jdip/orca-pod is admitted with basis `source repository`, its
@@ -78,8 +78,8 @@ contact an unrelated remote context just to expand the sweep.
 
 ## Inventory Orca resources
 
-Run this package's `scripts/orca_inventory.py --discovery <file>` (Python 3.9+,
-resolved relative to this skill), passing this run's saved `discover.py` output. It
+Run this package's `scripts/orca_inventory.py --discovery <file>` with
+`"$ORCA_POD_PYTHON"` (resolved relative to this skill), passing this run's saved `discover.py` output. It
 is always a dry run: it reads `orca worktree current`, `orca repo list`, `orca
 worktree ps`, `orca terminal list`, and `orca orchestration worker-list --run <id>`
 for every Run in `orca orchestration run-list`, plus each local checkout's Git state
@@ -176,7 +176,7 @@ needs action. Do not describe unresolved teardown as completed cleanup or close 
 issue whose acceptance requires it.
 
 Scheduled runs retain a concise disposition, including coverage limits and
-discovery failures, in this package's `scripts/sweep_state.py` (Python 3.9+). Once
+discovery failures, in this package's `scripts/sweep_state.py`, run with `"$ORCA_POD_PYTHON"`. Once
 the run's actions are done, pass it a JSON object mapping each finding's stable key
 (such as `worktree:<id>` or `discovery:<root>`) to its concise disposition from the
 final inventory, leaving out values that change every run, such as `idle_days`

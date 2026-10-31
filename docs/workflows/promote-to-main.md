@@ -9,7 +9,7 @@ Run only on a separate explicit promotion request. Issue implementation,
 including next-issue's continue mode, does not request promotion. Use a clean
 checkout of the intended origin/test revision, preserving existing task
 checkouts and unrelated work.
-Requirements are the same Git/gh/Bash/Python 3.11+ tools as PR-to-test. Read actual
+Requirements are the same Git/gh/Bash/Python 3.14+ tools as PR-to-test. Read actual
 review and test-delivery evidence; review any changes not covered by it.
 
 Run scripts/promote-to-main.sh, optionally supplying --title and --body-file.

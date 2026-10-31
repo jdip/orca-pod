@@ -17,7 +17,7 @@ jobs:
           fetch-depth: 2
       - uses: actions/setup-python@v7
         with:
-          python-version: '3.12'
+          python-version-file: .python-version
       - name: Targeted checks of the integration's changes
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}

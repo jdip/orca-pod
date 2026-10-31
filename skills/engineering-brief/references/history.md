@@ -1,15 +1,14 @@
 # Local history
 
-Use the package's `scripts/history.py` with Python 3.11+ from inside the actual
+Run the package's `scripts/history.py` with `"$ORCA_POD_PYTHON"` from inside the actual
 Orca Pod checkout. It uses only the Python standard library and Git. Resolve the
 script relative to the loaded `SKILL.md`, not a hardcoded machine path.
 
 ```sh
-python3.13 <skill-directory>/scripts/history.py context --mode brief
-python3.13 <skill-directory>/scripts/history.py context --mode audit
+"$ORCA_POD_PYTHON" <skill-directory>/scripts/history.py context --mode brief
+"$ORCA_POD_PYTHON" <skill-directory>/scripts/history.py context --mode audit
 ```
 
-Select an available supported Python runtime; `python3.13` above is an example.
 `context` is read-only. It resolves `<absolute-git-common-dir>/orca-pod-engineering-brief/`
 and returns the mode, UTC interval, previous report, latest report in each mode,
 recent report paths, a rolling discovery start, draft directory, and any cutoff gap. Inspect the resolved
@@ -53,7 +52,7 @@ generated reports in the tracked checkout.
 Before the first scratch file, allocate this run's own scratch directory:
 
 ```sh
-python3.13 <skill-directory>/scripts/history.py work
+"$ORCA_POD_PYTHON" <skill-directory>/scripts/history.py work
 ```
 
 It creates an owner-only (0700) directory `.work/<run_id>` under the archive,
@@ -69,7 +68,7 @@ After research and citation/repo-impact checks, save using the exact interval
 captured at run start:
 
 ```sh
-python3.13 <skill-directory>/scripts/history.py save --mode brief \
+"$ORCA_POD_PYTHON" <skill-directory>/scripts/history.py save --mode brief \
   --start '<coverage_start>' --end '<coverage_end>' '<local-draft.md>'
 ```
 

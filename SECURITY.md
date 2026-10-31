@@ -13,7 +13,7 @@ It preserves unrelated configuration and never writes or copies credentials; sig
 stays an interactive provider step. A successful install does not establish that
 repository content is safe to publish.
 
-The local `python3 scripts/check_secrets.py` gate checks the Git index for credential filenames,
+The local `"$ORCA_POD_PYTHON" scripts/check_secrets.py` gate checks the Git index for credential filenames,
 recognizable token/private-key patterns, and literal macOS/Linux/Windows home paths.
 Use `~`, environment variables, or descriptive placeholders in portable examples. Stage intended changes and run it before
 every push; the delivery script runs it before pushing, and CI checks the committed tree. The check reports a

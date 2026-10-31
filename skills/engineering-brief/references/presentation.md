@@ -8,14 +8,15 @@ no Node/npm, new package, server, or public hosting. The shell entrypoint
 currently supports macOS and other POSIX hosts; native Windows is not verified.
 
 After saving a checked brief or audit, run the package's `scripts/render.sh` from
-inside Orca Pod, selecting Python 3.11+ through `ORCA_POD_PYTHON` when needed.
-The entrypoint owns its isolated Python environment in the local archive and
-installs only the package's declared `requirements.txt`, the named exception in
-the root AGENTS.md dependency rule. Do not install dependencies globally or add
+inside Orca Pod; it runs on the `ORCA_POD_PYTHON` interpreter, Python 3.14+.
+The entrypoint owns its isolated Python environment in the local archive,
+rebuilds it when that interpreter's version changes, and installs only the
+package's declared `requirements.txt`, the named exception in the root
+AGENTS.md dependency rule. Do not install dependencies globally or add
 them to host installation (`machine/install.py`).
 
 ```sh
-ORCA_POD_PYTHON=python3.13 <skill-directory>/scripts/render.sh
+<skill-directory>/scripts/render.sh
 ```
 
 Use the returned index and article paths. Open the HTML through the host's file or

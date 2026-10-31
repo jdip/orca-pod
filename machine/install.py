@@ -8,6 +8,7 @@
 import argparse
 import copy
 import difflib
+import functools
 import grp
 import hashlib
 import json
@@ -31,7 +32,7 @@ GENERATE = ROOT / 'roster' / 'generate.py'
 ROLES = ROOT / 'roster' / 'roles.toml'
 AUTOMATIONS = ROOT / 'machine' / 'automations.toml'
 PYTHON_VERSION = ROOT / '.python-version'  # The minimum Python version, as major.minor.
-PYTHON = os.environ.get('ORCA_POD_PYTHON') or sys.executable  # Interpreter for the child Python helpers.
+PYTHON = os.environ.get('ORCA_POD_PYTHON') or sys.executable  # Requested interpreter; run only via helper_python().
 STATE = Path('.local/state/orca-pod')
 MANIFEST_VERSION = 1
 FILE_ROOTS = ('.agents/skills/', '.claude/', '.codex/')  # Whole files and links the manifest may own.
@@ -799,11 +800,11 @@ def plan_skills(plan):
 
 
 def render_roles():
-    check = run(PYTHON, str(GENERATE), '--check')
+    check = run(helper_python(), str(GENERATE), '--check')
     if check.returncode:
         raise Refusal('roster tables are stale; run roster/generate.py and commit: ' + check.stderr.strip())
     with tempfile.TemporaryDirectory(prefix='orca-pod-roster-') as tmp:
-        result = run(PYTHON, str(GENERATE), '--out', tmp)
+        result = run(helper_python(), str(GENERATE), '--out', tmp)
         if result.returncode:
             raise Refusal('roster/generate.py failed: ' + (result.stderr or result.stdout).strip())
         return {p.relative_to(tmp).as_posix(): p.read_bytes() for p in Path(tmp).rglob('*') if p.is_file()}
@@ -949,7 +950,7 @@ def plan_codex_config(plan, adopt):
     cur = read_key_file(plan, path)
     if cur is False:
         return
-    python = automation_python()
+    python = helper_python()
     matched = orca_hook_trust(plan.home, plan.notes)
     old_keys = entry.get('hook_keys', []) if entry else []
     text = cur.decode('utf-8') if cur else ''
@@ -1029,7 +1030,7 @@ def plan_claude(plan):
     # in env, so the skills' helpers never fall back to an older host python3.
     plan_json(plan, 'claude settings', plan.home / '.claude' / 'settings.json',
               {'model': model, ('modelSettings', model, 'effortLevel'): effort,
-               'skipDangerousModePermissionPrompt': True, ('env', 'ORCA_POD_PYTHON'): automation_python()},
+               'skipDangerousModePermissionPrompt': True, ('env', 'ORCA_POD_PYTHON'): helper_python()},
               {'theme': 'dark'})
     # First-run keys only; Orca's "Trust the folder" covers project trust for every agent it launches (#14).
     first_run = {'hasCompletedOnboarding': True}
@@ -1059,10 +1060,12 @@ def replaceable_by_others(path):
     return None
 
 
-def automation_python():
-    """The absolute path of the install-time interpreter, which each automation run and agent session uses for
-    the Python helpers; it must be at least the .python-version minimum, and only this user, root or the admin group
-    may be able to replace it, since its path is recorded for unattended runs."""
+@functools.cache
+def helper_python():
+    """The absolute path of the install-time interpreter, which the installer's child helpers, each automation run
+    and agent session use for the Python helpers; it must be at least the .python-version minimum, and only this
+    user, root or the admin group may be able to replace it, since its path is recorded for unattended runs. Every
+    child helper runs on this path, so nothing runs before it is checked."""
     found = shutil.which(PYTHON)
     real = os.path.realpath(found) if found else None  # The link target, so a later repointed link is not used.
     if not real or not os.path.isfile(real) or not os.access(real, os.X_OK):
@@ -1090,7 +1093,7 @@ def automation_python():
 def automation_definitions():
     """The automations in machine/automations.toml, each run by its roster role's default model and effort. Each
     prompt ends with the install-time interpreter, so a run does not depend on the host's default python3."""
-    path = automation_python()
+    path = helper_python()
     python = shlex.quote(path)
     python_line = (f'Run this run\'s Python helpers with ORCA_POD_PYTHON={python}, the interpreter the installer '
                    f'resolved: invoke each `.py` script as `{python} <script>` and give each shell script the same '
@@ -1735,8 +1738,8 @@ def patch_orca(writer, patch, stamp):
     fd, temp = tempfile.mkstemp(dir=state, prefix='.orca-settings-log-', suffix='.tmp')
     os.replace(temp, log_path)
     with open(fd, 'wb') as log:
-        subprocess.Popen([PYTHON, str(ORCA_SETTINGS), '--patch', json.dumps(patch), '--result', str(result_path),
-                          '--backup', str(backup)],
+        subprocess.Popen([helper_python(), str(ORCA_SETTINGS), '--patch', json.dumps(patch),
+                          '--result', str(result_path), '--backup', str(backup)],
                          stdin=subprocess.DEVNULL, stdout=log, stderr=log, start_new_session=True)
     print(f'Orca app settings: the detached helper quits, patches and relaunches Orca; waiting on {result_path}')
     deadline = time.monotonic() + 600
@@ -1820,8 +1823,9 @@ def orca_steps(plan, args, writer, manifest, stamp):
 
 # ---------- Uninstall ----------
 
-def uninstall_preflight(home, old):
-    """Containment-check every path the manifest names before anything is written."""
+def uninstall_preflight(home, old, args):
+    """Containment-check every path the manifest names, and the interpreter of the Orca settings helper when it
+    would run, before anything is written."""
     problems = []
 
     def check(path, leaf_dir=False, links=False):
@@ -1844,11 +1848,16 @@ def uninstall_preflight(home, old):
         check(home / rel, leaf_dir=True)
     for path in (home / STATE, home / STATE / 'backups'):
         check(path, leaf_dir=True)
+    if old.get('orca_settings') and not args.scratch and not args.skip_orca_settings:
+        try:
+            helper_python()
+        except Refusal as error:
+            problems.append(str(error))
     return list(dict.fromkeys(problems))
 
 
 def uninstall(home, old, args, stamp):
-    refused = uninstall_preflight(home, old)
+    refused = uninstall_preflight(home, old, args)
     if refused:
         print(f'REFUSED ({len(refused)}); --uninstall writes nothing until these are resolved:')
         for problem in refused:

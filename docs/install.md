@@ -24,7 +24,10 @@ export ORCA_POD_PYTHON="$(uv python find 3.14)"  # any Python 3.14+; see below
 
 The installer resolves one interpreter: `ORCA_POD_PYTHON`, else its own, as an
 absolute path with symlinks resolved. It refuses one older than the
-`.python-version` minimum. It runs its child helpers (`roster/generate.py`,
+`.python-version` minimum. It also refuses one that another user could replace:
+the interpreter and each directory above it must be owned by you or root, not
+world-writable, and not group-writable except by macOS's `admin` group, whose
+members can already become root. It runs its child helpers (`roster/generate.py`,
 `machine/orca_settings.py`) with that interpreter, names it in both automation
 prompts ([below](#orca-automations)) and records it as `ORCA_POD_PYTHON` in both
 agents' environments: `env` in `~/.claude/settings.json` and

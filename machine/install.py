@@ -8,6 +8,7 @@
 import argparse
 import copy
 import difflib
+import grp
 import hashlib
 import json
 import os
@@ -1042,9 +1043,26 @@ def plan_claude(plan):
 
 # ---------- Orca automations ----------
 
+def replaceable_by_others(path):
+    """The first of a canonical path and its ancestor directories that is owned by neither this user nor root, is
+    world-writable, or is group-writable by a group other than macOS's admin group, whose members can already
+    become root; None when there is none."""
+    try:
+        admin = grp.getgrnam('admin').gr_gid
+    except KeyError:
+        admin = None
+    for part in (Path(path), *Path(path).parents):
+        info = os.lstat(part)
+        if (info.st_uid not in (os.getuid(), 0) or info.st_mode & stat.S_IWOTH
+                or (info.st_mode & stat.S_IWGRP and info.st_gid != admin)):
+            return part
+    return None
+
+
 def automation_python():
     """The absolute path of the install-time interpreter, which each automation run and agent session uses for
-    the Python helpers; it must be at least the .python-version minimum."""
+    the Python helpers; it must be at least the .python-version minimum, and only this user, root or the admin group
+    may be able to replace it, since its path is recorded for unattended runs."""
     found = shutil.which(PYTHON)
     real = os.path.realpath(found) if found else None  # The link target, so a later repointed link is not used.
     if not real or not os.path.isfile(real) or not os.access(real, os.X_OK):
@@ -1054,6 +1072,11 @@ def automation_python():
         raise Refusal(f'the Python interpreter path {real!r} has characters outside letters, digits and ._+-/; '
                       'install it at a plain path or set ORCA_POD_PYTHON to one')
     minimum = PYTHON_VERSION.read_text(encoding='utf-8').strip()
+    if unsafe := replaceable_by_others(real):
+        raise Refusal(f'the Python interpreter {real} (ORCA_POD_PYTHON, else the installer\'s own) could be replaced '
+                      f'by another user through {unsafe}, which is owned by another user or writable by others; set '
+                      'ORCA_POD_PYTHON to an interpreter you own, for example '
+                      f'ORCA_POD_PYTHON="$(uv python find {minimum})"')
     probe = run(real, '-I', '-c', 'import sys; print(*sys.version_info[:2])')
     version = tuple(map(int, probe.stdout.split())) if probe.returncode == 0 else ()
     if version < tuple(map(int, minimum.split('.'))):

@@ -42,10 +42,14 @@ you run the delivery scripts from:
 export ORCA_POD_PYTHON="$(uv python find 3.14)"
 ```
 
+A Homebrew Python works too, for example
+`ORCA_POD_PYTHON=/opt/homebrew/bin/python3.14`.
+
 Each shell entry point refuses an older or missing interpreter with a message
 naming `ORCA_POD_PYTHON`. When the recorded interpreter moves, for example after
-uv replaces a patch release, which changes the resolved path, rerun `--apply`
-with the new one; it updates both keys and both prompts in place.
+a Homebrew or uv upgrade replaces a patch release, which changes the resolved
+path, rerun `--apply` with the new one; it updates both keys and both prompts in
+place.
 
 To roll back to a revision older than this one, first run this or a newer
 installer's `--uninstall` with a 3.14+ interpreter, then apply the older

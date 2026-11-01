@@ -63,7 +63,7 @@ AUTOMATION_PREFIX = 'Orca Pod: '
 AUTOMATION_ID = re.compile(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')  # Orca's UUIDs.
 CRON = re.compile(r'[0-9*,/-]+(?: [0-9*,/-]+){4}')
 PLAIN_TOKEN = re.compile(r'[A-Za-z0-9][A-Za-z0-9._-]*')
-PROMPT_SAFE_PATH = re.compile(r'/[A-Za-z0-9._+/-]+')  # An interpreter path that is safe in a prompt.
+PROMPT_SAFE_PATH = re.compile(r'/[A-Za-z0-9._+@/-]+')  # An interpreter path that is safe in a prompt.
 ORCA_MISSED_RUN_GRACE = 720  # Orca's default missed-run grace window in minutes (1.4.240 and 1.4.241).
 
 # The known sets of command hooks Orca writes to ~/.codex/hooks.json, by event. Trust follows content, not the
@@ -1072,7 +1072,7 @@ def helper_python():
         raise Refusal(f'the Python interpreter {PYTHON!r} (ORCA_POD_PYTHON, else the installer\'s own) is not an '
                       'executable; an automation run could not use it')
     if not PROMPT_SAFE_PATH.fullmatch(real):  # It is written into unattended prompts, so no newlines or markup.
-        raise Refusal(f'the Python interpreter path {real!r} has characters outside letters, digits and ._+-/; '
+        raise Refusal(f'the Python interpreter path {real!r} has characters outside letters, digits and ._+@-/; '
                       'install it at a plain path or set ORCA_POD_PYTHON to one')
     minimum = PYTHON_VERSION.read_text(encoding='utf-8').strip()
     if unsafe := replaceable_by_others(real):

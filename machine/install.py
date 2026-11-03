@@ -1975,7 +1975,7 @@ def orca_steps(plan, args, writer, manifest, stamp):
     settle_orca_record(writer, manifest, outcome)
     if outcome.get('stale'):
         print(f'Orca app settings: {job_blocker(writer.home, job_label(stamp), outcome)}')
-    return ok and outcome.get('ok', False) and not outcome.get('stale')
+    return ok and outcome.get('ok', False) and not outcome.get('stale') and not outcome.get('running')
 
 
 # ---------- Uninstall ----------

@@ -1811,7 +1811,8 @@ def job_state(label):
 
 def job_outcome(home, label):
     """Read-only: the settings job's result when final (it has `ok`), else what it recorded so far, marked
-    unfinished, with whether launchd still runs the job; `stale` marks a job launchd still holds after it exited."""
+    unfinished; every outcome carries whether launchd still runs the job, and `stale` marks a job launchd still
+    holds after it exited."""
     result_path = job_paths(home / STATE, ORCA_JOB.fullmatch(label)[1])[0]
     check_path(home, result_path)
     # launchd first: a job that finishes in between has already written its final result.
@@ -1821,10 +1822,11 @@ def job_outcome(home, label):
         result = json.loads(read_regular(result_path, links_ok=True))
     except (OSError, ValueError):
         result = None
+    # A final result can precede the job's own teardown, so launchd's state stays part of every outcome.
+    running = {'running': state == 'active'}
     if isinstance(result, dict) and 'ok' in result:
-        return {**result, **stale}
-    return {**(result if isinstance(result, dict) else {}), 'unfinished': True, 'running': state == 'active',
-            **stale}
+        return {**result, **running, **stale}
+    return {**(result if isinstance(result, dict) else {}), 'unfinished': True, **running, **stale}
 
 
 def job_blocker(home, label, outcome):
@@ -1846,7 +1848,8 @@ def patch_report(outcome):
         detail = outcome.get('after') if outcome['ok'] else outcome.get('error')
         return (f'{"ok" if outcome["ok"] else "FAILED"} {json.dumps(detail)}'
                 + (f'; restored: {outcome.get("restore_verified", False)}'
-                   if outcome.get('written') and not outcome['ok'] else '') + stale)
+                   if outcome.get('written') and not outcome['ok'] else '') + stale
+                + ('; the job is still finishing' if outcome.get('running') else ''))
     steps = outcome.get('steps')
     last = steps[-1].get('step') if isinstance(steps, list) and steps and isinstance(steps[-1], dict) else None
     if outcome['running']:

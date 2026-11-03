@@ -1475,10 +1475,9 @@ def print_plan(plan, args, source):
             print(f'  previous     Orca app settings patch {label}: {patch_report(previous)}')
         if args.skip_orca_settings:
             print('  skip         Orca app settings (--skip-orca-settings)')
-        elif previous.get('running'):
-            plan.refusals.append(f'Orca app settings: the previous patch job {label} is still running; rerun when it '
-                                 'finishes')
-            print('  REFUSED      Orca app settings: the previous patch job is still running')
+        elif blocker := job_blocker(plan.home, label, previous):
+            plan.refusals.append(f'Orca app settings: {blocker}')
+            print(f'  REFUSED      Orca app settings: {blocker}')
         else:
             pre = orca_settings_module().preflight(ORCA_PATCH)
             if not pre['ok']:
@@ -1774,11 +1773,15 @@ def job_target(label):
 def launch_job(writer, label, command, plist, log):
     """Bootstrap command as a one-shot job in the user's GUI launchd domain, logging to log.
 
-    The job runs once at load; JOB_PROGRAM then deletes plist and boots the job out. A launchd refusal raises
-    Refusal with the plist removed and nothing started.
+    The job runs once at load; JOB_PROGRAM then deletes plist and boots the job out. An existing plist, log or
+    label, or a launchd refusal, raises Refusal with nothing overwritten or started.
     """
     for path in (plist, log):
         writer.check(path)
+        if os.path.lexists(path):
+            raise Refusal(f'{path} already exists; refusing to reuse it for the Orca settings job {label}')
+    if job_state(label) != 'absent':
+        raise Refusal(f'launchd already holds a job labelled {label}')
     fd, temp = tempfile.mkstemp(dir=log.parent, prefix='.orca-settings-log-', suffix='.tmp')
     os.close(fd)
     os.replace(temp, log)
@@ -1794,36 +1797,63 @@ def launch_job(writer, label, command, plist, log):
                       + (f': {detail}' if detail else '') + ')')
 
 
+def job_state(label):
+    """launchd's view of a job: 'absent' when not loaded, 'exited' when still loaded after it ran and exited (a
+    job that did not remove itself), else 'active' (starting or running)."""
+    out = run('/bin/launchctl', 'print', job_target(label))
+    if out.returncode != 0:
+        return 'absent'
+    fields = dict(m.groups() for m in re.finditer(r'^\t(state|pid|runs) = (.*)$', out.stdout, re.M))
+    if fields.get('state') == 'not running' and 'pid' not in fields and fields.get('runs', '0') != '0':
+        return 'exited'
+    return 'active'
+
+
 def job_outcome(home, label):
     """Read-only: the settings job's result when final (it has `ok`), else what it recorded so far, marked
-    unfinished, with whether launchd still holds the job."""
+    unfinished, with whether launchd still runs the job; `stale` marks a job launchd still holds after it exited."""
     result_path = job_paths(home / STATE, ORCA_JOB.fullmatch(label)[1])[0]
     check_path(home, result_path)
     # launchd first: a job that finishes in between has already written its final result.
-    running = run('/bin/launchctl', 'print', job_target(label)).returncode == 0
+    state = job_state(label)
+    stale = {'stale': True} if state == 'exited' else {}
     try:
         result = json.loads(read_regular(result_path, links_ok=True))
     except (OSError, ValueError):
         result = None
     if isinstance(result, dict) and 'ok' in result:
-        return result
-    return {**(result if isinstance(result, dict) else {}), 'unfinished': True, 'running': running}
+        return {**result, **stale}
+    return {**(result if isinstance(result, dict) else {}), 'unfinished': True, 'running': state == 'active',
+            **stale}
+
+
+def job_blocker(home, label, outcome):
+    """Why the recorded settings job must settle before another settings step, or None when it may."""
+    if outcome.get('running'):
+        return f'the Orca app settings job {label} is still running; rerun when it finishes'
+    if outcome.get('stale'):
+        result, log, plist = job_paths(home / STATE, ORCA_JOB.fullmatch(label)[1])
+        return (f'the Orca app settings job {label} exited but is still registered with launchd; after checking '
+                f'{result} and {log}, remove it with `launchctl bootout {job_target(label)}`, delete {plist} if it '
+                'is still there, and rerun')
+    return None
 
 
 def patch_report(outcome):
     """One line on a settings job outcome from job_outcome."""
+    stale = '; launchd still holds the exited job' if outcome.get('stale') else ''
     if not outcome.get('unfinished'):
         detail = outcome.get('after') if outcome['ok'] else outcome.get('error')
         return (f'{"ok" if outcome["ok"] else "FAILED"} {json.dumps(detail)}'
                 + (f'; restored: {outcome.get("restore_verified", False)}'
-                   if outcome.get('written') and not outcome['ok'] else ''))
+                   if outcome.get('written') and not outcome['ok'] else '') + stale)
     steps = outcome.get('steps')
     last = steps[-1].get('step') if isinstance(steps, list) and steps and isinstance(steps[-1], dict) else None
     if outcome['running']:
         return f'still running (last step: {last or "none"})'
     return (f'ended without a result (last step: {last or "none"})'
             + ('; the settings may have been written' if outcome.get('written') or last == 'backup' else '')
-            + '; check its result file and log')
+            + stale + '; check its result file and log')
 
 
 def patch_orca(writer, patch, stamp):
@@ -1839,6 +1869,8 @@ def patch_orca(writer, patch, stamp):
     writer.ensure_dir(backup.parent, private=True, record=False)
     for path in (result_path, backup):
         writer.check(path)
+    if os.path.lexists(result_path):
+        raise Refusal(f'{result_path} already exists; refusing to reuse it for the Orca settings job {label}')
     launch_job(writer, label, [helper_python(), str(ORCA_SETTINGS), '--patch', json.dumps(patch),
                                '--result', str(result_path), '--backup', str(backup)], plist, log_path)
     print(f'Orca app settings: the launchd job {label} quits, patches and relaunches Orca; waiting on {result_path}')
@@ -1856,24 +1888,27 @@ def patch_orca(writer, patch, stamp):
     return outcome
 
 
-def record_orca_patch(writer, manifest, pre, patch, stamp):
-    """Record the previous Orca values and the job before it starts; the record keeps the one it replaces as
-    `earlier` until settled."""
+def record_orca_patch(writer, manifest, stamp, pre=None, patch=None):
+    """Record the job before it starts, with the previous Orca values for an install patch (pre and patch); an
+    uninstall restore keeps the record's values. The record keeps the one it replaces as `earlier` until settled."""
     earlier = copy.deepcopy(manifest.get('orca_settings'))
     record = copy.deepcopy(earlier) if earlier else {}
-    record['previous'] = {**pre['before'], **record.get('previous', {})}  # Keep the first original values.
-    record.update(set=dict(patch), status='pending', app_version=pre['app_version'],  # The version is informational.
-                  domain_version=pre['domain_version'], job=job_label(stamp), earlier=earlier,
-                  backup=(writer.backup_root / 'orca-settings.json').relative_to(writer.state).as_posix())
+    if pre:
+        record['previous'] = {**pre['before'], **record.get('previous', {})}  # Keep the first original values.
+        record.update(set=dict(patch), app_version=pre['app_version'],  # The version is informational.
+                      domain_version=pre['domain_version'],
+                      backup=(writer.backup_root / 'orca-settings.json').relative_to(writer.state).as_posix())
+    record.update(status='pending', job=job_label(stamp), earlier=earlier)
     manifest['orca_settings'] = record
     write_manifest(writer, manifest)
 
 
 def settle_orca_record(writer, manifest, outcome):
     """Keep the restoration record until the settings are verified as applied or verified as restored. While the
-    job may still write its result, the record keeps the job for a later run to read."""
+    job may still write its result, or launchd still holds it after it exited, the record keeps the job for a later
+    run to read."""
     record = manifest['orca_settings']
-    if outcome.get('running'):
+    if outcome.get('running') or outcome.get('stale'):
         record['status'] = 'unverified'
     else:
         earlier = record.pop('earlier', None)
@@ -1926,7 +1961,7 @@ def orca_steps(plan, args, writer, manifest, stamp):
             record.update(seen)
             write_manifest(writer, manifest)
         return ok
-    record_orca_patch(writer, manifest, pre, ORCA_PATCH, stamp)
+    record_orca_patch(writer, manifest, stamp, pre, ORCA_PATCH)
     try:
         outcome = patch_orca(writer, ORCA_PATCH, stamp)
     except Refusal as error:
@@ -1935,7 +1970,9 @@ def orca_steps(plan, args, writer, manifest, stamp):
                       f'({writer.changed} file change(s), Orca skills, automations and default base ref); resolve '
                       'the launchd error and rerun --apply') from None
     settle_orca_record(writer, manifest, outcome)
-    return ok and outcome.get('ok', False)
+    if outcome.get('stale'):
+        print(f'Orca app settings: {job_blocker(writer.home, job_label(stamp), outcome)}')
+    return ok and outcome.get('ok', False) and not outcome.get('stale')
 
 
 # ---------- Uninstall ----------
@@ -1965,12 +2002,17 @@ def uninstall_preflight(home, old, args):
         check(home / rel, leaf_dir=True)
     for path in (home / STATE, home / STATE / 'backups'):
         check(path, leaf_dir=True)
+    label = (old.get('orca_settings') or {}).get('job')
+    if label:  # Even an uninstall that leaves the settings alone must not drop the record of an unsettled job.
+        try:
+            blocker = job_blocker(home, label, job_outcome(home, label))
+        except Refusal as error:
+            blocker = str(error)
+        if blocker:
+            problems.append(blocker)
     if old.get('orca_settings') and not args.scratch and not args.skip_orca_settings:
         try:
             helper_python()
-            label = old['orca_settings'].get('job')
-            if label and job_outcome(home, label).get('running'):
-                problems.append(f'the Orca app settings patch job {label} is still running; rerun when it finishes')
         except Refusal as error:
             problems.append(str(error))
     return list(dict.fromkeys(problems))
@@ -2042,6 +2084,11 @@ def uninstall(home, old, args, stamp):
         if entry['created']:
             print(f'  kept         ~/{rel} (created by the installer, but it now holds content Orca Pod does not own)')
     settings = old.get('orca_settings')
+    unsettled = False
+    if settings and settings.get('job') and not args.scratch and not args.skip_orca_settings:
+        # The preflight refused an unsettled job, so an earlier run's finished job is settled first.
+        settle_orca_record(writer, old, job_outcome(home, settings['job']))
+        settings = old.get('orca_settings')
     if settings and not args.scratch and not args.skip_orca_settings:
         pre = orca_settings_module().preflight(settings['previous'])
         if not pre['ok']:
@@ -2051,20 +2098,29 @@ def uninstall(home, old, args, stamp):
         elif pre['before'] != settings['set']:
             print('Orca app settings changed since install; left as they are')
         else:
+            record_orca_patch(writer, old, stamp)  # The manifest owns the restore job before it starts.
             try:
-                restored = patch_orca(writer, settings['previous'], stamp).get('ok')
+                outcome = patch_orca(writer, settings['previous'], stamp)
             except Refusal as error:
                 problems.append(str(error))
-                restored = False
-            if not restored:  # The kept incomplete manifest still holds the previous values for a later restore.
+                outcome = {'ok': False}
+            settle_orca_record(writer, old, outcome)
+            unsettled = outcome.get('running') or outcome.get('stale')
+            if unsettled:
+                problems.append(f'{job_blocker(home, job_label(stamp), outcome)}; the manifest keeps the job and the '
+                                'previous Orca app settings values until then')
+            elif not outcome.get('ok'):  # The kept incomplete manifest holds the previous values for a later restore.
                 problems.append(f'Orca app settings not restored to {json.dumps(settings["previous"])}')
     kept = writer.prune_dirs(old.get('dirs', []))
     manifest = home / STATE / 'manifest.json'
     if problems:  # Keep the ownership record next to the backups for manual recovery.
-        os.replace(manifest, manifest.with_name(f'manifest-{stamp}.incomplete.json'))
+        os.link(manifest, manifest.with_name(f'manifest-{stamp}.incomplete.json'))
+    if unsettled:  # The canonical manifest keeps owning the restore job, and nothing this uninstall removed.
+        write_manifest(writer, {'version': MANIFEST_VERSION, 'files': {}, 'keys': {}, 'dirs': kept,
+                                'orca_settings': old['orca_settings']})
     else:
         manifest.unlink()
-    writer.prune_dirs(kept)
+        writer.prune_dirs(kept)
     for problem in problems:
         print(f'PROBLEM: {problem}')
     print(f'Uninstalled; {writer.changed} change(s). Backups are kept under {home / STATE / "backups"}.')

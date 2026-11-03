@@ -239,8 +239,9 @@ Terminal.app), the installer runs the helper as a one-shot launchd job in your
 GUI domain, never as its own child process. It writes the job's plist to
 `~/.local/state/orca-pod/orca-settings-<timestamp>.plist` (owner-only, label
 `orca-pod.orca-settings.<timestamp>`) and loads it with
-`launchctl bootstrap gui/<uid> <plist>`. launchd starts the helper once, outside
-Orca's process tree. When the helper exits, the job deletes its plist and removes
+`launchctl bootstrap gui/<uid> <plist>`; it refuses before writing anything when
+that plist, its log or result file, or a job with that label already exists.
+launchd starts the helper once, outside Orca's process tree. When the helper exits, the job deletes its plist and removes
 itself with `launchctl bootout gui/<uid>/<label>`. Afterwards
 `launchctl print gui/<uid>/<label>` reports no such service. The helper writes
 its result to `orca-settings-<timestamp>.json` and its output to
@@ -263,7 +264,16 @@ run, dry run or `--apply`, reads the result and reports it under `[orca]` as
 result` when the job stopped before finishing. A dry run only reports; `--apply`
 settles the manifest record as the original run would have. While the job is
 still running, `--apply` (without `--skip-orca-settings`) and `--uninstall`
-refuse and ask you to rerun when it finishes.
+(with or without `--skip-orca-settings`) refuse and ask you to rerun when it
+finishes.
+
+The installer reads the job's `state` and `pid` from `launchctl print`. A job
+that exited without removing itself stays registered with `state = not running`
+and no `pid`; the report adds `launchd still holds the exited job`. The manifest
+keeps the job, and `--apply` (without `--skip-orca-settings`) and `--uninstall`
+refuse with the exact cleanup: after checking the job's result file and log, run
+`launchctl bootout gui/<uid>/orca-pod.orca-settings.<timestamp>`, delete
+`orca-settings-<timestamp>.plist` if it is still there, and rerun.
 
 If launchd refuses the job, the run stops with `install.py: STOPPED:` and the
 `launchctl` error. Orca's app settings are unchanged. The file changes, Orca
@@ -396,8 +406,17 @@ renamed into place.
   is removed only when nothing but its owned keys and blocks is left in it,
   otherwise the rest stays in place and is reported as kept;
 - restores the previous Orca app settings through the helper, unless they have
-  changed since install;
-- removes the directories it created when they are empty, and the manifest.
+  changed since install. The restore is a settings job like the install patch:
+  the manifest records it before it starts and settles its result. When an
+  earlier run's job is still running or still registered after it exited, the
+  uninstall refuses before changing anything, even with `--skip-orca-settings`;
+- removes the directories it created when they are empty, and the manifest. When
+  its own restore job is still running when it stops waiting, or exited but is
+  still registered, the manifest stays in place owning only that job and the
+  previous settings values, with the full record kept as
+  `manifest-<timestamp>.incomplete.json`; rerun `--uninstall` once the job has
+  finished or been cleaned up as in
+  [Settings job launch and result](#settings-job-launch-and-result).
 
 Orca's own skills stay installed; manage them in Orca. Backups are kept. If
 uninstall cannot remove keys cleanly, it leaves that file as is, reports a

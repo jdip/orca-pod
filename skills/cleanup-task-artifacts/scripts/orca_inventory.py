@@ -111,10 +111,10 @@ def workers():
             workers_here = field(page, 'workers', list, 'worker-list')
             listed += workers_here
             if 'page' not in page:
-                # An unpaged response is the Run's whole listing unless it follows a cursor or
-                # fills the limit, where it may be cut short.
-                if after:
-                    raise Gap('worker-list paging stopped without page metadata')
+                # An unpaged response is the Run's whole listing unless it follows a cursor, carries a
+                # top-level continuation, or fills the limit, where it may be cut short.
+                if after or page.get('nextCursor') is not None or page.get('hasMore'):
+                    raise Gap('worker-list paging is partial without page metadata')
                 if len(workers_here) >= WORKER_LIMIT:
                     raise Gap(f'worker-list for {run} fills its limit without paging and may be truncated')
                 total = len(listed)

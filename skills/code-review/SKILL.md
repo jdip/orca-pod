@@ -24,6 +24,8 @@ Take every role, model and effort from the roster; never select a model here.
 
 Route to SEC-REV when the change touches authentication, sessions or authorization; secrets or credential handling; crypto; sandboxing or permissions; parsing untrusted input; installers or configuration writers that touch home directories; or network-exposed endpoints. Any other roster security-path trigger also applies: a security fix, CI/release credentials or supply chain, a reviewer's safeguard refusal, or the operator's request. Report every re-route.
 
+For code that runs on an Orca Pod host, the SEC-REV brief links Orca Pod's [host threat model](https://github.com/jdip/orca-pod/blob/test/SECURITY.md#host-threat-model) as the scope of the Security axis. A finding that only another local user or principal could exploit is disposed as out of scope under that model and does not block delivery.
+
 Launch SEC through the roster's **SEC launch**, never with `--agent`, `--model` or `--effort`: a Daybreak terminal on the reviewed worktree, adopted for supervision.
 
 ```bash

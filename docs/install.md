@@ -66,7 +66,8 @@ backup` when the installer backed up its original. The dry run shows a diff only
 for content Orca Pod owns: a file it wrote, and the owned lines of the managed
 `config.toml` blocks. Other lines of `config.toml` are counted (`… N unowned
 line(s) not shown …`), never printed, and the JSON files show only the owned keys
-being set. It also lists the Orca steps (`run`, `patch`, `skip` or `unchanged`),
+being set. It also lists the Orca steps (`run`, `patch`, `skip` or `unchanged`, and
+`previous` for the [result of an earlier settings job](#settings-job-launch-and-result)),
 each automation's action (`create`, `update`, `unchanged`, `adopt (identical)`,
 `remove`, `forget` for a record of an adopted or already deleted automation that
 is no longer managed, `planned` on a scratch run, or `skip` with
@@ -206,7 +207,8 @@ that changes the algorithm shows up as the review prompt returning.
 ### Orca app settings
 
 Orca has no settings CLI, so the installer launches `machine/orca_settings.py`
-detached and waits on its result file under `~/.local/state/orca-pod/`. The
+as a one-shot launchd job and waits on its result file under
+`~/.local/state/orca-pod/` ([launch and result](#settings-job-launch-and-result)). The
 helper is gated on the settings schema verified in
 [#6](https://github.com/jdip/orca-pod/issues/6) and
 [#38](https://github.com/jdip/orca-pod/issues/38), not on the Orca version: it
@@ -225,10 +227,48 @@ verifies the values survived startup. If anything fails after the write, it
 restores the saved document before Orca starts again, quitting Orca first when
 the failure shows up after the relaunch. The installer keeps the restoration
 record in the manifest until the change is verified as applied or as restored.
-Agent sessions survive the restart. When the values already match, nothing is
-restarted. When the schema check fails it refuses and changes nothing; set
-**Branch prefix** to custom `orca` and the default agent permission to full
-access by hand in Orca's settings and rerun with `--skip-orca-settings`.
+When the values already match, nothing is restarted and no job is created. When
+the schema check fails it refuses and changes nothing; set **Branch prefix** to
+custom `orca` and the default agent permission to full access by hand in Orca's
+settings and rerun with `--skip-orca-settings`.
+
+#### Settings job launch and result
+
+In every context (a terminal agent session, an Orca native chat session or
+Terminal.app), the installer runs the helper as a one-shot launchd job in your
+GUI domain, never as its own child process. It writes the job's plist to
+`~/.local/state/orca-pod/orca-settings-<timestamp>.plist` (owner-only, label
+`orca-pod.orca-settings.<timestamp>`) and loads it with
+`launchctl bootstrap gui/<uid> <plist>`. launchd starts the helper once, outside
+Orca's process tree. When the helper exits, the job deletes its plist and removes
+itself with `launchctl bootout gui/<uid>/<label>`. Afterwards
+`launchctl print gui/<uid>/<label>` reports no such service. The helper writes
+its result to `orca-settings-<timestamp>.json` and its output to
+`orca-settings-<timestamp>.log` in the same directory, and both are kept.
+
+The restart affects sessions differently:
+
+- **Terminal agent sessions** run under Orca's terminal host daemon and survive
+  the restart. An installer started from one waits on the result and reports it
+  in the same run, as from Terminal.app.
+- **An Orca native chat session** runs inside the Orca app, so quitting Orca
+  interrupts it, together with an installer it started. The launchd job is not
+  affected and completes the patch, including any restore.
+
+The manifest records the job while its result is unsettled; an installer that
+stops waiting after 10 minutes leaves it recorded too. The next installer
+run, dry run or `--apply`, reads the result and reports it under `[orca]` as
+`previous     Orca app settings patch <label>: ok {…}`, or `FAILED <error>`, adding
+`restored: True` or `False` when the helper had written. It reports `ended without a
+result` when the job stopped before finishing. A dry run only reports; `--apply`
+settles the manifest record as the original run would have. While the job is
+still running, `--apply` (without `--skip-orca-settings`) and `--uninstall`
+refuse and ask you to rerun when it finishes.
+
+If launchd refuses the job, the run stops with `install.py: STOPPED:` and the
+`launchctl` error. Orca's app settings are unchanged. The file changes, Orca
+skills, automations and default base ref reported earlier in the run stay
+applied; nothing is rolled back. Resolve the launchd error and rerun `--apply`.
 
 ### Orca automations
 

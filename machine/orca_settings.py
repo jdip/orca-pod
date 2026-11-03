@@ -1,15 +1,19 @@
 #!/usr/bin/env python3
 """Apply Orca app settings while Orca is quit (macOS); see docs/install.md.
 
-The installer launches this helper detached and waits on its --result file. It quits Orca.app
-gracefully, saves the previous `settings` document (payload, content_hash, revision, updated_at) to a
-new private --backup file, patches that document, relaunches Orca, waits for the runtime, verifies the
-patch survived and writes a JSON result. On any failure after the write it restores the saved document
+The installer launches this helper as a one-shot launchd job in the user's GUI domain, outside Orca's
+process tree, so quitting Orca does not end it; the job removes itself and its plist when the helper
+exits. The installer waits on the --result file, and a later installer run reports it when the
+installer did not survive the restart. The helper quits Orca.app gracefully, saves the previous
+`settings` document (payload, content_hash, revision, updated_at) to a new private --backup file,
+patches that document, relaunches Orca, waits for the runtime, verifies the patch survived and writes
+a JSON result. On any failure after the write it restores the saved document
 before Orca starts, quitting Orca again first when the failure is found after the relaunch, and reports
 whether the restore was verified. Orca is never force-killed. The gate is the settings schema, not the
 app version: an unsupported settings domain_version, or a target key that is missing or has an unexpected
-type or value, is refused with nothing changed; the app version is only recorded. Agent sessions run under
-Orca's terminal host, so they survive the restart.
+type or value, is refused with nothing changed; the app version is only recorded. Terminal agent sessions
+run under Orca's terminal host, so they survive the restart; an Orca native chat session runs inside the
+app and is interrupted, while this job completes the patch.
 """
 import argparse
 import hashlib

@@ -40,6 +40,20 @@ attribution need an explicit owner decision when identity removal would affect
 them. The staged check does not detect every personal name, email, private project
 or host alias, and does not inspect hosted discussions or historical objects.
 
+## Host threat model
+
+Orca Pod hosts are single-user macOS machines: one person logs in. Defenses
+against other local users or principals, such as another account replacing an
+interpreter or holding an ACL entry, are out of scope by default. These stay in
+scope:
+
+- credentials and secrets
+- untrusted input: repository content, web, downloads and prompt injection
+- network exposure
+- CI
+- supply chain
+- public-repository leakage
+
 ## Public repository work
 
 Treat this repository and all outgoing GitHub content as public, including during

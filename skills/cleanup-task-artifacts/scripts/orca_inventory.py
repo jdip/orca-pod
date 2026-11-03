@@ -23,6 +23,7 @@ LIVE_TERMINAL_STATES = {'active', 'retained', 'release_pending', 'release_unknow
 IDLE_TERMINAL_STATES = {'reclaimable', 'released'}  # Orca 1.4.241's other terminal states; any other is a gap.
 SETTLED_WORKER_STATES = {'succeeded', 'failed'}
 SETTLED_DISPATCH_STATUSES = {'completed', 'failed'}
+WORKER_LIMIT = 100  # worker-list --limit; an unpaged listing this long may be truncated
 # Every discovered repository adopts, or is the source of, the Repository Standard, which delivers through PR-to-test.
 DELIVERY_BRANCH = 'test'
 SOURCE_KEY = 'github.com/jdip/orca-pod'  # discover.py's only repository for its source-repository basis
@@ -87,10 +88,14 @@ def complete(result, key, label):
 
 
 def workers():
-    """Every Run's supervised workers; worker-list alone covers only the bound Run."""
+    """Every Run's supervised workers; worker-list alone covers only the bound Run.
+
+    --full asks for Orca's full records; from Orca 1.4.246 the default concise view omits worker
+    states, resources and paging.
+    """
     runs, after = [], None
     while True:
-        page = orca('orchestration', 'run-list', '--limit', '100', *(['--cursor', after] if after else []))
+        page = orca('orchestration', 'run-list', '--full', '--limit', '100', *(['--cursor', after] if after else []))
         runs += [field(run, 'id', str, 'run') for run in field(page, 'runs', list, 'run-list')]
         after = cursor(page, 'run-list')
         if not after:
@@ -101,9 +106,19 @@ def workers():
     for run in runs:
         listed, after = [], None
         while True:
-            page = orca('orchestration', 'worker-list', '--run', run, '--limit', '100',
+            page = orca('orchestration', 'worker-list', '--full', '--run', run, '--limit', str(WORKER_LIMIT),
                         *(['--cursor', after] if after else []))
-            listed += field(page, 'workers', list, 'worker-list')
+            workers_here = field(page, 'workers', list, 'worker-list')
+            listed += workers_here
+            if 'page' not in page:
+                # An unpaged response is the Run's whole listing unless it follows a cursor, carries a
+                # top-level continuation, or fills the limit, where it may be cut short.
+                if after or page.get('nextCursor') is not None or page.get('hasMore'):
+                    raise Gap('worker-list paging is partial without page metadata')
+                if len(workers_here) >= WORKER_LIMIT:
+                    raise Gap(f'worker-list for {run} fills its limit without paging and may be truncated')
+                total = len(listed)
+                break
             paging = field(page, 'page', dict, 'worker-list')
             more, after = field(paging, 'hasMore', bool, 'worker-list page'), cursor(paging, 'worker-list')
             total = field(paging, 'total', int, 'worker-list page')

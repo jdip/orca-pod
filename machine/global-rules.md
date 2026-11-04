@@ -16,6 +16,12 @@ Interactive helper scripts require a human-capable terminal. When a needed
 capability is unavailable, report that limit and preserve affected state. Missing
 lifecycle evidence also preserves the resource.
 
+Full access does not waive built-in CLI safety checks: Claude Code asks about `cd`
+compounds that write, redirect or run git, and about dangerous removals; Codex
+rejects `rm -f` outright. Use absolute paths or `git -C <dir>` instead of
+`cd <dir> && …`, and remove temporary files with explicit `rm <path>`,
+`find <dir> -delete` or Python `shutil.rmtree`.
+
 Skills retain the authorization and chaining rules in their maintained text. Use an
 already authorized workflow skill for its next permitted step. Preserve deliberate
 manual-only upstream packages and the skill-to-skill chaining that authorized

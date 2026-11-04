@@ -197,6 +197,12 @@ Process every message in `result.messages` before acknowledging
 `result.deliveryId` with the next wait (`check --ack <delivery_id> --wait ...`).
 A timeout or empty result is a checkpoint, not a failure.
 
+When a wait times out or a worker stays quiet, read `observation.agentWait` from
+`worker-show`. A worker parked on a prompt only a human can answer is healthy:
+name the worker and its prompt to the human, then wait. The human answers it;
+the coordinator never approves it through `terminal send`, retries, relaunches
+or fails it. An absent `agentWait` means Orca did not look; `null` means no wait.
+
 **Answer, follow up, inspect, settle:**
 
 ```bash

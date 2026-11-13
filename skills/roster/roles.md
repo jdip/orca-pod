@@ -68,7 +68,7 @@ Return concise evidence and unresolved decisions to the coordinator.
 
 Independent second review in a fresh context, for high-risk changes only.
 
-- Model: Claude · `claude-opus-5-5` · xhigh
+- Model: Claude · `claude-fable-5-2` · high
 - Layer: orca; authority: read-only
 
 ```text
@@ -84,7 +84,7 @@ Return concise evidence and unresolved decisions to the coordinator.
 Resolve difficult technical ambiguity, root causes, and architectural tradeoffs, as two independent opinions.
 
 - Model: Codex · `gpt-6-astra` · max, sandbox `read-only`
-- Model: Claude · `claude-opus-5-5` · max
+- Model: Claude · `claude-fable-5-2` · high
 - Layer: orca; authority: read-only
 
 ```text

@@ -93,7 +93,8 @@ its own fresh session:
 [design critic](../to-spec/review-lenses/design_critic.md),
 [implementation readiness](../to-spec/review-lenses/implementation_readiness.md),
 [comprehension](../to-spec/review-lenses/comprehension.md)
-and [verification cost](../to-spec/review-lenses/verification_cost.md). The subject is the
+and [verification cost](../to-spec/review-lenses/verification_cost.md) with its
+[catalog](../to-spec/review-lenses/verification-cost-standard.md). The subject is the
 repository SHA plus the inline draft. Its Decisions so far are the governing
 decisions, with the existing map's URL for a reopened map. Do not manufacture
 frontier detail to start a round.

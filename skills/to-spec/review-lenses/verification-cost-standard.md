@@ -108,6 +108,8 @@ A real-time test may wait out a clock no test can control, and starts nothing.
 Each case cites that clock. Where a linter's exemption lifts a whole rule, the
 real-time path restates the start ban as a source-check line.
 
+#### Privileged areas
+
 Both privileged areas share these properties:
 
 - Each runs as its own named check step, so its case count and elapsed time
@@ -221,7 +223,7 @@ line, as in a list written one item per line, unless it flags the option alone;
 write the value attached to its option, such as `--dist=loadscope`. These
 matches are properties of the lines, not exemptions: a path stays the only
 exemption, and there is still no inline suppression
-([real-time tests](#real-time-tests)).
+([privileged areas](#privileged-areas)).
 
 Placeholders. The repository names each one when it installs the rules, before
 the files exist, as globs for a linter and as file lists for source-check lines.
@@ -249,7 +251,7 @@ question A2 governs what the paths miss.
 
 | Ecosystem | Test paths | Runner configuration | In-file test markers |
 | --- | --- | --- | --- |
-| Python with pytest | `test_*.py`, `*_test.py`, `conftest.py`, and the test directories | `pyproject.toml` (`[tool.pytest.ini_options]`), `pytest.ini`, `tox.ini`, `setup.cfg`, `conftest.py` | Doctests collected by `--doctest-modules` |
+| Python with pytest | `test_*.py`, `*_test.py`, `conftest.py`, and the test directories | `pytest.toml`, `.pytest.toml`, `pyproject.toml` (`[tool.pytest]` or `[tool.pytest.ini_options]`), `pytest.ini`, `tox.ini`, `setup.cfg`, `conftest.py` | Doctests collected by `--doctest-modules` |
 | Rust with `cargo test` | `tests/` | `Cargo.toml`, `.cargo/config.toml` | `#[cfg(test)]`, `#[test]`, `#[tokio::test]` in `src/` |
 | TypeScript with Vitest and Playwright | `*.test.*` and `*.spec.*` files, and the Playwright test directory | `vitest.config.*`, `vite.config.*` (its `test` key), `playwright.config.*`, `package.json` scripts | `import.meta.vitest` (Vitest in-source tests) |
 | Shell check scripts | `<check-scripts>`, `<workflow-files>` | The workflow files | None |
@@ -502,7 +504,7 @@ Instance: every case of one suite called a helper that started the application
 process with its supporting services, waited for readiness and tore it down. A
 second suite started a proxy process per case. A server fixture written with no
 scope ran per test. In another repository a function-scoped fixture dropped and
-rebuilt the database schema for every case, and two browser tests launched a
+rebuilt the database schema for every case, and browser tests launched a
 browser per test function. Rust command-line tests started the service binary
 once per test, written to mirror an existing test. For TypeScript and shell no
 instance was observed; two homes were observed working: a browser suite's server
@@ -707,12 +709,13 @@ Python with pytest:
 ```sh
 # Scan: <runner-config>, <check-scripts>, <workflow-files>
 # Message: Let independent work run side by side. A setting that must stay serial states its cause on the same line as a "serial-cause:" comment naming the constraint.
-grep -nE -e '-p["'\'',=[:space:]]*no:xdist|(-n["'\'',=[:space:]]*0|--numprocesses["'\'',=[:space:]]*[01])([^0-9]|$)|(^[[:space:]]*|pytest.*|PYTEST.*|addopts.*|["'\''])-n["'\'',=[:space:]]*1([^0-9]|$)|--dist["'\'',=[:space:]]*no([^a-z]|$)|(--(numprocesses|dist)["'\'']?|["'\'']-n["'\'']),?[[:space:]]*\\?$' <files> | grep -v 'serial-cause:'
+grep -nE -e '-p["'\'',=[:space:]]*no:xdist|--numprocesses["'\'',=[:space:]]*[01]([^0-9]|$)|(^[[:space:]]*|pytest.*|PYTEST.*|addopts.*|["'\''])-n["'\'',=[:space:]]*[01]([^0-9]|$)|--dist["'\'',=[:space:]]*no([^a-z]|$)|(--(numprocesses|dist)["'\'']?|["'\'']-n["'\'']),?[[:space:]]*\\?$' <files> | grep -v 'serial-cause:'
 ```
 
-The line counts `-n 1` only after `pytest`, `PYTEST` or `addopts` on the same
-line, at the start of a line, as on a continuation line, or right after a quote,
-because other commands, such as `head`, take `-n 1`.
+The line counts `-n 0` and `-n 1` only after `pytest`, `PYTEST` or `addopts` on
+the same line, at the start of a line, as on a continuation line, or right after
+a quote, because other commands, such as `head` and `tail`, take `-n 0` and
+`-n 1`.
 
 Rust with `cargo test`:
 
@@ -752,9 +755,10 @@ recorded, and a targeted check ran nearly the whole gate.
 ## Review questions
 
 Answer each question yes or no, with the file and line that decides it. Yes
-passes. In a repository that has not yet converted, answer a question about a
-missing structure item "not yet converted" (see
-[before a repository upgrades](#before-a-repository-upgrades)).
+passes. In a repository that has not upgraded (see
+[before a repository upgrades](#before-a-repository-upgrades)), answer a
+question about a missing structure item or a missing
+[check-step output](#check-step-output) line "not yet converted".
 
 Applicability:
 
@@ -866,9 +870,9 @@ is a few generic sentences with no repository name, path, identifier or log.
 
 The originating repository records the report in its own tracker under
 `upstream:orca-pod`, the label the Repository Standard's tracker conventions
-define. An Orca Pod session pulls reports during
-[`whats-next`](../../whats-next/SKILL.md) discovery, under the public-work
-policy:
+define, and creates that label where it lacks it. An Orca Pod session pulls
+reports during [`whats-next`](../../whats-next/SKILL.md) discovery, under the
+public-work policy:
 
 - Intake changes nothing in the originating repository.
 - It searches Orca Pod issues, open and closed, for the public summary, and
@@ -881,18 +885,22 @@ no scheduled automation.
 
 The originating repository closes its own report. A Standards Upgrade there
 closes it once the revision it upgrades to resolves the report, or once Orca Pod
-has declined it. Until then the report stays open.
+has declined it, which the upgrade finds by searching Orca Pod's issues for the
+report's public summary. Until then the report stays open.
 
 ## Before a repository upgrades
 
 Host installation binds sessions started after it. A repository keeps its old
-checks until its own upgrade. In that interval:
+checks until its own upgrade. It has upgraded when its development guidance
+holds the Verification structure paragraph, which says what is installed and
+what reads "none yet". In that interval:
 
 - New test code in every repository follows the rules: no new per-case start,
   wall-clock wait or forced-serial setting, and no new use of an existing one.
 - The review axis and the panel persona report those as findings. They report a
-  repository's missing lint stage, privileged paths or start owner as "not yet
-  converted", and do not ask an ordinary task to build them.
+  missing structure item, such as the lint stage, a privileged path or the start
+  owner, as "not yet converted", as the [review questions](#review-questions)
+  say, and do not ask an ordinary task to build it.
 - Existing instances wait for that repository's Standards Upgrade or its own
   map. The session that finds them lists them once in one scoped issue in that
   repository, under its tracker deduplication.

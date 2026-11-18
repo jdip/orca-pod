@@ -21,7 +21,10 @@ copying an entire scaffolding tree.
   Apply the global target-repository write boundary at the tracker write step:
   local remediation stays autonomous; any external destination requires explicit
   operator approval regardless of ownership, with read-only discovery and pending
-  drafts preserved.
+  drafts preserved. Define the `upstream:orca-pod` label, under which the
+  repository records its
+  [upstream reports](../skills/to-spec/review-lenses/verification-cost-standard.md#upstream-reports)
+  in the form the catalog gives.
 - Task-relevant domain-documentation pointers like docs/agents/domain.md. Create
   or change domain docs when real terms or decisions emerge, rather than as
   empty scaffolding.
@@ -30,6 +33,9 @@ copying an entire scaffolding tree.
 - Verification policy held by the target's native CI, script and runbook owners
   under [verification evidence](#verification-evidence), with executable
   alignment completed under [validation and adoption](#validation-and-adoption).
+- A Verification structure paragraph in the development guidance, with each part
+  of that structure installed where it is first needed, under
+  [verification structure](#verification-structure).
 - Guidance retirement under the outcome below, including inherited process that
   adds unjustified complexity without directly contradicting another rule.
 - A target-specific plan under Target assessment and planning below, resolved
@@ -333,27 +339,102 @@ conformance suites, tests of tests, or resumable workflow engines. Running appli
 checks through a shell wrapper does not turn those checks into prohibited Tooling tests.
 
 Greenfield Initialization establishes only the needed organization, guidance, tracker
-conventions, and minimal shell entry points. Application tooling grows with actual
-application development.
+conventions, and minimal shell entry points. Application tooling arrives with actual
+application development, and verification structure arrives at the points that
+[verification structure](#verification-structure) names, starting from its
+greenfield marker and check.
 
 Adoption and upgrades align the target's executable verification, not only its
 guidance. This includes selecting targeted checks for feature-to-rollup PRs and
 full CI for delivery PRs by their actual destination, with matching required-check
 configuration and evidence handling. The target-owned plan names the workflow,
 CI, script, test and fixture
-changes that retire obsolete enforcement, such as Tooling suites, fake environments,
-duplicate verification runs and unjustified per-case service startup, and how each
-change is verified. Apply [TDD's test boundaries](../skills/tdd/SKILL.md#seams-where-tests-go)
-when changing application tests and fixtures. Routine repairs
+changes that retire obsolete enforcement, such as Tooling suites, fake environments
+and duplicate verification runs, and how each change is verified. It converts the
+target's tests, fixtures, checks and workflows under
+[verification structure](#verification-structure). Routine repairs
 within that scope ship in the alignment change under its existing authority.
 Preserve mechanisms justified by current needs: meaningful application behavior
-and native-contract tests, fresh per-case data and isolated credentials, and
-dedicated services for destructive or lifecycle cases. Alignment changes how
+and native-contract tests, case isolation through fresh per-case data and
+isolated credentials, and lifecycle tests, each citing the lifecycle state it
+asserts. Alignment changes how
 verification runs and is reused; it is not an application rewrite. A substantive
 missing design, authorization or external capability stays an explicit blocker and
 leaves adoption or upgrade incomplete. Application coverage gaps unrelated to that
 alignment remain scoped, deduplicated issues with their own owner and do not block
 adoption. Actual delivery prerequisites still apply.
+
+## Verification structure
+
+The [verification-cost catalog](../skills/to-spec/review-lenses/verification-cost-standard.md)
+says what verification structure is: its
+[principle](../skills/to-spec/review-lenses/verification-cost-standard.md#principle)
+and [terms](../skills/to-spec/review-lenses/verification-cost-standard.md#terms),
+the [named structure](../skills/to-spec/review-lenses/verification-cost-standard.md#named-structure),
+the [check-step output](../skills/to-spec/review-lenses/verification-cost-standard.md#check-step-output),
+and each [rule](../skills/to-spec/review-lenses/verification-cost-standard.md#rules)
+with its invariant and stanzas. This section says when and where a repository
+installs each part: in the change that first needs it.
+
+The development guidance holds one Verification structure paragraph. It pairs
+each rule with what enforces it, and reads "none yet" for anything no test or
+check needs. Each change below updates that paragraph with what it installs.
+
+- **Greenfield with no stack.** The paragraph reads "Verification structure:
+  none yet". One source check of the repository's own fails when test files or a
+  test-runner configuration exist while that marker remains, and its message
+  names this section. It recognizes test files of any stack by their file and
+  directory names, and it also looks for the runner configuration files and
+  in-file test markers that the catalog's
+  [stanza conventions](../skills/to-spec/review-lenses/verification-cost-standard.md#stanza-conventions)
+  name. A change that brings in a stack this check would miss, including a stack
+  with no stanza, adds that stack's test names and runner configuration to the
+  check before any test exists.
+- **A component's stack and first test runner.** The change that introduces them
+  installs the catalog's rules for that stack in its native lint configuration,
+  with the exempt paths named, and makes the
+  [lint stage](../skills/to-spec/review-lenses/verification-cost-standard.md#lint-stage)
+  the first step of the check script. It adds only that configuration: the
+  linter configuration and the lint step. Privileged paths are named in that
+  configuration and created by the first test that needs them, so the change
+  adds no empty test directories or placeholder files.
+- **The no-stanza path.** Where the catalog has no stanza for the stack, or the
+  stack's existing linter differs from the stanza's, the change that installs the
+  rules writes the seed rules' bans in the stack's own linter, or as source-check
+  lines where that linter cannot express one. It shows each rule firing once
+  through the native lint run on an uncommitted example of the banned primitive,
+  records that run in the change's verification evidence, and files an
+  [upstream report](../skills/to-spec/review-lenses/verification-cost-standard.md#upstream-reports).
+  Nothing is kept as a test. Adding a different linter needs the target's
+  authorization under [languages and environments](#languages-and-environments).
+- **The first check that builds, installs or pulls** brings the
+  [reuse path](../skills/to-spec/review-lenses/verification-cost-standard.md#reuse-path)
+  for its runner, or the recorded absence of one. The absence stays recorded
+  with its cause until a later map revisits it.
+- **The second check step that does not depend on the first** brings
+  separately invocable check steps, each declaring what it depends on.
+- **The first test that needs the start owner, the wait helper or a privileged
+  test path** brings it.
+
+The repository's map records two decisions at the map gate: the reuse path or
+why none is available, because a reuse path can need a credential, a registry or
+a persistent runner; and a serial test runner whose parallel mode needs a new
+dependency. This Standard mandates no parallel runner, clock library or cache
+tool.
+
+Brownfield Adoption and Standards Upgrade search the repository for every
+primitive and setting the catalog's rules name, and convert every hit, including
+moving lifecycle cases into their privileged area. They install the rules in the
+same change, with no baseline of tolerated hits. A structural absence that
+conversion cannot settle is recorded with its cause and a scoped issue.
+
+A Standards Upgrade also:
+
+- replaces the repository's own copies of guidance that this section supersedes;
+- closes each of the repository's open upstream reports that the revision it
+  upgrades to resolves, or that Orca Pod has declined, as the catalog's
+  [upstream reports](../skills/to-spec/review-lenses/verification-cost-standard.md#upstream-reports)
+  describe, and leaves the others open.
 
 ## Verification evidence
 
@@ -363,7 +444,10 @@ to the delivery boundary:
 
 - Feature to rollup: run only targeted tests and validation for the changed
   behavior and affected integration paths, plus review. A new cumulative tree
-  needs fresh targeted evidence, not a full suite.
+  needs fresh targeted evidence, not a full suite. The targeted check runs the
+  [lint stage](../skills/to-spec/review-lenses/verification-cost-standard.md#lint-stage)
+  first, selects steps by the inputs each declares, and never falls back to the
+  full gate.
 - PR to test, from a direct feature or completed rollup: run authoritative full CI
   for the combined change and verify actual test deployment/processing.
 - Separately requested promotion to main and its synchronization: use equivalent
@@ -376,6 +460,10 @@ target. Hosted CI is authoritative where it exists; at full-delivery boundaries,
 full local runs are optional unless the runbook names a local-only gate.
 Cheap pre-publication privacy checks stay mandatory before each push, and changed
 Tooling uses proportionate checks and available behavioral evidence.
+
+The target's check script prints the catalog's
+[check-step output](../skills/to-spec/review-lenses/verification-cost-standard.md#check-step-output)
+lines, and verification evidence quotes them.
 
 Targeted evidence never satisfies a full-suite gate. Keep the scopes distinguishable
 in native CI results and delivery lookup. A conflicting full child requirement

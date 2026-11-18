@@ -179,6 +179,11 @@ placeholders.
 
 ### Stanza conventions
 
+A stanza flags the ordinary forms of its identifiers in its ecosystem, the ones a
+test is copied from, so a missing ordinary form is a defect in the stanza. It is
+not proof against a deliberate workaround: what a ban by name cannot see, the
+[review questions](#review-questions) carry.
+
 Linters. Python uses Ruff `flake8-tidy-imports.banned-api` (rule TID251) with
 `per-file-ignores`. TypeScript uses ESLint flat config `no-restricted-imports`
 and `no-restricted-syntax`, which need no type information. A target whose stack
@@ -204,13 +209,14 @@ stated beside them.
 
 A source-check line reads one line at a time and matches text, not syntax, so it
 also flags some lines that hold no banned name. So that a banned name on a later
-line cannot pass, it flags a line that opens a grouped import of a banned
-module, or an inline `eslint` configuration comment, and does not close it,
-whatever the group holds; close it on that line, or split the import into
-separate imports. It also flags a banned name inside a comment, and a module
-alias that could hide one, such as `import os as <name>` in a path where the
-start ban is restated; reword the comment, or import the module under its own
-name. These matches are properties of the lines, not exemptions: a path stays
+line cannot pass, it flags a line that opens a grouped import of a banned module
+and does not close it, whatever the group holds, and a line that begins an
+inline `eslint` comment directive that does not close on that line, whatever the
+directive configures; close the group or the comment on that line, or split the
+import into separate imports. It also flags a banned name inside a comment, and
+a module alias that could hide one, such as `import os as <name>` in a path
+where the start ban is restated; reword the comment, or import the module under
+its own name. These matches are properties of the lines, not exemptions: a path stays
 the only exemption, and there is still no inline suppression
 ([real-time tests](#real-time-tests)).
 
@@ -290,13 +296,15 @@ TypeScript, in `eslint.config.js` (or `.mjs` or `.ts`):
 const testPaths = ['<test-paths>'];
 const own = { paths: [], patterns: [], syntax: [] };
 
-// One list of module names bans both the static and the dynamic imports.
+// One list of modules bans both the static and the dynamic imports. An entry
+// with importNames bans those names statically and its whole module dynamically.
 function ban(modules, message, selectors) {
+  const entries = modules.map((m) => (typeof m === 'string' ? { name: m } : m));
   return {
-    paths: modules.map((name) => ({ name, message })),
+    paths: entries.map((entry) => ({ ...entry, message })),
     syntax: [
       ...selectors,
-      ...modules.flatMap((name) => [
+      ...entries.flatMap(({ name }) => [
         { selector: `ImportExpression[source.value='${name}']`, message },
         { selector: `CallExpression[callee.name='require'][arguments.0.value='${name}']`, message },
       ]),
@@ -342,7 +350,7 @@ grep -nE 'noqa([^:]|$)|noqa:[^#]*TID251' <files>
 
 # Scan: <test-paths> (TypeScript)
 # Message: Exemption is by path. Move the case to <lifecycle-path> or <real-time-path>, or use the start owner or the wait helper.
-grep -nE 'eslint-disable[^*]*no-restricted-|eslint-disable(-next-line|-line)?[[:space:]]*(\*/|--|$)|\*[[:space:]]*eslint([[:space:]][^*]*no-restricted-(imports|syntax)|[[:space:]]*$)' <files>
+grep -nE 'eslint-disable[^*]*no-restricted-|eslint-disable(-next-line|-line)?[[:space:]]*(\*/|--|$)|(\*|^)[[:space:]]*eslint([[:space:]][^*]*no-restricted-(imports|syntax)|([[:space:]-]([^*]|\*+[^*/])*\**)?$)' <files>
 ```
 
 ### Per-case expensive starts
@@ -381,10 +389,11 @@ Homes for legitimate uses:
 
 The stanzas ban by start primitive, so they are deliberately broader than the
 invariant: they also flag a command that a test runs to completion and that is
-neither an expensive resource nor the product's own command, such as `git`
-building a fixture repository. Such a command has no home in this catalog. The
-case makes its data in-process, or the start owner makes shared data once per
-run. The lifecycle path and the command helper do not take it: a lifecycle test
+neither an expensive resource nor the product's own command, such as a tool
+that builds fixture data or a tool that converts the product's output so a case
+can assert on it. Such a command has no home in this catalog. The case does that
+work in-process, or the start owner prepares shared data once per run. The
+lifecycle path and the command helper do not take it: a lifecycle test
 asserts a start or stop, and the command helper runs only the product's own
 command. A repository whose product needs such a command per case narrows the
 rule through an approved specification that names the command, as
@@ -407,6 +416,12 @@ Python with pytest. Add to the shared `banned-api` table:
 "asyncio.create_subprocess_exec".msg = "Test code starts no expensive resource. Use the start owner's named configuration; run the product's own command through the command helper and build other fixture data in-process; a case that asserts a start or stop goes under <lifecycle-path>."
 "asyncio.create_subprocess_shell".msg = "Test code starts no expensive resource. Use the start owner's named configuration; run the product's own command through the command helper and build other fixture data in-process; a case that asserts a start or stop goes under <lifecycle-path>."
 "multiprocessing.Process".msg = "Test code starts no expensive resource. Use the start owner's named configuration; a case that asserts a start or stop goes under <lifecycle-path>."
+"pexpect".msg = "Test code starts no expensive resource. Use the start owner's named configuration; run the product's own command through the command helper; a case that asserts a start or stop goes under <lifecycle-path>."
+"selenium.webdriver.Chrome".msg = "Test code launches no browser. Take the browser from the start owner; a case that asserts a launch goes under <lifecycle-path>."
+"selenium.webdriver.Firefox".msg = "Test code launches no browser. Take the browser from the start owner; a case that asserts a launch goes under <lifecycle-path>."
+"selenium.webdriver.Edge".msg = "Test code launches no browser. Take the browser from the start owner; a case that asserts a launch goes under <lifecycle-path>."
+"selenium.webdriver.Safari".msg = "Test code launches no browser. Take the browser from the start owner; a case that asserts a launch goes under <lifecycle-path>."
+"selenium.webdriver.Remote".msg = "Test code launches no browser. Take the browser from the start owner; a case that asserts a launch goes under <lifecycle-path>."
 "playwright.sync_api.sync_playwright".msg = "Test code launches no browser. Take the browser from the start owner; a case that asserts a launch goes under <lifecycle-path>."
 "playwright.async_api.async_playwright".msg = "Test code launches no browser. Take the browser from the start owner; a case that asserts a launch goes under <lifecycle-path>."
 "testcontainers".msg = "Test code starts no container. Use the start owner's named configuration; a case that asserts a start or stop goes under <lifecycle-path>."
@@ -419,27 +434,29 @@ the wait ban, so this line restates it:
 ```sh
 # Scan: <real-time-path>, <wait-helper>
 # Message: Real-time tests and the wait helper start nothing. Use the start owner's named configuration; a case that asserts a start or stop goes under <lifecycle-path>.
-grep -nE 'subprocess|os\.(system|popen)|create_subprocess_|multiprocessing|sync_playwright|async_playwright|testcontainers|from[[:space:]]+os[[:space:]]+import[^#]*(system|popen|\([^)]*$)|import[[:space:]]+([^#]*,[[:space:]]*)?os[[:space:]]+as|(import|from)[[:space:]]+([^#]*,[[:space:]]*)?docker([^[:alnum:]_]|$)' <files>
+grep -nE 'subprocess|os\.(system|popen)|create_subprocess_|multiprocessing|pexpect|sync_playwright|async_playwright|testcontainers|from[[:space:]]+os[[:space:]]+import[^#]*(system|popen|\([^)]*$)|import[[:space:]]+([^#]*,[[:space:]]*)?os[[:space:]]+as|(import|from)[[:space:]]+([^#]*,[[:space:]]*)?docker([^[:alnum:]_]|$)|webdriver(\.|[[:space:]]+import[^#]*)(Chrome|Firefox|Edge|Safari|Remote)([^[:alnum:]_]|$)|webdriver[[:space:]]+(import[^#]*\([^)]*$|as[[:space:]])' <files>
 ```
 
-A fixture that rebuilds a schema for every case calls the repository's own
-schema or migration API, which no shared stanza can name. When the stack is
-known, the repository adds that API to the table as a local rule.
+A start reached through the repository's own code, such as a fixture that
+rebuilds a schema for every case through the repository's schema or migration
+API or a wrapper that launches a browser, calls an API no shared stanza can
+name. When the stack is known, the repository adds that API to the table as a
+local rule.
 
 Rust with `cargo test`:
 
 ```sh
 # Scan: <test-paths>, except <lifecycle-path> and <start-owner>
 # Message: Test code starts no process or container. Use the start owner's named configuration; run the product's own command through the command helper and build other fixture data in-process; a case that asserts a start or stop goes under <lifecycle-path>.
-grep -nE 'process::(\{[^}]*)?(Command|$)|process::\*|Command::cargo_bin|testcontainers' <files>
+grep -nE 'process::(\{[^}]*)?(Command|$)|process::\*|Command::cargo_bin|assert_cmd|(^|[^[:alnum:]_])(duct|xshell)::|testcontainers|bollard' <files>
 ```
 
 The line matches a path or import that reaches `Command` through `process::`,
 a glob import of a `process` module, and a line that opens a grouped import of
 one without closing it, so it skips an unrelated `Command` type. It cannot see a
 `process` module imported under another name, such as
-`use std::process as proc;`, or a start reached through another crate; review
-question R1 carries those.
+`use std::process as proc;`, or a start reached through a crate the line does
+not name; review question R1 carries those.
 
 TypeScript with Vitest and Playwright. Define before the shared scaffolding's
 `export default`:
@@ -447,13 +464,21 @@ TypeScript with Vitest and Playwright. Define before the shared scaffolding's
 ```js
 const startMessage =
   'Test code starts no process, browser or container. Use the start owner (globalSetup, webServer or a worker-scoped fixture) and isolate the case by its own records and credentials; run the product\'s own command through the command helper and build other fixture data in-process; a case that asserts a start or stop goes under <lifecycle-path>.';
-const startBan = ban(['child_process', 'node:child_process', 'execa', 'testcontainers'], startMessage, [
-  { selector: "CallExpression[callee.property.name=/^launch/]", message: startMessage },
-]);
+const startBan = ban(
+  ['child_process', 'node:child_process', 'execa', 'cross-spawn', 'shelljs', 'zx', 'zx/globals', 'testcontainers', 'dockerode'],
+  startMessage,
+  [
+    { selector: "CallExpression[callee.property.name=/^launch/]", message: startMessage },
+    { selector: "[source.value=/^@testcontainers./]", message: startMessage },
+    { selector: "CallExpression[callee.name='require'][arguments.0.value=/^@testcontainers./]", message: startMessage },
+  ],
+);
 ```
 
 The `launch` selector catches a browser type's `launch` calls in test code;
-Playwright's own browser and page fixtures need none.
+Playwright's own browser and page fixtures need none. The `@testcontainers`
+selectors catch the per-service packages, such as `@testcontainers/postgresql`,
+in every import and export form.
 
 Shell check scripts:
 
@@ -513,6 +538,8 @@ Python with pytest. Add to the shared `banned-api` table:
 ```toml
 "time.sleep".msg = "A test passes when its condition holds. Wait through the wait helper (<wait-helper>), let a fake block on an Event the test sets, or give the product a clock the test advances. Waiting out a clock no test controls goes under <real-time-path>."
 "asyncio.sleep".msg = "A test passes when its condition holds. Wait through the wait helper (<wait-helper>), let a fake block on an asyncio.Event the test sets, or give the product a clock the test advances. Waiting out a clock no test controls goes under <real-time-path>."
+"anyio.sleep".msg = "A test passes when its condition holds. Wait through the wait helper (<wait-helper>), let a fake block on an anyio.Event the test sets, or give the product a clock the test advances. Waiting out a clock no test controls goes under <real-time-path>."
+"trio.sleep".msg = "A test passes when its condition holds. Wait through the wait helper (<wait-helper>), let a fake block on a trio.Event the test sets, or give the product a clock the test advances. Waiting out a clock no test controls goes under <real-time-path>."
 ```
 
 Ruff's exemption for the start owner lifts this ban with the start ban, so this
@@ -538,17 +565,29 @@ TypeScript with Vitest and Playwright. Define before the shared scaffolding's
 ```js
 const waitMessage =
   'A test passes when its condition holds. Wait through <wait-helper>; advance time with vi.useFakeTimers or Playwright\'s clock; let a fake wait on a promise the test resolves. Waiting out a clock no test controls goes under <real-time-path>.';
-const waitBan = ban(['timers/promises', 'node:timers/promises'], waitMessage, [
-  { selector: "CallExpression[callee.name='setTimeout']", message: waitMessage },
-  { selector: "CallExpression[callee.property.name='setTimeout']", message: waitMessage },
-  { selector: "CallExpression[callee.property.name='waitForTimeout']", message: waitMessage },
-]);
+const waitBan = ban(
+  [
+    'timers/promises',
+    'node:timers/promises',
+    { name: 'timers', importNames: ['setTimeout'] },
+    { name: 'node:timers', importNames: ['setTimeout'] },
+  ],
+  waitMessage,
+  [
+    { selector: "CallExpression[callee.name='setTimeout']", message: waitMessage },
+    { selector: "CallExpression[callee.property.name='setTimeout']", message: waitMessage },
+    { selector: "CallExpression[callee.property.name='waitForTimeout']", message: waitMessage },
+  ],
+);
 ```
+
+The `timers` entries ban `setTimeout` by its imported name, so an alias cannot
+hide it.
 
 Shell check scripts:
 
 ```sh
-# Scan: <check-scripts>, <workflow-files>, except <wait-helper>
+# Scan: <check-scripts>, <workflow-files>, except <lifecycle-path>, <real-time-path> and <wait-helper>
 # Message: Wait for a condition through the wait helper (<wait-helper>), which returns when it holds and raises at its bound.
 grep -nE '(^|[^[:alnum:]_.-])sleep([[:space:]]|;|$)' <files>
 ```
@@ -652,15 +691,20 @@ Python with pytest:
 ```sh
 # Scan: <runner-config>, <check-scripts>, <workflow-files>
 # Message: Let independent work run side by side. A setting that must stay serial states its cause on the same line as a "serial-cause:" comment naming the constraint.
-grep -nE -e '-p[[:space:]]*no:xdist|(-n|--numprocesses)[=[:space:]]*0([^0-9]|$)|--dist[=[:space:]]*no([^a-z]|$)' <files> | grep -v 'serial-cause:'
+grep -nE -e '-p[",[:space:]]*no:xdist|(-n[",=[:space:]]*0|--numprocesses[",=[:space:]]*[01])([^0-9]|$)|(pytest.*|PYTEST.*|addopts.*|")-n[",=[:space:]]*1([^0-9]|$)|--dist[",=[:space:]]*no([^a-z]|$)' <files> | grep -v 'serial-cause:'
 ```
+
+The line also reads an option split into list items, such as
+`addopts = ["-n", "1"]`. It counts `-n 1` only after `pytest`, `PYTEST` or
+`addopts` on the same line, or right after a quote, because other commands,
+such as `head`, take `-n 1`.
 
 Rust with `cargo test`:
 
 ```sh
-# Scan: <runner-config>, <check-scripts>, <workflow-files>
+# Scan: <runner-config>, <test-paths>, <check-scripts>, <workflow-files>
 # Message: Let independent work run side by side. A setting that must stay serial states its cause on the same line as a "serial-cause:" comment naming the constraint.
-grep -nE -e '--test-threads[=[:space:]]*1([^0-9]|$)|RUST_TEST_THREADS[^0-9]*1([^0-9]|$)' <files> | grep -v 'serial-cause:'
+grep -nE -e '--test-threads[=[:space:]]*1([^0-9]|$)|RUST_TEST_THREADS[^0-9]*1([^0-9]|$)|#\[(serial_test::)?(file_)?serial([](]|$)' <files> | grep -v 'serial-cause:'
 ```
 
 TypeScript with Vitest and Playwright:
@@ -668,7 +712,7 @@ TypeScript with Vitest and Playwright:
 ```sh
 # Scan: <runner-config>, <test-paths>, <check-scripts>, <workflow-files>
 # Message: Let independent work run side by side. A setting that must stay serial states its cause on the same line as a "serial-cause:" comment naming the constraint.
-grep -nE -e '(maxW|w)orkers:([^,]*[?:])?[[:space:]]*1([^0-9.]|$)|--workers[=[:space:]]*1([^0-9]|$)|fileParallelism:[[:space:]]*false|--no-file-parallelism|mode:[[:space:]]*.serial.' <files> | grep -v 'serial-cause:'
+grep -nE -e '(maxW|w)orkers:([^,]*[?:])?[[:space:]]*1([^0-9.]|$)|--(maxW|w)orkers[=[:space:]]*1([^0-9]|$)|fileParallelism:[[:space:]]*false|--no-file-parallelism|single(Thread|Fork):[[:space:]]*true|mode:[[:space:]]*.serial.|describe\.serial([^[:alnum:]_]|$)' <files> | grep -v 'serial-cause:'
 ```
 
 The `workers` pattern also matches a worker count of one chosen by condition,

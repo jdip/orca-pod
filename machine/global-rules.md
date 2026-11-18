@@ -235,11 +235,13 @@ named structure and per-pattern rules. In every repository, converted or not,
 a new case that asserts no start or stop shares what its run started and
 isolates by its own records, identities and credentials, and new test code adds
 no per-case start, wall-clock wait or forced-serial setting, and no new use of
-an existing one. The only exceptions are a lifecycle test that asserts a start
-or stop and cites the lifecycle state it asserts, a real-time test that waits
-out a clock no test can control and cites that clock, and a serial setting that
-states its cause beside it. A new case calling a helper or fixture that starts
-an instance for each case is a new use.
+an existing one. The only exceptions are that a lifecycle test may start and
+stop an instance and may wait, and cites the lifecycle state it asserts; a
+real-time test may wait out a clock no test can control, cites that clock and
+starts nothing; and any test may hold a setting that forces serial execution
+when that setting states its cause beside it. Nothing else is excepted. A new
+case calling a helper or fixture that starts an instance for each case is a new
+use.
 Existing instances wait for that repository's Standards Upgrade or its own map;
 work that can be met only by adding to one returns to that repository's
 planning.

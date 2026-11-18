@@ -202,6 +202,18 @@ or has no files to scan. A `grep` exit status above one is a broken check, not a
 pass. A line ending in `| grep -v 'serial-cause:'` drops settings whose cause is
 stated beside them.
 
+A source-check line reads one line at a time and matches text, not syntax, so it
+also flags some lines that hold no banned name. So that a banned name on a later
+line cannot pass, it flags a line that opens a grouped import of a banned
+module, or an inline `eslint` configuration comment, and does not close it,
+whatever the group holds; close it on that line, or split the import into
+separate imports. It also flags a banned name inside a comment, and a module
+alias that could hide one, such as `import os as <name>` in a path where the
+start ban is restated; reword the comment, or import the module under its own
+name. These matches are properties of the lines, not exemptions: a path stays
+the only exemption, and there is still no inline suppression
+([real-time tests](#real-time-tests)).
+
 Placeholders. The repository names each one when it installs the rules, before
 the files exist, as globs for a linter and as file lists for source-check lines.
 
@@ -274,31 +286,54 @@ bans as source-check lines instead.
 TypeScript, in `eslint.config.js` (or `.mjs` or `.ts`):
 
 ```js
-// startImports, startSyntax: from the per-case-starts entry.
-// waitImports, waitSyntax: from the waits entry.
+// startBan: from the per-case-starts entry. waitBan: from the waits entry.
 const testPaths = ['<test-paths>'];
-const bans = (imports, syntax) => ({
-  'no-restricted-imports': ['error', { paths: imports }],
-  'no-restricted-syntax': ['error', ...syntax],
-});
+const own = { paths: [], patterns: [], syntax: [] };
+
+// One list of module names bans both the static and the dynamic imports.
+function ban(modules, message, selectors) {
+  return {
+    paths: modules.map((name) => ({ name, message })),
+    syntax: [
+      ...selectors,
+      ...modules.flatMap((name) => [
+        { selector: `ImportExpression[source.value='${name}']`, message },
+        { selector: `CallExpression[callee.name='require'][arguments.0.value='${name}']`, message },
+      ]),
+    ],
+  };
+}
+
+function rules(...bans) {
+  return {
+    'no-restricted-imports': [
+      'error',
+      { paths: [...own.paths, ...bans.flatMap((b) => b.paths)], patterns: own.patterns },
+    ],
+    'no-restricted-syntax': ['error', ...own.syntax, ...bans.flatMap((b) => b.syntax)],
+  };
+}
 
 export default [
   // ...the repository's own objects, then:
   {
     files: testPaths,
     ignores: ['<lifecycle-path>', '<real-time-path>', '<start-owner>', '<wait-helper>'],
-    rules: bans([...startImports, ...waitImports], [...startSyntax, ...waitSyntax]),
+    rules: rules(startBan, waitBan),
   },
-  { files: ['<real-time-path>', '<wait-helper>'], rules: bans(startImports, startSyntax) },
-  { files: ['<start-owner>'], rules: bans(waitImports, waitSyntax) },
+  { files: ['<real-time-path>', '<wait-helper>'], rules: rules(startBan) },
+  { files: ['<start-owner>'], rules: rules(waitBan) },
 ];
 ```
 
 A later object's options for a rule replace an earlier object's for the same
-file. Place these objects last, and put any options the repository already gives
-these two rules for the same files into the arrays.
+file, so place these objects last. An existing configuration of either rule for
+the same files is kept through `own`: its `paths` entries join `own.paths`, its
+`no-restricted-syntax` selectors join `own.syntax`, and its `patterns` stay
+under `own.patterns`.
 
-Inline suppressions, as source-check lines:
+Inline suppressions, and inline ESLint configuration of the two rules, as
+source-check lines:
 
 ```sh
 # Scan: <test-paths> (Python)
@@ -307,7 +342,7 @@ grep -nE 'noqa([^:]|$)|noqa:[^#]*TID251' <files>
 
 # Scan: <test-paths> (TypeScript)
 # Message: Exemption is by path. Move the case to <lifecycle-path> or <real-time-path>, or use the start owner or the wait helper.
-grep -nE 'eslint-disable[^*]*no-restricted-|eslint-disable(-next-line|-line)?[[:space:]]*(\*/|--|$)' <files>
+grep -nE 'eslint-disable[^*]*no-restricted-|eslint-disable(-next-line|-line)?[[:space:]]*(\*/|--|$)|\*[[:space:]]*eslint([[:space:]][^*]*no-restricted-(imports|syntax)|[[:space:]]*$)' <files>
 ```
 
 ### Per-case expensive starts
@@ -330,11 +365,12 @@ Invariant:
 Homes for legitimate uses:
 
 - A resource a case uses: the start owner, by named configuration. Native forms:
-  a pytest fixture with a broader scope than pytest's default function scope; a
-  Vitest `globalSetup` file, which runs once before the workers and provides
-  values to tests; Playwright's `webServer`, which starts one server before the
-  tests, and worker-scoped fixtures; a check script that starts services once and
-  passes them to the tests.
+  a session-scoped pytest fixture, which under a parallel plugin starts once per
+  worker (see [run](#terms)); a Vitest `globalSetup` file, which runs once before
+  the workers and provides values to tests; Playwright's `webServer`, which
+  starts one server before the tests, and worker-scoped fixtures; a check script
+  that starts services once and passes them to the tests. A pytest fixture of
+  narrower scope may hand a case the running instance; it starts nothing.
 - In Rust, `cargo test` builds each file under `tests/` as its own binary and
   runs the binaries one after another, so a start owner inside `tests/` starts
   once per binary. Keeping the integration tests in one binary, or starting the
@@ -342,6 +378,18 @@ Homes for legitimate uses:
   run.
 - A case that asserts starting or stopping: the lifecycle path.
 - The product's own command, run to completion: the command helper.
+
+The stanzas ban by start primitive, so they are deliberately broader than the
+invariant: they also flag a command that a test runs to completion and that is
+neither an expensive resource nor the product's own command, such as `git`
+building a fixture repository. Such a command has no home in this catalog. The
+case makes its data in-process, or the start owner makes shared data once per
+run. The lifecycle path and the command helper do not take it: a lifecycle test
+asserts a start or stop, and the command helper runs only the product's own
+command. A repository whose product needs such a command per case narrows the
+rule through an approved specification that names the command, as
+[rule upkeep](#rule-upkeep) says, and files an
+[upstream report](#upstream-reports).
 
 Rejected: a fixture-scope rule (the carriers found were helpers, not fixtures,
 and case data stays per case). Rejected: an importable general harness as owner
@@ -353,11 +401,11 @@ does not establish need).
 Python with pytest. Add to the shared `banned-api` table:
 
 ```toml
-"subprocess".msg = "Test code starts no expensive resource. Use the start owner's named configuration and isolate the case by its own records and credentials; run the product's own command through the command helper; a case that asserts a start or stop goes under <lifecycle-path>."
-"os.system".msg = "Test code starts no expensive resource. Use the start owner's named configuration; run the product's own command through the command helper; a case that asserts a start or stop goes under <lifecycle-path>."
-"os.popen".msg = "Test code starts no expensive resource. Use the start owner's named configuration; run the product's own command through the command helper; a case that asserts a start or stop goes under <lifecycle-path>."
-"asyncio.create_subprocess_exec".msg = "Test code starts no expensive resource. Use the start owner's named configuration; run the product's own command through the command helper; a case that asserts a start or stop goes under <lifecycle-path>."
-"asyncio.create_subprocess_shell".msg = "Test code starts no expensive resource. Use the start owner's named configuration; run the product's own command through the command helper; a case that asserts a start or stop goes under <lifecycle-path>."
+"subprocess".msg = "Test code starts no expensive resource. Use the start owner's named configuration and isolate the case by its own records and credentials; run the product's own command through the command helper and build other fixture data in-process; a case that asserts a start or stop goes under <lifecycle-path>."
+"os.system".msg = "Test code starts no expensive resource. Use the start owner's named configuration; run the product's own command through the command helper and build other fixture data in-process; a case that asserts a start or stop goes under <lifecycle-path>."
+"os.popen".msg = "Test code starts no expensive resource. Use the start owner's named configuration; run the product's own command through the command helper and build other fixture data in-process; a case that asserts a start or stop goes under <lifecycle-path>."
+"asyncio.create_subprocess_exec".msg = "Test code starts no expensive resource. Use the start owner's named configuration; run the product's own command through the command helper and build other fixture data in-process; a case that asserts a start or stop goes under <lifecycle-path>."
+"asyncio.create_subprocess_shell".msg = "Test code starts no expensive resource. Use the start owner's named configuration; run the product's own command through the command helper and build other fixture data in-process; a case that asserts a start or stop goes under <lifecycle-path>."
 "multiprocessing.Process".msg = "Test code starts no expensive resource. Use the start owner's named configuration; a case that asserts a start or stop goes under <lifecycle-path>."
 "playwright.sync_api.sync_playwright".msg = "Test code launches no browser. Take the browser from the start owner; a case that asserts a launch goes under <lifecycle-path>."
 "playwright.async_api.async_playwright".msg = "Test code launches no browser. Take the browser from the start owner; a case that asserts a launch goes under <lifecycle-path>."
@@ -371,7 +419,7 @@ the wait ban, so this line restates it:
 ```sh
 # Scan: <real-time-path>, <wait-helper>
 # Message: Real-time tests and the wait helper start nothing. Use the start owner's named configuration; a case that asserts a start or stop goes under <lifecycle-path>.
-grep -nE 'subprocess|os\.(system|popen)|create_subprocess_|multiprocessing|sync_playwright|async_playwright|testcontainers|(import|from)[[:space:]]+docker' <files>
+grep -nE 'subprocess|os\.(system|popen)|create_subprocess_|multiprocessing|sync_playwright|async_playwright|testcontainers|from[[:space:]]+os[[:space:]]+import[^#]*(system|popen|\([^)]*$)|import[[:space:]]+([^#]*,[[:space:]]*)?os[[:space:]]+as|(import|from)[[:space:]]+([^#]*,[[:space:]]*)?docker([^[:alnum:]_]|$)' <files>
 ```
 
 A fixture that rebuilds a schema for every case calls the repository's own
@@ -382,25 +430,26 @@ Rust with `cargo test`:
 
 ```sh
 # Scan: <test-paths>, except <lifecycle-path> and <start-owner>
-# Message: Test code starts no process or container. Use the start owner's named configuration; run the product's own command through the command helper; a case that asserts a start or stop goes under <lifecycle-path>.
-grep -nE 'process::(\{[^}]*)?Command|process::\*|Command::cargo_bin|testcontainers' <files>
+# Message: Test code starts no process or container. Use the start owner's named configuration; run the product's own command through the command helper and build other fixture data in-process; a case that asserts a start or stop goes under <lifecycle-path>.
+grep -nE 'process::(\{[^}]*)?(Command|$)|process::\*|Command::cargo_bin|testcontainers' <files>
 ```
 
-The line matches the import or path of `std::process::Command` and
-`tokio::process::Command`, so it catches every `Command::new` of either without
-matching an unrelated `Command` type.
+The line matches a path or import that reaches `Command` through `process::`,
+a glob import of a `process` module, and a line that opens a grouped import of
+one without closing it, so it skips an unrelated `Command` type. It cannot see a
+`process` module imported under another name, such as
+`use std::process as proc;`, or a start reached through another crate; review
+question R1 carries those.
 
-TypeScript with Vitest and Playwright. Define beside the shared scaffolding:
+TypeScript with Vitest and Playwright. Define before the shared scaffolding's
+`export default`:
 
 ```js
 const startMessage =
-  'Test code starts no process, browser or container. Use the start owner (globalSetup, webServer or a worker-scoped fixture) and isolate the case by its own records and credentials; run the product\'s own command through the command helper; a case that asserts a start or stop goes under <lifecycle-path>.';
-const startImports = ['child_process', 'node:child_process', 'execa', 'testcontainers'].map(
-  (name) => ({ name, message: startMessage }),
-);
-const startSyntax = [
+  'Test code starts no process, browser or container. Use the start owner (globalSetup, webServer or a worker-scoped fixture) and isolate the case by its own records and credentials; run the product\'s own command through the command helper and build other fixture data in-process; a case that asserts a start or stop goes under <lifecycle-path>.';
+const startBan = ban(['child_process', 'node:child_process', 'execa', 'testcontainers'], startMessage, [
   { selector: "CallExpression[callee.property.name=/^launch/]", message: startMessage },
-];
+]);
 ```
 
 The `launch` selector catches a browser type's `launch` calls in test code;
@@ -472,7 +521,7 @@ line restates it:
 ```sh
 # Scan: <start-owner>
 # Message: The start owner waits for readiness through the wait helper (<wait-helper>), never a fixed delay.
-grep -nE 'sleep\(' <files>
+grep -nE '(^|[^[:alnum:]_])sleep([^[:alnum:]_]|$)' <files>
 ```
 
 Rust with `cargo test`:
@@ -480,22 +529,20 @@ Rust with `cargo test`:
 ```sh
 # Scan: <test-paths>, except <lifecycle-path>, <real-time-path> and <wait-helper>
 # Message: A test passes when its condition holds. Wait through <wait-helper>; under #[tokio::test(start_paused = true)] move time with tokio::time::advance; let a fake wait on a channel the test releases. Waiting out a clock no test controls goes under <real-time-path>.
-grep -nE '(thread|time)::(\{[^}]*)?sleep' <files>
+grep -nE '(thread|time)::(\{[^}]*)?(sleep|$)' <files>
 ```
 
-TypeScript with Vitest and Playwright. Define beside the shared scaffolding:
+TypeScript with Vitest and Playwright. Define before the shared scaffolding's
+`export default`:
 
 ```js
 const waitMessage =
   'A test passes when its condition holds. Wait through <wait-helper>; advance time with vi.useFakeTimers or Playwright\'s clock; let a fake wait on a promise the test resolves. Waiting out a clock no test controls goes under <real-time-path>.';
-const waitImports = ['timers/promises', 'node:timers/promises'].map(
-  (name) => ({ name, message: waitMessage }),
-);
-const waitSyntax = [
+const waitBan = ban(['timers/promises', 'node:timers/promises'], waitMessage, [
   { selector: "CallExpression[callee.name='setTimeout']", message: waitMessage },
   { selector: "CallExpression[callee.property.name='setTimeout']", message: waitMessage },
   { selector: "CallExpression[callee.property.name='waitForTimeout']", message: waitMessage },
-];
+]);
 ```
 
 Shell check scripts:
@@ -665,18 +712,19 @@ Applicability:
 
 Named structure:
 
-- S1. Does every expensive resource a changed case uses come from the start
-  owner, which cases cannot call to start anything and which refuses a second
-  start?
-- S2. Is every start-only setting a changed case needs declared by name in the
-  start owner, with everything else passed as case data?
-- S3. Does every changed wait go through the wait helper, and does the helper
-  still return when its condition holds, raise at its bound and offer no fixed
-  delay?
+- S1. Does every expensive resource a changed case outside the lifecycle path
+  uses come from the start owner, which cases cannot call to start anything and
+  which refuses a second start?
+- S2. Is every start-only setting a changed case outside the lifecycle path
+  needs declared by name in the start owner, with everything else passed as case
+  data?
+- S3. Does every changed wait for a condition go through the wait helper, or
+  for a fake through a gate the test releases, and does the helper still return
+  when its condition holds, raise at its bound and offer no fixed delay?
 - S4. Is every changed case that starts or stops an instance under the
   lifecycle path, citing the lifecycle state it asserts?
-- S5. Is every changed case that waits out an uncontrollable clock under the
-  real-time path, citing that clock and starting nothing?
+- S5. Is every changed case that waits out an uncontrollable clock and starts
+  nothing under the real-time path, citing that clock?
 - S6. Does each changed check that builds, installs or pulls restore unchanged
   pinned inputs from the reuse path, or cite the recorded absence?
 - S7. Is each changed check step separately invocable with its dependencies
@@ -688,8 +736,8 @@ Named structure:
 
 Rules:
 
-- R1. Does the changed test code start no expensive resource, and add no case to
-  an existing per-case start?
+- R1. Does changed test code outside the lifecycle path start no expensive
+  resource and add no case to an existing per-case start?
 - R2. Does every changed test pass only when its condition holds, never because
   time ran out?
 - R3. Within a run, is each artifact built, installed or pulled once from the

@@ -30,14 +30,14 @@ bypassed or insufficient for this failure. Distinguish configured enforcement fr
 evidence that it actually ran. Repair or extend an existing mechanism where
 practical before proposing another. Keep this inspection scoped to the lesson.
 
-Classify the failure as mechanical or requiring judgment. Prefer deterministic
-enforcement for objectively detectable violations, such as banned APIs or fixed
-file/import patterns, when it earns its maintenance cost; otherwise improve the
-owning guidance or review criteria. Keep contextual choices there as well. For a
-mixed failure, separate what a check can enforce from the judgment that remains.
-For any correction, take the earliest remedy in this order that prevents it:
-remove the mistake by design; then make it fail in types, lint or CI; then in
-tests; prose last. A verification-cost rule candidate also meets the admission
+Classify the failure as mechanical or requiring judgment. For any correction,
+take the earliest remedy in this order that prevents it: remove the mistake by
+design; then make it fail in types, lint or CI; then in tests; prose last. An
+objectively detectable violation, such as a banned API or a fixed file or import
+pattern, gets deterministic enforcement. The owning guidance or review criteria
+carry only what the earlier remedies cannot prevent, and contextual choices. For
+a mixed failure, separate what a check can enforce from the judgment that
+remains. A verification-cost rule candidate also meets the admission
 conditions in the verification-cost catalog's
 [rule upkeep](../to-spec/review-lenses/verification-cost-standard.md#rule-upkeep).
 

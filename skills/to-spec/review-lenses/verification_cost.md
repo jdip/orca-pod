@@ -68,7 +68,7 @@ Audit the spec parent and child issue bodies against the map (its Destination, D
 
 Report your findings back to the coordinator in plain, natural language. Open with your required reads. For a subject that is not applicable, send only the report described in instruction 1.
 
-List "not yet converted" items separately from findings, one line each: the missing structure item and the evidence that it is missing.
+List "not yet converted" items separately from findings, one line each: the missing item and the evidence that it is missing. The catalog's [review questions](verification-cost-standard.md#review-questions) decide which items qualify.
 
 #### IF Mode: SPEC REVIEW
 For each finding, include:

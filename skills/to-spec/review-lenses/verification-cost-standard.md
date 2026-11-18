@@ -353,7 +353,7 @@ source-check lines:
 # Message: Exemption is by path. Move the case to <lifecycle-path> or <real-time-path>, or use the start owner or the wait helper.
 grep -inE 'noqa([^:]|$)|noqa:[^#]*TID251' <files>
 
-# Scan: <test-paths> (TypeScript)
+# Scan: <test-paths>, <start-owner>, <wait-helper>, <real-time-path> (TypeScript)
 # Message: Exemption is by path. Move the case to <lifecycle-path> or <real-time-path>, or use the start owner or the wait helper.
 grep -nE 'eslint-disable[^*]*no-restricted-|eslint-disable(-next-line|-line)?[[:space:]]*(\*/|--|$)|(\*|^)[[:space:]]*eslint([[:space:]][^*]*no-restricted-(imports|syntax)|([[:space:]-]([^*]|\*+[^*/])*\**)?$)' <files>
 ```
@@ -694,10 +694,11 @@ The settings live in configuration and the cause in a comment, which no syntax
 rule reads, so every ecosystem's stanza is a source-check line. Each line reads
 an option's value after a space, `=`, either quote or a comma, so it also reads
 an option split into list items, such as `addopts = ['-n', '1']`, and reads a
-key's value with or without quotes, such as `workers: '1'`. The lines flag
-`--numprocesses`, `--dist`, `--test-threads`, `--workers`, `--maxWorkers` and
-`--jobs`, and pytest's `-n` as a quoted list item, when only a closing quote, a
-comma or a line continuation follows on that line, whatever value comes next.
+key and its value with or without quotes, such as `workers: '1'` or
+`'workers': 1`. The lines flag `--numprocesses`, `--dist`, `--test-threads`,
+`--workers`, `--maxWorkers` and `--jobs`, and pytest's `-n` as a quoted list
+item, when only a closing quote, a comma or a line continuation follows on that
+line, whatever value comes next.
 They leave `-p` and `-j` unflagged there, since that would flag every plugin load
 and every unlimited job count.
 
@@ -726,7 +727,7 @@ TypeScript with Vitest and Playwright:
 ```sh
 # Scan: <runner-config>, <test-paths>, <check-scripts>, <workflow-files>
 # Message: Let independent work run side by side. A setting that must stay serial states its cause on the same line as a "serial-cause:" comment naming the constraint.
-grep -nE -e '(maxW|w)orkers:([^,]*[?:])?[[:space:]]*["'\'']?1([^0-9.]|$)|(-j|--(maxW|w)orkers)["'\'',=[:space:]]*1([^0-9]|$)|--(maxW|w)orkers["'\'']?,?[[:space:]]*\\?$|fileParallelism:[[:space:]]*["'\'']?false|--fileParallelism=false|--no-file-parallelism|single(Thread|Fork):[[:space:]]*["'\'']?true|--[^[:space:]]*single(Thread|Fork)|mode:[[:space:]]*.serial.|describe\.serial([^[:alnum:]_]|$)' <files> | grep -v 'serial-cause:'
+grep -nE -e '(maxW|w)orkers["'\'']?:([^,]*[?:])?[[:space:]]*["'\'']?1([^0-9.]|$)|(-j|--(maxW|w)orkers)["'\'',=[:space:]]*1([^0-9]|$)|--(maxW|w)orkers["'\'']?,?[[:space:]]*\\?$|fileParallelism["'\'']?:[[:space:]]*["'\'']?false|--fileParallelism=false|--no-file-parallelism|single(Thread|Fork)["'\'']?:[[:space:]]*["'\'']?true|--[^[:space:]]*single(Thread|Fork)(=true)?([^[:alnum:]_=]|$)|mode["'\'']?:[[:space:]]*.serial.|describe\.serial([^[:alnum:]_]|$)' <files> | grep -v 'serial-cause:'
 ```
 
 The `workers` pattern also matches a worker count of one chosen by condition,
@@ -737,7 +738,7 @@ Shell check scripts and CI workflows:
 ```sh
 # Scan: <check-scripts>, <workflow-files>
 # Message: Let independent work run side by side. A setting that must stay serial states its cause on the same line as a "serial-cause:" comment naming the constraint.
-grep -nE -e 'max-parallel:[[:space:]]*["'\'']?1([^0-9]|$)|(-j|--jobs)["'\'',=[:space:]]*1([^0-9]|$)|--jobs["'\'']?,?[[:space:]]*\\?$' <files> | grep -v 'serial-cause:'
+grep -nE -e 'max-parallel["'\'']?:[[:space:]]*["'\'']?1([^0-9]|$)|(-j|--jobs)["'\'',=[:space:]]*1([^0-9]|$)|--jobs["'\'']?,?[[:space:]]*\\?$' <files> | grep -v 'serial-cause:'
 ```
 
 Instance: a browser suite was forced to one worker; a single server on a fixed

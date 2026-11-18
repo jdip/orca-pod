@@ -216,8 +216,11 @@ directive configures; close the group or the comment on that line, or split the
 import into separate imports. It also flags a banned name inside a comment, and
 a module alias that could hide one, such as `import os as <name>` in a path
 where the start ban is restated; reword the comment, or import the module under
-its own name. These matches are properties of the lines, not exemptions: a path stays
-the only exemption, and there is still no inline suppression
+its own name. Nor can a line pair an option with a value written on a later
+line, as in a list written one item per line, unless it flags the option alone;
+write the value attached to its option, such as `--dist=loadscope`. These
+matches are properties of the lines, not exemptions: a path stays the only
+exemption, and there is still no inline suppression
 ([real-time tests](#real-time-tests)).
 
 Placeholders. The repository names each one when it installs the rules, before
@@ -296,8 +299,9 @@ TypeScript, in `eslint.config.js` (or `.mjs` or `.ts`):
 const testPaths = ['<test-paths>'];
 const own = { paths: [], patterns: [], syntax: [] };
 
-// One list of modules bans both the static and the dynamic imports. An entry
-// with importNames bans those names statically and its whole module dynamically.
+// One list of modules bans its static imports and re-exports, dynamic import(),
+// require() calls and import-equals declarations. An entry with importNames bans
+// those names in static imports and re-exports, and its whole module otherwise.
 function ban(modules, message, selectors) {
   const entries = modules.map((m) => (typeof m === 'string' ? { name: m } : m));
   return {
@@ -307,6 +311,7 @@ function ban(modules, message, selectors) {
       ...entries.flatMap(({ name }) => [
         { selector: `ImportExpression[source.value='${name}']`, message },
         { selector: `CallExpression[callee.name='require'][arguments.0.value='${name}']`, message },
+        { selector: `TSImportEqualsDeclaration[moduleReference.expression.value='${name}']`, message },
       ]),
     ],
   };
@@ -346,7 +351,7 @@ source-check lines:
 ```sh
 # Scan: <test-paths> (Python)
 # Message: Exemption is by path. Move the case to <lifecycle-path> or <real-time-path>, or use the start owner or the wait helper.
-grep -nE 'noqa([^:]|$)|noqa:[^#]*TID251' <files>
+grep -inE 'noqa([^:]|$)|noqa:[^#]*TID251' <files>
 
 # Scan: <test-paths> (TypeScript)
 # Message: Exemption is by path. Move the case to <lifecycle-path> or <real-time-path>, or use the start owner or the wait helper.
@@ -465,12 +470,13 @@ TypeScript with Vitest and Playwright. Define before the shared scaffolding's
 const startMessage =
   'Test code starts no process, browser or container. Use the start owner (globalSetup, webServer or a worker-scoped fixture) and isolate the case by its own records and credentials; run the product\'s own command through the command helper and build other fixture data in-process; a case that asserts a start or stop goes under <lifecycle-path>.';
 const startBan = ban(
-  ['child_process', 'node:child_process', 'execa', 'cross-spawn', 'shelljs', 'zx', 'zx/globals', 'testcontainers', 'dockerode'],
+  ['child_process', 'node:child_process', 'execa', 'cross-spawn', 'shelljs', 'shelljs/global', 'zx', 'zx/globals', 'testcontainers', 'dockerode'],
   startMessage,
   [
     { selector: "CallExpression[callee.property.name=/^launch/]", message: startMessage },
     { selector: "[source.value=/^@testcontainers./]", message: startMessage },
     { selector: "CallExpression[callee.name='require'][arguments.0.value=/^@testcontainers./]", message: startMessage },
+    { selector: "TSImportEqualsDeclaration[moduleReference.expression.value=/^@testcontainers./]", message: startMessage },
   ],
 );
 ```
@@ -478,14 +484,15 @@ const startBan = ban(
 The `launch` selector catches a browser type's `launch` calls in test code;
 Playwright's own browser and page fixtures need none. The `@testcontainers`
 selectors catch the per-service packages, such as `@testcontainers/postgresql`,
-in every import and export form.
+in static imports, re-exports, dynamic `import()`, `require()` calls and
+import-equals declarations.
 
 Shell check scripts:
 
 ```sh
 # Scan: <check-scripts>, <workflow-files>, except <start-owner> and <lifecycle-path>
 # Message: Start services once in the start owner (<start-owner>) and pass them to the steps that need them.
-grep -nE 'docker[[:space:]]+(run|start)([[:space:]]|$)|docker(-|[[:space:]]+)compose([[:space:]].*)?[[:space:]](up|run|start)([[:space:]]|$)|nohup' <files>
+grep -nE 'docker[[:space:]]+(container[[:space:]]+)?(run|start)([[:space:]]|$)|docker(-|[[:space:]]+)compose([[:space:]].*)?[[:space:]](up|run|start)([[:space:]]|$)|nohup' <files>
 ```
 
 A server sent to the background with `&` has no token that separates it from
@@ -556,7 +563,7 @@ Rust with `cargo test`:
 ```sh
 # Scan: <test-paths>, except <lifecycle-path>, <real-time-path> and <wait-helper>
 # Message: A test passes when its condition holds. Wait through <wait-helper>; under #[tokio::test(start_paused = true)] move time with tokio::time::advance; let a fake wait on a channel the test releases. Waiting out a clock no test controls goes under <real-time-path>.
-grep -nE '(thread|time)::(\{[^}]*)?(sleep|$)' <files>
+grep -nE '(thread|time)::(\{[^}]*)?(sleep|$)|(thread|time)::\*' <files>
 ```
 
 TypeScript with Vitest and Playwright. Define before the shared scaffolding's
@@ -684,27 +691,34 @@ trades cost for missed regressions). Rejected: mandating a parallel runner, a
 clock library or a build cache tool (each needs the target's authorization).
 
 The settings live in configuration and the cause in a comment, which no syntax
-rule reads, so every ecosystem's stanza is a source-check line.
+rule reads, so every ecosystem's stanza is a source-check line. Each line reads
+an option's value after a space, `=`, either quote or a comma, so it also reads
+an option split into list items, such as `addopts = ['-n', '1']`, and reads a
+key's value with or without quotes, such as `workers: '1'`. The lines flag
+`--numprocesses`, `--dist`, `--test-threads`, `--workers`, `--maxWorkers` and
+`--jobs`, and pytest's `-n` as a quoted list item, when only a closing quote, a
+comma or a line continuation follows on that line, whatever value comes next.
+They leave `-p` and `-j` unflagged there, since that would flag every plugin load
+and every unlimited job count.
 
 Python with pytest:
 
 ```sh
 # Scan: <runner-config>, <check-scripts>, <workflow-files>
 # Message: Let independent work run side by side. A setting that must stay serial states its cause on the same line as a "serial-cause:" comment naming the constraint.
-grep -nE -e '-p[",[:space:]]*no:xdist|(-n[",=[:space:]]*0|--numprocesses[",=[:space:]]*[01])([^0-9]|$)|(pytest.*|PYTEST.*|addopts.*|")-n[",=[:space:]]*1([^0-9]|$)|--dist[",=[:space:]]*no([^a-z]|$)' <files> | grep -v 'serial-cause:'
+grep -nE -e '-p["'\'',=[:space:]]*no:xdist|(-n["'\'',=[:space:]]*0|--numprocesses["'\'',=[:space:]]*[01])([^0-9]|$)|(^[[:space:]]*|pytest.*|PYTEST.*|addopts.*|["'\''])-n["'\'',=[:space:]]*1([^0-9]|$)|--dist["'\'',=[:space:]]*no([^a-z]|$)|(--(numprocesses|dist)["'\'']?|["'\'']-n["'\'']),?[[:space:]]*\\?$' <files> | grep -v 'serial-cause:'
 ```
 
-The line also reads an option split into list items, such as
-`addopts = ["-n", "1"]`. It counts `-n 1` only after `pytest`, `PYTEST` or
-`addopts` on the same line, or right after a quote, because other commands,
-such as `head`, take `-n 1`.
+The line counts `-n 1` only after `pytest`, `PYTEST` or `addopts` on the same
+line, at the start of a line, as on a continuation line, or right after a quote,
+because other commands, such as `head`, take `-n 1`.
 
 Rust with `cargo test`:
 
 ```sh
 # Scan: <runner-config>, <test-paths>, <check-scripts>, <workflow-files>
 # Message: Let independent work run side by side. A setting that must stay serial states its cause on the same line as a "serial-cause:" comment naming the constraint.
-grep -nE -e '--test-threads[=[:space:]]*1([^0-9]|$)|RUST_TEST_THREADS[^0-9]*1([^0-9]|$)|#\[(serial_test::)?(file_)?serial([](]|$)' <files> | grep -v 'serial-cause:'
+grep -nE -e '--test-threads["'\'',=[:space:]]*1([^0-9]|$)|RUST_TEST_THREADS[^0-9]*1([^0-9]|$)|#\[(serial_test::)?(file_)?serial([](]|$)|--test-threads["'\'']?,?[[:space:]]*\\?$' <files> | grep -v 'serial-cause:'
 ```
 
 TypeScript with Vitest and Playwright:
@@ -712,7 +726,7 @@ TypeScript with Vitest and Playwright:
 ```sh
 # Scan: <runner-config>, <test-paths>, <check-scripts>, <workflow-files>
 # Message: Let independent work run side by side. A setting that must stay serial states its cause on the same line as a "serial-cause:" comment naming the constraint.
-grep -nE -e '(maxW|w)orkers:([^,]*[?:])?[[:space:]]*1([^0-9.]|$)|--(maxW|w)orkers[=[:space:]]*1([^0-9]|$)|fileParallelism:[[:space:]]*false|--no-file-parallelism|single(Thread|Fork):[[:space:]]*true|mode:[[:space:]]*.serial.|describe\.serial([^[:alnum:]_]|$)' <files> | grep -v 'serial-cause:'
+grep -nE -e '(maxW|w)orkers:([^,]*[?:])?[[:space:]]*["'\'']?1([^0-9.]|$)|(-j|--(maxW|w)orkers)["'\'',=[:space:]]*1([^0-9]|$)|--(maxW|w)orkers["'\'']?,?[[:space:]]*\\?$|fileParallelism:[[:space:]]*["'\'']?false|--fileParallelism=false|--no-file-parallelism|single(Thread|Fork):[[:space:]]*["'\'']?true|--[^[:space:]]*single(Thread|Fork)|mode:[[:space:]]*.serial.|describe\.serial([^[:alnum:]_]|$)' <files> | grep -v 'serial-cause:'
 ```
 
 The `workers` pattern also matches a worker count of one chosen by condition,
@@ -723,7 +737,7 @@ Shell check scripts and CI workflows:
 ```sh
 # Scan: <check-scripts>, <workflow-files>
 # Message: Let independent work run side by side. A setting that must stay serial states its cause on the same line as a "serial-cause:" comment naming the constraint.
-grep -nE -e 'max-parallel:[[:space:]]*1([^0-9]|$)|(-j[[:space:]]*|--jobs[=[:space:]]*)1([^0-9]|$)' <files> | grep -v 'serial-cause:'
+grep -nE -e 'max-parallel:[[:space:]]*["'\'']?1([^0-9]|$)|(-j|--jobs)["'\'',=[:space:]]*1([^0-9]|$)|--jobs["'\'']?,?[[:space:]]*\\?$' <files> | grep -v 'serial-cause:'
 ```
 
 Instance: a browser suite was forced to one worker; a single server on a fixed

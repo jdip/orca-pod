@@ -23,8 +23,8 @@ Standing instructions for each role are in [roles.md](roles.md).
 | **🗺️ PLN** `pln` | Draft substantive maps and specifications; plan complex execution within approved scope. | Claude · `claude-opus-5-5` · high | native | read-only | — |
 | **🛠️ WRK** `wrk` | Implement a bounded component or fix against explicit acceptance criteria. | Claude · `claude-opus-5-5` · high | orca | write-owned-files | Codex · `gpt-6.1-sol` · high: long-horizon batch run on Codex; REV and TST-proof then flip to Claude |
 | **🔍 REV** `rev` | Review correctness, regressions, security, and fidelity to the approved outcome, read-only. | Codex · `gpt-6.1-sol` · xhigh | orca | read-only | Claude · `claude-opus-5-5` · xhigh: the implementer ran on Codex (WRK on Codex, or SEC-WRK), or the spec drafter ran on Codex, or the map drafter ran on Codex |
-| **🔍 REV2** `rev2` | Independent second review in a fresh context, for high-risk changes only. | Claude · `claude-opus-5-5` · xhigh | orca | read-only | — |
-| **🧠 DSP** `dsp` | Resolve difficult technical ambiguity, root causes, and architectural tradeoffs, as two independent opinions. | Codex · `gpt-6-astra` · max **and** Claude · `claude-opus-5-5` · max | orca | read-only | — |
+| **🔍 REV2** `rev2` | Independent second review in a fresh context, for high-risk changes only. | Claude · `claude-fable-5-2` · high | orca | read-only | — |
+| **🧠 DSP** `dsp` | Resolve difficult technical ambiguity, root causes, and architectural tradeoffs, as two independent opinions. | Codex · `gpt-6-astra` · max **and** Claude · `claude-fable-5-2` · high | orca | read-only | — |
 | **🛡️ SEC** `sec` | Perform scoped, authorized defensive security analysis; security reviewer, proof owner or worker on the security path. | Codex · `gpt-5.6-sol` · xhigh, Daybreak Blue via `codex --profile orca-pod-sec` | orca (terminal) | read-only | — |
 | **🧰 OPS** `ops` | Diagnose systems and perform authorized operational changes. | Codex · `gpt-6.1-sol` · high | orca | write-owned-files | — |
 | **🧪 TST** `tst` | Reproduce behavior and verify changes with relevant checks and evidence. | Codex · `gpt-6.1-terra` · medium | orca | read-only | Codex · `gpt-6.1-sol` · medium: complex evidence-heavy verification |
@@ -197,6 +197,12 @@ Process every message in `result.messages` before acknowledging
 `result.deliveryId` with the next wait (`check --ack <delivery_id> --wait ...`).
 A timeout or empty result is a checkpoint, not a failure.
 
+When a wait times out or a worker stays quiet, read `observation.agentWait` from
+`worker-show`. A worker parked on a prompt only a human can answer is healthy:
+name the worker and its prompt to the human, then wait. The human answers it;
+the coordinator never approves it through `terminal send`, retries, relaunches
+or fails it. An absent `agentWait` means Orca did not look; `null` means no wait.
+
 **Answer, follow up, inspect, settle:**
 
 ```bash
@@ -291,7 +297,7 @@ Route an assignment to SEC when **any** trigger applies:
 
 | Mode | When | Assignment |
 | --- | --- | --- |
-| **SEC-REV** | Any trigger on a change someone else implemented | In addition to REV, read-only, owning the **Security** review axis: trust boundaries, attack paths validated against reachable behavior and existing controls, severity, remediation. For a pure security fix, SEC-REV may cover all three axes and REV becomes optional. |
+| **SEC-REV** | Any trigger on a change someone else implemented | In addition to REV, read-only, owning the **Security** review axis: trust boundaries, attack paths validated against reachable behavior and existing controls, severity, remediation. For a pure security fix, SEC-REV may cover all axes and REV becomes optional. |
 | **SEC-PROOF** | A security fix under `tdd` | SEC writes the failing proof, a reproduction test against the local code only. WRK (Opus 5.5) writes the fix against it, keeping proof and fix owners independent. |
 | **SEC-WRK** | The implementation is itself security-domain work, or WRK refused | SEC gets WRK's write authority for the assigned files only, in its own child worktree. REV flips to Claude Opus 5.5 xhigh. If Opus refuses that review, REV runs on Codex `gpt-6.1-sol` xhigh under standard safeguards (another model and session than SEC); report that exception. |
 
@@ -352,7 +358,7 @@ notice such as "This content can't be shown" where the result belongs, and no
    `orca terminal close --terminal <handle>`. If the turn may still be running
    or its state is unverifiable, keep the terminal and dispatch, and report
    them as retained.
-3. Route the targeted security re-review to REV2 (Claude Opus 5.5 xhigh) with
+3. Route the targeted security re-review to REV2 (Claude Fable 5.2 high) with
    the salvaged evidence, and report it as an exception.
 
 Every SEC brief asks for findings in defect-and-fix terms: the flaw, its
@@ -362,7 +368,7 @@ narratives.
 ## DSP dual opinion
 
 DSP is two independent specialists on one question: Codex `gpt-6-astra` max and
-Claude Opus 5.5 max.
+Claude Fable 5.2 high.
 
 1. Write one brief with the concrete question and evidence. Start both workers
    in the same wave, read-only, `--worktree current`, each with its own

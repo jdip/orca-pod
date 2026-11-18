@@ -39,6 +39,11 @@ there is an actual term or decision to record.
 - **Rollup**: an `orca/` branch, cut from fresh `origin/test`, that collects a
   spec's reviewed child PRs (each with targeted checks) before one final PR to
   `test` with full CI.
+- **Verification cost**: defined in the
+  [verification-cost catalog](../../skills/to-spec/review-lenses/verification-cost-standard.md#terms),
+  together with multiplier, expensive resource, run, named configuration,
+  privileged area, exempt path, rule upkeep and upstream report. The catalog's
+  run, one invocation of a check step, is not an Orca **Run**.
 
 ### Orca
 

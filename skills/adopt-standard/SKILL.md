@@ -137,6 +137,14 @@ source checks and available authorized behavioral checks, without fake
 infrastructure or recursive tooling tests. Report unexercised future-use scenarios
 as limits under the standard's closure policy.
 
+Apply the selected standard's Verification structure outcome in the same change,
+together with those two, and confirm that the repository's Verification structure
+paragraph agrees with the rules installed. Apply only what the selected revision
+holds: where it has no Verification structure section, add none of that
+structure, and the catalog's
+[before a repository upgrades](../to-spec/review-lenses/verification-cost-standard.md#before-a-repository-upgrades)
+keeps applying.
+
 The workflow is complete only when guidance and executable controls agree; an
 unresolved design, authorization or capability blocker keeps it explicitly
 incomplete. Record application coverage gaps in scoped, deduplicated tracker
@@ -171,8 +179,9 @@ delivery permits the next task without resolving non-blocking remediation first.
   Include initial Git branch setup when needed.
 - Implement: select or scaffold an application stack, coverage program, CI matrix
   or deployment environment only with explicit user authorization. Application
-  linting, type checking, validation and meaningful high coverage grow with actual
-  application development.
+  linting, type checking, validation and meaningful high coverage arrive with
+  actual application development, and verification structure arrives at the
+  points the selected standard names.
 - Decide and deliver: with no application, report that reality rather than
   inventing a deployment.
 

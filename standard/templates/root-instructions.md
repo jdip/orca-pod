@@ -12,7 +12,8 @@ do not publish a placeholder declaration or duplicate machine-level settings.
 - For domain terminology and decisions, use docs/agents/domain.md.
 - For implementation and verification, use docs/development.md for the actual
   environment, Application Code/Tooling classification, checks, and verification
-  evidence reuse.
+  evidence reuse. Read its Verification structure paragraph before writing a
+  test, fixture, wait, build step or CI job.
 
 ## Visibility and publication
 

@@ -727,7 +727,7 @@ TypeScript with Vitest and Playwright:
 ```sh
 # Scan: <runner-config>, <test-paths>, <check-scripts>, <workflow-files>
 # Message: Let independent work run side by side. A setting that must stay serial states its cause on the same line as a "serial-cause:" comment naming the constraint.
-grep -nE -e '(maxW|w)orkers["'\'']?:([^,]*[?:])?[[:space:]]*["'\'']?1([^0-9.]|$)|(-j|--(maxW|w)orkers)["'\'',=[:space:]]*1([^0-9]|$)|--(maxW|w)orkers["'\'']?,?[[:space:]]*\\?$|fileParallelism["'\'']?:[[:space:]]*["'\'']?false|--fileParallelism=false|--no-file-parallelism|single(Thread|Fork)["'\'']?:[[:space:]]*["'\'']?true|--[^[:space:]]*single(Thread|Fork)(=true)?([^[:alnum:]_=]|$)|mode["'\'']?:[[:space:]]*.serial.|describe\.serial([^[:alnum:]_]|$)' <files> | grep -v 'serial-cause:'
+grep -nE -e '(maxW|w)orkers["'\'']?:([^,]*[?:])?[[:space:]]*["'\'']?1([^0-9.]|$)|(-j|--(maxW|w)orkers)["'\'',=[:space:]]*1([^0-9]|$)|--(maxW|w)orkers["'\'']?,?[[:space:]]*\\?$|fileParallelism["'\'']?:[[:space:]]*["'\'']?false|--fileParallelism=false|--no-file-parallelism|single(Thread|Fork)["'\'']?:[[:space:]]*["'\'']?true|--(([^n[:space:]]|n[^o[:space:]]|no[^-[:space:]])[^[:space:]]*)?single(Thread|Fork)(=["'\'']?true)?([^[:alnum:]_=]|$)|mode["'\'']?:[[:space:]]*.serial.|describe\.serial([^[:alnum:]_]|$)' <files> | grep -v 'serial-cause:'
 ```
 
 The `workers` pattern also matches a worker count of one chosen by condition,

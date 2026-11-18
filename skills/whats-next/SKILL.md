@@ -30,6 +30,10 @@ while code work is active. Reuse a successful read within that pass; refresh at 
 next pass and after relevant remediation. Report disabled or inaccessible alert
 coverage separately from zero alerts. This read does not start maintenance edits.
 
+When this repository is Orca Pod, pull adopted repositories' reports into Orca
+Pod's tracker during ordinary discovery through
+[upstream reports](maintenance.md#upstream-reports).
+
 Read [selection scope and handoff](../select/SELECTIONS.md) whenever reading,
 selecting, resuming, forking, moving or handing off a map/backlog. Use the existing
 selector owners with the explicit scope/task binding; preserve each effort. A closed

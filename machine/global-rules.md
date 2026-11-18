@@ -232,10 +232,14 @@ independent work queued one after another. Before writing or reviewing a test,
 fixture, wait, build step or CI job, read the verification-cost catalog, the
 `to-spec` skill's `review-lenses/verification-cost-standard.md`, for its terms,
 named structure and per-pattern rules. In every repository, converted or not,
-new cases share what their run started and isolate by their own records,
-identities and credentials, and new test code adds no per-case start, wall-clock
-wait or forced-serial setting, and no new use of an existing one. A new case
-calling a helper or fixture that starts an instance for each case is a new use.
+a new case that asserts no start or stop shares what its run started and
+isolates by its own records, identities and credentials, and new test code adds
+no per-case start, wall-clock wait or forced-serial setting, and no new use of
+an existing one. The only exceptions are a lifecycle test that asserts a start
+or stop and cites the lifecycle state it asserts, a real-time test that waits
+out a clock no test can control and cites that clock, and a serial setting that
+states its cause beside it. A new case calling a helper or fixture that starts
+an instance for each case is a new use.
 Existing instances wait for that repository's Standards Upgrade or its own map;
 work that can be met only by adding to one returns to that repository's
 planning.

@@ -87,12 +87,13 @@ skips it. A map waiver means no panel.
 
 **Rounds.** Run each round under the
 [panel rules](../to-spec/review-lenses/panel.md) and `roster`'s **Review panel**,
-on the provider opposite the drafter: four personas in `MAP PASS` mode, each in
+on the provider opposite the drafter: five personas in `MAP PASS` mode, each in
 its own fresh session:
 [zoom out](../to-spec/review-lenses/zoom_out.md),
 [design critic](../to-spec/review-lenses/design_critic.md),
-[implementation readiness](../to-spec/review-lenses/implementation_readiness.md)
-and [comprehension](../to-spec/review-lenses/comprehension.md). The subject is the
+[implementation readiness](../to-spec/review-lenses/implementation_readiness.md),
+[comprehension](../to-spec/review-lenses/comprehension.md)
+and [verification cost](../to-spec/review-lenses/verification_cost.md). The subject is the
 repository SHA plus the inline draft. Its Decisions so far are the governing
 decisions, with the existing map's URL for a reopened map. Do not manufacture
 frontier detail to start a round.

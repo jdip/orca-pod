@@ -13,8 +13,8 @@ observable result, not its internal call sequence.
 Use native integration tests for contracts that depend on real protocol, database,
 permission or persistence semantics. A substitute does not prove those contracts.
 Keep the adapter real when testing its translation of the external protocol.
-Native service use and fresh-instance isolation are separate choices; use the
-[seam and fixture-lifetime guidance](SKILL.md#seams-where-tests-go).
+For how long a native service lives and how cases share it, use the
+[verification-cost catalog's start owner](../to-spec/review-lenses/verification-cost-standard.md#start-owner).
 
 ## Designing for Mockability
 

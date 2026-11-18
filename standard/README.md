@@ -380,17 +380,19 @@ The development guidance holds one Verification structure paragraph. It pairs
 each rule with what enforces it, and reads "none yet" for anything no test or
 check needs. Each change below updates that paragraph with what it installs.
 
-- **Greenfield with no stack.** The paragraph reads "Verification structure:
-  none yet". One source check of the repository's own fails when test files or a
-  test-runner configuration exist while that marker remains, and its message
+- Greenfield with no stack. The paragraph reads "Verification structure: none
+  yet". One source check of the repository's own fails when a test file or a
+  test runner's configuration exists while that marker remains, and its message
   names this section. It recognizes test files of any stack by their file and
-  directory names, and it also looks for the runner configuration files and
-  in-file test markers that the catalog's
+  directory names, and the test-runner configuration files and in-file test
+  markers that the catalog's
   [stanza conventions](../skills/to-spec/review-lenses/verification-cost-standard.md#stanza-conventions)
-  name. A change that brings in a stack this check would miss, including a stack
+  name for a language's test runner. The repository's check script and CI
+  workflows count as neither: every repository has them, with or without a
+  stack. A change that brings in a stack this check would miss, including a stack
   with no stanza, adds that stack's test names and runner configuration to the
   check before any test exists.
-- **A component's stack and first test runner.** The change that introduces them
+- A component's stack and first test runner. The change that introduces them
   installs the catalog's rules for that stack in its native lint configuration,
   with the exempt paths named, and makes the
   [lint stage](../skills/to-spec/review-lenses/verification-cost-standard.md#lint-stage)
@@ -398,7 +400,7 @@ check needs. Each change below updates that paragraph with what it installs.
   linter configuration and the lint step. Privileged paths are named in that
   configuration and created by the first test that needs them, so the change
   adds no empty test directories or placeholder files.
-- **The no-stanza path.** Where the catalog has no stanza for the stack, or the
+- The no-stanza path. Where the catalog has no stanza for the stack, or the
   stack's existing linter differs from the stanza's, the change that installs the
   rules writes the seed rules' bans in the stack's own linter, or as source-check
   lines where that linter cannot express one. It shows each rule firing once
@@ -407,14 +409,14 @@ check needs. Each change below updates that paragraph with what it installs.
   [upstream report](../skills/to-spec/review-lenses/verification-cost-standard.md#upstream-reports).
   Nothing is kept as a test. Adding a different linter needs the target's
   authorization under [languages and environments](#languages-and-environments).
-- **The first check that builds, installs or pulls** brings the
+- The first check that builds, installs or pulls brings the
   [reuse path](../skills/to-spec/review-lenses/verification-cost-standard.md#reuse-path)
   for its runner, or the recorded absence of one. The absence stays recorded
   with its cause until a later map revisits it.
-- **The second check step that does not depend on the first** brings
+- The second check step that does not depend on the first brings
   separately invocable check steps, each declaring what it depends on.
-- **The first test that needs the start owner, the wait helper or a privileged
-  test path** brings it.
+- The first test that needs the start owner, the wait helper or a privileged
+  test path brings it.
 
 The repository's map records two decisions at the map gate: the reuse path or
 why none is available, because a reuse path can need a credential, a registry or

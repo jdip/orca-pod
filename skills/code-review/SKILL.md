@@ -3,24 +3,25 @@ name: code-review
 description: Review a PR, branch, or working-tree diff against repository standards and the requested outcome, including delivery reviews and triggered security reviews.
 ---
 
-Two-axis review of the requested committed or working-tree changes:
+Review of the requested committed or working-tree changes, with each axis reported separately:
 
 - **Standards**: does the code conform to this repo's documented coding standards?
 - **Spec**: does the code faithfully implement the originating issue / spec?
+- **Verification cost**: does the change keep verification cost free of multipliers, as the [verification-cost catalog](../to-spec/review-lenses/verification-cost-standard.md) defines them?
 
-A third, triggered axis applies when the change crosses a trust boundary:
+A triggered axis applies when the change crosses a trust boundary:
 
 - **Security**: can the change be reached and abused across a trust boundary, and do existing controls hold? Owned by SEC-REV. When a provider content filter hides SEC-REV's result, follow the roster's [filter-blocked SEC](../roster/SKILL.md#filter-blocked-sec) rule.
 
-The primary agent selects reviewers per the `roster` skill (skills/roster/SKILL.md) after preparing the review packet below. This applies to explicit reviews and delivery reviews. An already assigned reviewer performs its axes directly and returns findings to the primary; it does not reroute or spawn reviewers. A single reviewer checks Standards and Spec unless assigned only one. Review is read-only: report fixes for the implementation owner.
+The primary agent selects reviewers per the `roster` skill (skills/roster/SKILL.md) after preparing the review packet below. This applies to explicit reviews and delivery reviews. An already assigned reviewer performs its axes directly and returns findings to the primary; it does not reroute or spawn reviewers. A single reviewer checks Standards, Spec and Verification cost unless assigned fewer. Review is read-only: report fixes for the implementation owner.
 
 ## Reviewers
 
 Take every role, model and effort from the roster; never select a model here.
 
-- **REV** reviews Standards and Spec on the other provider from the implementer. When the implementer ran on Codex (WRK on Codex, or SEC-WRK), use REV's Claude alternate.
+- **REV** reviews Standards, Spec and Verification cost on the other provider from the implementer. When the implementer ran on Codex (WRK on Codex, or SEC-WRK), use REV's Claude alternate.
 - **REV2** adds an independent second review, in a fresh context, only for high-risk changes. It runs on the provider the roster lists, which can be the implementer's, and never sees REV's findings.
-- **SEC-REV** owns the Security axis whenever a trigger below applies, in addition to REV. For a pure security fix, SEC-REV may cover all three axes and REV becomes optional.
+- **SEC-REV** owns the Security axis whenever a trigger below applies, in addition to REV. For a pure security fix, SEC-REV may cover all axes and REV becomes optional.
 
 Route to SEC-REV when the change touches authentication, sessions or authorization; secrets or credential handling; crypto; sandboxing or permissions; parsing untrusted input; installers or configuration writers that touch home directories; or network-exposed endpoints. Any other roster security-path trigger also applies: a security fix, CI/release credentials or supply chain, a reviewer's safeguard refusal, or the operator's request. Report every re-route.
 
@@ -34,7 +35,7 @@ orca orchestration worker-start --terminal <handle> --worktree <sel> --task-titl
 
 The receipt proves nothing about an adopted terminal's model: verify Daybreak from the Codex records and tear down as the roster describes.
 
-Give every reviewer the same **review packet**, written per the roster's brief: the exact repository and immutable comparison; the complete requested diff, including work in progress when applicable; requirements; applicable instructions; this skill's assigned axes and smell baseline; and verification evidence with its limits. A reviewer on another provider receives no other context, so name the source files and callers to inspect. Keep credentials and unrelated private material out of the packet.
+Give every reviewer the same **review packet**, written per the roster's brief: the exact repository and immutable comparison; the complete requested diff, including work in progress when applicable; requirements; applicable instructions; this skill's assigned axes and smell baseline; and verification evidence with its limits, including the check-run output whose run lines the Verification cost axis quotes. A reviewer on another provider receives no other context, so name the source files and callers to inspect. Keep credentials and unrelated private material out of the packet.
 
 Before publishing review comments or evidence, follow the target repository's
 applicable publication policy.
@@ -62,7 +63,7 @@ Anything in the repo that documents how code should be written, such as `CODING_
 On top of whatever the repo documents, the Standards axis always carries the **smell baseline** below: a fixed set of Fowler code smells (_Refactoring_, ch.3) that applies even when a repo documents nothing. Two rules bind it:
 
 - **The repo overrides.** A documented repo standard always wins; where it endorses something the baseline would flag, suppress the smell.
-- **Always a judgement call.** Each smell is a labelled heuristic ("possible Feature Envy"), never a hard violation. Like any standard here, skip anything tooling already enforces.
+- **Always a judgement call.** Each smell is a labelled heuristic ("possible Feature Envy"), never a hard violation. Like any standard here, skip anything tooling already enforces. The Verification cost axis still checks that an enforcing rule applies to the changed paths and that code was not moved behind an exempt helper or path.
 
 Each smell reads *what it is* → *how to fix*; match it against the diff:
 
@@ -88,17 +89,6 @@ as an exposure requiring investigation; a later review is not prevention.
 
 For **Standards**, report violations of documented rules with the source rule and exact changed location. Apply the smell baseline as a heuristic, distinguishing actionable problems from optional improvements. Trace relevant callers and downstream effects. Apply the repository's Application Code/Tooling classification; assess actual required checks and evidence rather than inventing additional test suites or coverage requirements.
 
-For changed tests or test setup, trace the cases through inherited fixtures and
-helpers to actual service startup, initialization and teardown. Distinguish needing
-native service behavior from needing a fresh instance per case. Flag a test that
-bootstraps and discards a stack for an assertion unrelated to that lifecycle when
-isolated state or a smaller behavioral boundary suffices. Cite the affected case
-and setup path, including implicit fixture scope. Preserve justified fresh instances
-for destructive/global-state or lifecycle cases; inspect their consumers before
-recommending reuse. Passing tests or coverage do not establish that the setup is
-necessary. Apply [TDD's boundary guidance](../tdd/SKILL.md#seams-where-tests-go)
-within this review, without starting a separate testing workflow.
-
 For changed CI, delivery or verification steps, and for adoption or upgrade
 changes, apply the target's verification policy and, where it declares a Repository
 Standard, that revision's Verification evidence and Validation and adoption
@@ -107,6 +97,30 @@ even when each child changes the tree; those checks must be targeted. Also flag 
 full suite repeated for an already verified integration context,
 evidence reuse without explicit context equivalence, and alignment that edits
 guidance while its workflows, CI, tests or fixtures still enforce the retired rule.
+
+For **Verification cost**, apply the
+[verification-cost catalog](../to-spec/review-lenses/verification-cost-standard.md):
+
+- **Applicability.** The axis applies by path: test code, fixtures, helpers,
+  fakes, runner or lint configuration, check or delivery scripts, build files the
+  checks use, and CI workflows. When the change touches none of them, report the
+  axis "not applicable" and name the paths that decided it.
+- **Questions.** Answer every one of the catalog's
+  [review questions](../to-spec/review-lenses/verification-cost-standard.md#review-questions)
+  yes or no, each with the file and line that decides it. Each "no" is a finding.
+- **Run lines.** Quote the run lines an answer relies on from the packet's
+  check-run output, the catalog's
+  [check-step output](../to-spec/review-lenses/verification-cost-standard.md#check-step-output).
+- **Marks.** Mark each finding as the Marks passage of the catalog's
+  [review questions](../to-spec/review-lenses/verification-cost-standard.md#review-questions)
+  defines. A rule candidate goes on through
+  [rule upkeep](../to-spec/review-lenses/verification-cost-standard.md#rule-upkeep),
+  and an upstream finding through an
+  [upstream report](../to-spec/review-lenses/verification-cost-standard.md#upstream-reports).
+- **Unconverted repositories.** Report a missing lint stage, privileged path or
+  start owner as "not yet converted", as
+  [before a repository upgrades](../to-spec/review-lenses/verification-cost-standard.md#before-a-repository-upgrades)
+  says.
 
 For **Spec**, identify missing or partial requirements, unrequested behavior, and incorrect implementations. Cite the supplied requirement and the changed location. Assess correctness, regressions, and relevant security implications within the requested scope; a triggered Security axis goes deeper.
 
@@ -121,16 +135,17 @@ When the primary splits the axes, give each reviewer the same review packet. Ass
 
 ### 5. Report
 
-Report Standards, Spec and any Security outcomes separately, with severity, exact file/line evidence, the concrete failure, and a focused correction for each actionable finding. State when an axis has no actionable findings or cannot be assessed. Distinguish review evidence from checks actually executed. Subsequent changes require review only of the changes and affected conclusions; completed evidence remains reusable where it still applies.
+Report Standards, Spec, Verification cost and any Security outcomes separately, with severity, exact file/line evidence, the concrete failure, and a focused correction for each actionable finding. State when an axis has no actionable findings, is not applicable or cannot be assessed. Distinguish review evidence from checks actually executed. Subsequent changes require review only of the changes and affected conclusions; completed evidence remains reusable where it still applies.
 
-## Why two axes
+## Why separate axes
 
-A change can pass one axis and fail the other:
+A change can pass one axis and fail another:
 
 - Code that follows every standard but implements the wrong thing → **Standards pass, Spec fail.**
 - Code that does exactly what the issue asked but breaks the project's conventions → **Spec pass, Standards fail.**
+- A test that follows the conventions and proves what the issue asked, but starts a stack for each case → **Standards and Spec pass, Verification cost fail.**
 
-Reporting them separately stops one axis from masking the other. Security is separate for the same reason: code can match the spec and the standards and still open an attack path.
+Reporting them separately stops one axis from masking another. Security is separate for the same reason: code can match the spec and the standards and still open an attack path.
 
 ## Attribution
 

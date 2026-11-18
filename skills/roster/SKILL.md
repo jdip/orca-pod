@@ -297,7 +297,7 @@ Route an assignment to SEC when **any** trigger applies:
 
 | Mode | When | Assignment |
 | --- | --- | --- |
-| **SEC-REV** | Any trigger on a change someone else implemented | In addition to REV, read-only, owning the **Security** review axis: trust boundaries, attack paths validated against reachable behavior and existing controls, severity, remediation. For a pure security fix, SEC-REV may cover all three axes and REV becomes optional. |
+| **SEC-REV** | Any trigger on a change someone else implemented | In addition to REV, read-only, owning the **Security** review axis: trust boundaries, attack paths validated against reachable behavior and existing controls, severity, remediation. For a pure security fix, SEC-REV may cover all axes and REV becomes optional. |
 | **SEC-PROOF** | A security fix under `tdd` | SEC writes the failing proof, a reproduction test against the local code only. WRK (Opus 5.5) writes the fix against it, keeping proof and fix owners independent. |
 | **SEC-WRK** | The implementation is itself security-domain work, or WRK refused | SEC gets WRK's write authority for the assigned files only, in its own child worktree. REV flips to Claude Opus 5.5 xhigh. If Opus refuses that review, REV runs on Codex `gpt-6.1-sol` xhigh under standard safeguards (another model and session than SEC); report that exception. |
 

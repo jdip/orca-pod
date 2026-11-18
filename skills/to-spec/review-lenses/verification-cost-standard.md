@@ -804,6 +804,18 @@ Rules:
 - R4. Does every changed setting that forces one-at-a-time execution state, on
   its own line, a cause that names a real constraint?
 
+Marks:
+
+- Mark a finding "rule candidate" when a primitive, import, setting or token
+  identifies its pattern, the identification condition of
+  [rule upkeep](#rule-upkeep).
+- Mark a finding "upstream" when its cause traces to Orca Pod text, a trigger
+  for an [upstream report](#upstream-reports).
+
+A finding can carry both marks or neither. The verification-cost persona and
+the verification-cost axis of [`code-review`](../../code-review/SKILL.md) mark
+their findings this way.
+
 ## Rule upkeep
 
 [`reflect`](../../reflect/SKILL.md) owns how a correction becomes enforcement,

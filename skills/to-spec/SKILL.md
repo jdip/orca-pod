@@ -118,14 +118,16 @@ panel under the [panel rules](review-lenses/panel.md):
    `createdAt`) and the child breakdown: each ticket's outcome, acceptance
    criteria, source links and blockers. Start the round per `roster`'s **Review
    panel**, on the provider opposite the drafter (PLN, or the primary for a
-   compact record): five personas in `SPEC REVIEW` mode, each in its own fresh
+   compact record): six personas in `SPEC REVIEW` mode, each in its own fresh
    session:
    - [fidelity and grounding](review-lenses/fidelity_and_grounding.md);
    - [zoom out](review-lenses/zoom_out.md) with its adapted
      [standard](review-lenses/zoom-out-standard.md);
    - [design critic](review-lenses/design_critic.md);
-   - [implementation readiness](review-lenses/implementation_readiness.md); and
-   - [comprehension](review-lenses/comprehension.md).
+   - [implementation readiness](review-lenses/implementation_readiness.md);
+   - [comprehension](review-lenses/comprehension.md); and
+   - [verification cost](review-lenses/verification_cost.md) with its
+     [catalog](review-lenses/verification-cost-standard.md).
 
    Each brief carries the map URL with its Destination, Decisions so far and Out
    of scope text, and the frozen parent and breakdown. The settled list and

@@ -1,6 +1,6 @@
 > Adapted from [`resources/document_standards/zoom-out-standard.md`](https://github.com/google/elephant-goldfish-model/blob/05f8984cb6e0077b072ba034f66d95ffdde200ee/resources/document_standards/zoom-out-standard.md) in `google/elephant-goldfish-model` at `05f8984cb6e0077b072ba034f66d95ffdde200ee`, licensed under the
 > Apache License 2.0 ([LICENSE](LICENSE)).
-> Modified by Orca Pod: added this provenance header; the standard text is unchanged.
+> Modified by Orca Pod: added this provenance header; the YAGNI, Premature Optimization and Pattern Consistency items amended to agree with the verification-cost catalog and persona.
 
 # Zoom Out Standard
 
@@ -33,9 +33,16 @@ implementation details.
 ## 2. Simplicity & Extensibility
 
 *   **YAGNI (You Aren't Gonna Need It)**: Reject abstractions, code paths, or
-    features built solely for speculative future requirements.
+    features built solely for speculative future requirements. The
+    [named structure](verification-cost-standard.md#named-structure) of the
+    verification-cost catalog, installed at the point it is first needed, is
+    not speculative; anything beyond that closed list still is.
 *   **Premature Optimization**: Avoid introducing complexity (caching, sharding,
-    async queues) before performance bottlenecks are proven.
+    async queues) before performance bottlenecks are proven. In verification,
+    caching, asynchronous work or side-by-side check steps that form the
+    catalog's reuse path or separately invocable check steps are not premature
+    optimization; verification cost is the
+    [verification-cost persona](verification_cost.md)'s lens.
 *   **Minimalist Data Flow**: Ensure data passes through the minimal number of
     components.
 *   **No Architectural Dead-Ends**: Use clean interfaces and boundaries to allow
@@ -58,6 +65,9 @@ implementation details.
     classes, or modules instead of reinventing them. Ensure the candidate for
     reuse is stable, maintained, and does not violate dependency boundaries.
 *   **Pattern Consistency**: Follow established design patterns in the codebase.
+    Where the nearest pattern is one the verification-cost catalog's
+    [rules](verification-cost-standard.md#rules) name as a multiplier, follow
+    the catalog's named structure instead of copying it.
 *   **Platform Standards**: Use established ecosystem frameworks and standard libraries
     instead of bespoke or ad-hoc custom solutions.
 *   **Identify Anti-Patterns**: Actively flag known anti-patterns

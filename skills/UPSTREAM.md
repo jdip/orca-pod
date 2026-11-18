@@ -69,7 +69,8 @@ License 2.0. Each directory keeps upstream's `LICENSE` verbatim; upstream has no
 `NOTICE` file at the pin. Each file opens with its upstream path, the pin, the
 license and Orca Pod's modifications. `brainstorm`'s map panel and `to-spec`'s
 spec panel load the review lenses; `brainstorm`'s rounds load the questioning
-methods.
+methods. `to-spec/review-lenses/verification-cost-standard.md` is original to Orca
+Pod, so it carries no upstream header and has no row below.
 
 | File | Upstream path |
 | --- | --- |

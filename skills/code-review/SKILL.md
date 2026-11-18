@@ -117,8 +117,8 @@ For **Verification cost**, apply the
   [rule upkeep](../to-spec/review-lenses/verification-cost-standard.md#rule-upkeep),
   and an upstream finding through an
   [upstream report](../to-spec/review-lenses/verification-cost-standard.md#upstream-reports).
-- **Unconverted repositories.** Report a missing lint stage, privileged path or
-  start owner as "not yet converted", as
+- **Unconverted repositories.** Report a missing structure item, such as the
+  lint stage, a privileged path or the start owner, as "not yet converted", as
   [before a repository upgrades](../to-spec/review-lenses/verification-cost-standard.md#before-a-repository-upgrades)
   says.
 

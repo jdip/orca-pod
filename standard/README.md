@@ -387,14 +387,17 @@ check needs. Each change below updates that paragraph with what it installs.
   directory names, and the test-runner configuration files and in-file test
   markers that the catalog's
   [stanza conventions](../skills/to-spec/review-lenses/verification-cost-standard.md#stanza-conventions)
-  name for a language's test runner. The repository's check script and CI
-  workflows count as neither: every repository has them, with or without a
-  stack. A change that brings in a stack this check would miss, including a stack
-  with no stanza, adds that stack's test names and runner configuration to the
-  check before any test exists.
+  name for a language's test runner. A package manifest among them, such as
+  `Cargo.toml`, `package.json`, `setup.cfg` or `pyproject.toml`, counts only
+  when it holds the runner's own table, key or script. The repository's check
+  script and CI workflows count as neither: every repository has them, with or
+  without a stack. A change that brings in a stack this check would miss,
+  including a stack with no stanza, adds that stack's test names and runner
+  configuration to the check before any test exists.
 - A component's stack and first test runner. The change that introduces them
   installs the catalog's rules for that stack in its native lint configuration,
-  with the exempt paths named, and makes the
+  and the catalog's rules for check scripts and workflow files, with the exempt
+  paths named, and makes the
   [lint stage](../skills/to-spec/review-lenses/verification-cost-standard.md#lint-stage)
   the first step of the check script. It adds only that configuration: the
   linter configuration and the lint step. Privileged paths are named in that

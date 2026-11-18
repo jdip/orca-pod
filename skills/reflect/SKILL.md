@@ -70,11 +70,11 @@ A verification-cost lesson whose cause traces to Orca Pod text, or that meets
 another trigger listed under the catalog's
 [upstream reports](../to-spec/review-lenses/verification-cost-standard.md#upstream-reports),
 goes upstream as a report instead: an issue in the originating repository, in
-that section's form, labelled `upstream:orca-pod`, which this session creates
-there when the repository lacks it. This write stays within the task's target
-repository. In Orca Pod itself the lesson is an ordinary Orca Pod issue. A
-lesson that is urgent or outside the form takes the route above, with
-per-report approval for its Orca Pod write. Other shared lessons keep that route.
+that section's form, labelled `upstream:orca-pod` as that section says. This
+write stays within the task's target repository. In Orca Pod itself the lesson
+is an ordinary Orca Pod issue. A lesson that is urgent or outside the form takes
+the route above, with per-report approval for its Orca Pod write. Other shared
+lessons keep that route.
 
 Apply an in-scope fix through the global Planning before implementation rule and
 existing review/delivery authority, reusing coverage; record its result in the

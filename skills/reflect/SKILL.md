@@ -30,11 +30,16 @@ bypassed or insufficient for this failure. Distinguish configured enforcement fr
 evidence that it actually ran. Repair or extend an existing mechanism where
 practical before proposing another. Keep this inspection scoped to the lesson.
 
-Classify the failure as mechanical or requiring judgment. Prefer deterministic
-enforcement for objectively detectable violations, such as banned APIs or fixed
-file/import patterns, when it earns its maintenance cost; otherwise improve the
-owning guidance or review criteria. Keep contextual choices there as well. For a
-mixed failure, separate what a check can enforce from the judgment that remains.
+Classify the failure as mechanical or requiring judgment. For any correction,
+take the earliest remedy in this order that prevents it: remove the mistake by
+design; then make it fail in types, lint or CI; then in tests; prose last. An
+objectively detectable violation, such as a banned API or a fixed file or import
+pattern, gets deterministic enforcement. The owning guidance or review criteria
+carry only what the earlier remedies cannot prevent, and contextual choices. For
+a mixed failure, separate what a check can enforce from the judgment that
+remains. A verification-cost rule candidate also meets the admission
+conditions in the verification-cost catalog's
+[rule upkeep](../to-spec/review-lenses/verification-cost-standard.md#rule-upkeep).
 
 Keep repository-specific lessons with the repository. Route reusable shared-skill
 or Machine Profile improvements to their maintained source, not installed copies.
@@ -61,6 +66,16 @@ Record a justified local-only disposition when shared adaptation is unwarranted.
 Shared policy changes still require their applicable review, approval and normal
 distribution; intake does not authorize editing installed copies.
 
+A verification-cost lesson whose cause traces to Orca Pod text, or that meets
+another trigger listed under the catalog's
+[upstream reports](../to-spec/review-lenses/verification-cost-standard.md#upstream-reports),
+goes upstream as a report instead: an issue in the originating repository, in
+that section's form, labelled `upstream:orca-pod` as that section says. This
+write stays within the task's target repository. In Orca Pod itself the lesson
+is an ordinary Orca Pod issue. A lesson that is urgent or outside the form takes
+the route above, with per-report approval for its Orca Pod write. Other shared
+lessons keep that route.
+
 Apply an in-scope fix through the global Planning before implementation rule and
 existing review/delivery authority, reusing coverage; record its result in the
 issue. Analysis and lesson filing can inform that planning before
@@ -71,7 +86,9 @@ missing approval with concrete proposed changes; reuse consent already supplied.
 For an approved mechanical remedy, exercise the motivating violation and valid
 neighboring behavior through the required native invocation, respecting local
 verification classification. Record its command, revision, observed result and
-limits; configured enforcement alone does not establish execution. For a mixed or
+limits; configured enforcement alone does not establish execution. Its error
+names what to use instead, and the same command runs it locally and in CI.
+Retire the rule once its mistake can no longer happen. For a mixed or
 judgment lesson, justify the residual rule and keep it with the relevant context.
 Validate other approved changes against the motivating incident with the evidence
 available now. Report future-dependent benefit as a verification limit after

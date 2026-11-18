@@ -1,15 +1,17 @@
 > Adapted from [`skills/egm-review-loop/SKILL.md`](https://github.com/google/elephant-goldfish-model/blob/05f8984cb6e0077b072ba034f66d95ffdde200ee/skills/egm-review-loop/SKILL.md), [`skills/egm-resolve/SKILL.md`](https://github.com/google/elephant-goldfish-model/blob/05f8984cb6e0077b072ba034f66d95ffdde200ee/skills/egm-resolve/SKILL.md) and [`agents/synthesizer.md`](https://github.com/google/elephant-goldfish-model/blob/05f8984cb6e0077b072ba034f66d95ffdde200ee/agents/synthesizer.md) in `google/elephant-goldfish-model` at `05f8984cb6e0077b072ba034f66d95ffdde200ee`, licensed under the
 > Apache License 2.0 ([LICENSE](LICENSE)).
-> Modified by Orca Pod: upstream YAML frontmatter, harness setup and interactive intake removed; the three sources merged into one rule set for Orca Pod's map panel and spec panel; role names (Goldfish to a fresh cross-provider REV per persona, Elephant to coordinator ORC); the nested synthesizer, report files and per-round human gates replaced by direct ORC synthesis and one tracker comment per round; the target file and line range mapped to a frozen subject; dispositions extended with a decision impact, settlement by a recorded decision and return to the map; A/B sampling limited to an explicit high-risk designation.
+> Modified by Orca Pod: upstream YAML frontmatter, harness setup and interactive intake removed; the three sources merged into one rule set for Orca Pod's map panel and spec panel; role names (Goldfish to a fresh cross-provider REV per persona, Elephant to coordinator ORC); the nested synthesizer, report files and per-round human gates replaced by direct ORC synthesis and one tracker comment per round; the target file and line range mapped to a frozen subject; dispositions extended with a decision impact, settlement by a recorded decision and return to the map; A/B sampling limited to an explicit high-risk designation; the verification-cost persona added to every round of both panels, with its "not applicable" report counted as a completed persona; a running loop kept on the persona set it started with.
 
 # Review panel rules
 
 A **panel** reviews one frozen draft through isolated personas: one fresh REV
 session per persona, in parallel, each applying only its persona file, mode and
-`Lens:` line. The **map panel** runs four lenses in `MAP PASS` mode on a drafted
-map. The **spec panel** runs five personas in `SPEC REVIEW` mode on a
-specification parent and its child breakdown. The owning skill decides when a
-panel runs and what its result unlocks; `roster`'s **Review panel** section owns
+`Lens:` line. The **map panel** runs five lenses in `MAP PASS` mode on a drafted
+map. The **spec panel** runs six personas in `SPEC REVIEW` mode on a
+specification parent and its child breakdown. The
+[verification-cost](verification_cost.md) persona runs in every round of both
+panels and decides its own applicability. The owning skill decides when a panel
+runs and what its result unlocks; `roster`'s **Review panel** section owns
 dispatch. These rules govern every round of both panels.
 
 ## Reviewer contract
@@ -50,9 +52,11 @@ the round again on the new text.
 
 A persona is **not run** when its report is missing, its required reads are
 incomplete, or its receipt-verified model or effort differs from the assignment.
-Never count it as a reviewer with zero findings. A not-run persona gets one
-retry on the same assignment, launched only after the earlier attempt is settled
-or stopped. A persona still not run after its retry stays not run for the round.
+Never count it as a reviewer with zero findings. A persona's "not applicable"
+report, with its required reads and what decided it, is a completed persona.
+A not-run persona gets one retry on the same assignment, launched only after the
+earlier attempt is settled or stopped. A persona still not run after its retry
+stays not run for the round.
 
 **A/B sampling** runs only on the operator's explicit high-risk designation: two
 fresh sessions of a persona, and the persona completes only when both do.
@@ -126,6 +130,10 @@ rare even when the draft improves:
   recorded administrative edit under the
   [freshness rule](../SKILL.md#review-the-draft-against-the-map).
 - **Cap:** 5 rounds per loop.
+- **Persona set:** a loop keeps the persona set it started with until it
+  converges or restarts; a loop that starts after a host installation changes
+  the set uses the new set. Rounds under different persona sets never count
+  toward one convergence.
 - **Churn:** a new finding is at the scope of an applied fix, and reverting that
   fix would resolve it.
 

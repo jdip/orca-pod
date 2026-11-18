@@ -116,6 +116,16 @@ variants, compatibility shadows, speculative frameworks, process ledgers, or
 resumable orchestration machinery. Tooling handles the ordinary path and returns
 clear failures for the supervising agent to investigate.
 
+In verification, smallness is judged by repetition: a mechanism that repeats
+expensive work per case, per elapsed second, per run or per queued step is not
+the smallest implementation. This covers the four verification-cost patterns
+and expensive resources as the catalog named under Validation and delivery
+defines them. Case data and cheap in-process objects stay per case, and outside
+verification the paragraph above applies unchanged. Deciding verification
+structure before a component's first test is design, not a speculative
+framework. The catalog's named structure is a closed list; anything beyond it
+is still a speculative framework.
+
 Follow the repository's approved language and environment choices for each
 component. Adding a programming language, runtime, build/package toolchain, or
 execution/deployment environment requires explicit user authorization, including
@@ -210,6 +220,31 @@ proportionate checks: focused source checks plus the behavioral evidence
 available now, such as a practical native invocation of the changed operation or
 live configuration readback. Do not create tooling coverage suites, fake
 infrastructure, or tests of tests. Inspect rendered results for visual behavior.
+
+Verification cost has no multipliers: a run does each distinct piece of
+expensive work once, waits only for conditions, and queues nothing behind work
+it does not depend on. A component's first fixture, wait, build step and job is
+the template later work copies, so decide its structure before writing it. The
+four patterns to design out are per-case starts, where each test case starts an
+expensive resource such as an application, a container, a database or a browser;
+wall-clock waits; builds and installs that repeat or are not reused; and
+independent work queued one after another. Before writing or reviewing a test,
+fixture, wait, build step or CI job, read the verification-cost catalog, the
+`to-spec` skill's `review-lenses/verification-cost-standard.md`, for its terms,
+named structure and per-pattern rules. In every repository, converted or not,
+a new case that asserts no start or stop shares what its run started and
+isolates by its own records, identities and credentials, and new test code adds
+no per-case start, wall-clock wait or forced-serial setting, and no new use of
+an existing one. The only exceptions are that a lifecycle test may start and
+stop an instance and may wait, and cites the lifecycle state it asserts; a
+real-time test may wait out a clock no test can control, cites that clock and
+starts nothing; and any test may hold a setting that forces serial execution
+when that setting states its cause beside it. Nothing else is excepted. A new
+case calling a helper or fixture that starts an instance for each case is a new
+use.
+Existing instances wait for that repository's Standards Upgrade or its own map;
+work that can be met only by adding to one returns to that repository's
+planning.
 
 Investigate the earliest causal failure; do not blindly retry or weaken checks.
 Stop verification after relevant checks pass unless changes or unresolved evidence

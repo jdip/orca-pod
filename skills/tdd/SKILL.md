@@ -75,14 +75,14 @@ the real transport or service when its semantics are part of the assertion.
 
 Select seams from the approved behavior, supplied acceptance criteria, and established public interfaces. State the boundary under test and proceed within that scope; prior approval does not need a second seam-confirmation round. Ask only when choosing a boundary would settle an unresolved interface or scope decision. Complete independent inspection before presenting that decision.
 
-For tests needing real services, separate service lifetime from test-state
-isolation. Let the suite or worker reuse service processes while each case gets
-isolated records, identities and fresh consumable credentials. Use fresh instances
-for lifecycle assertions or global state that cannot be reliably isolated. Trace
-inherited fixtures and helpers before reuse: requesting test data should not also
-bootstrap a stack unless the case needs that lifecycle. Inspect destructive callers
-and credential consumption before broadening fixture scope; a scope change alone
-does not establish isolation.
+A test that needs an expensive resource gets the running instance from the
+repository's start owner, and each case isolates by its own records, identities
+and credentials. Only lifecycle tests start an instance, and every wait ends when
+its condition holds. The
+[verification-cost catalog](../to-spec/review-lenses/verification-cost-standard.md#named-structure)
+names this structure and the rules that enforce it. Where the repository has no
+start owner yet, follow the catalog's
+[before a repository upgrades](../to-spec/review-lenses/verification-cost-standard.md#before-a-repository-upgrades).
 
 When the interface itself is in question, read the available `codebase-design` skill for the module, interface, depth, seam, adapter, leverage and locality vocabulary. Use it as a reference, not a new planning session.
 
